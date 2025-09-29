@@ -175,7 +175,7 @@ graph LR
     
     subgraph "⚡ FlashBank Integration"
         INTERFACE[Implement IL2FlashLoan]
-        CALLBACK[executeFlashLoan() Function]
+        CALLBACK[executeFlashLoan Function]
         REPAY[Ensure Repayment Logic]
     end
     
@@ -237,7 +237,7 @@ graph TD
     end
     
     subgraph "💰 Profit Calculation"
-        FEE[Calculate Fee (0.05%)]
+        FEE[Calculate Fee 0.02%]
         TOTAL[Total Profit Earned]
         SPLIT[Split by Deposit Ratio]
         UPDATE[Update User Balances]

@@ -36,7 +36,7 @@ FlashBank is a revolutionary flash loan network where **your ETH never permanent
 - **Withdraw anytime** when no flash loans are active
 
 ### **For MEV Bots**
-- **44% cost savings** vs Aave (0.05% vs 0.09% fees)
+- **78% cost savings** vs Aave (0.02% vs 0.09% fees)
 - **Zero upfront capital** required
 - **Instant execution** - no waiting for liquidity
 - **Higher profits** due to lower costs
@@ -48,12 +48,12 @@ Traditional Aave Flash Loan (100 ETH):
 - Your cost: $360
 
 FlashBank Flash Loan (100 ETH):  
-- Fee: 0.05% = $200
-- Your savings: $160 per loan!
+- Fee: 0.02% = $80
+- Your savings: $280 per loan!
 
 For depositors with $10K deposited:
-- One daily 100 ETH flash loan = $140 profit
-- Annual return: $51,100 = 511% APY!
+- One daily 100 ETH flash loan = $70 profit
+- Annual return: $25,550 = 256% APY!
 ```
 
 ---
@@ -121,7 +121,7 @@ Visit [flashbank.net](https://flashbank.net) for the user-friendly interface:
 | Total Deposits | 0 ETH (just launched!) |
 | Total Profits Generated | 0 ETH |
 | Number of Depositors | 0 |
-| Flash Loan Fee | 0.05% |
+| Flash Loan Fee | 0.02% |
 | Maximum Fee (hardcoded) | 10% |
 | Contract Age | Live since Sept 2025 |
 

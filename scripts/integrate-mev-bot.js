@@ -5,7 +5,7 @@ const { ethers } = require("hardhat");
  * This script helps migrate from Aave flash loans to our zero-fee L2 network
  */
 async function main() {
-  console.log("🔗 Integrating L2 Flash Pool with MEV Bot...");
+  console.log("🔗 Setting up FlashBank for MEV bot integration...");
   
   const [deployer] = await ethers.getSigners();
   console.log("🔑 Using account:", deployer.address);
@@ -14,7 +14,7 @@ async function main() {
   
   const L2_FLASH_POOL_ADDRESS = process.env.L2_FLASH_POOL_ADDRESS;
   const MEV_RECEIVER_ADDRESS = process.env.MEV_RECEIVER_ADDRESS;
-  const MEV_BOT_EXECUTOR_ADDRESS = process.env.MEV_BOT_EXECUTOR_ADDRESS;
+  // FlashBank operates as a standalone pool - no separate MEV executor needed
   
   if (!L2_FLASH_POOL_ADDRESS || !MEV_RECEIVER_ADDRESS) {
     console.error("❌ Missing required addresses in .env file");
@@ -35,22 +35,11 @@ async function main() {
   console.log("✅ L2FlashPool connected:", L2_FLASH_POOL_ADDRESS);
   console.log("✅ MEVReceiver connected:", MEV_RECEIVER_ADDRESS);
   
-  // ============ CONFIGURE MEV RECEIVER ============
+  // ============ FLASHBANK READY ============
   
-  if (MEV_BOT_EXECUTOR_ADDRESS && MEV_BOT_EXECUTOR_ADDRESS !== "0x0000000000000000000000000000000000000000") {
-    console.log("\n🤖 Configuring MEV Bot Executor...");
-    
-    const currentExecutor = await mevReceiver.mevBotExecutor();
-    if (currentExecutor === ethers.ZeroAddress) {
-      console.log("📝 Setting MEVBotExecutor address...");
-      await mevReceiver.setMEVBotExecutor(MEV_BOT_EXECUTOR_ADDRESS);
-      console.log("✅ MEVBotExecutor set to:", MEV_BOT_EXECUTOR_ADDRESS);
-    } else {
-      console.log("ℹ️ MEVBotExecutor already set:", currentExecutor);
-    }
-  } else {
-    console.log("⚠️ MEV_BOT_EXECUTOR_ADDRESS not set - configure manually later");
-  }
+  console.log("\n🎉 FlashBank is ready for direct MEV bot integration!");
+  console.log("💡 MEV bots can call flashLoan() directly on the pool contract");
+  console.log("📋 No separate MEV executor needed - FlashBank is self-contained");
   
   // ============ ADD INITIAL LIQUIDITY ============
   
@@ -125,12 +114,7 @@ await l2FlashPool.flashLoan(
   console.log("1. ✅ L2 Flash Pool deployed and configured");
   console.log("2. ✅ MEV Receiver ready for integration");
   
-  if (!MEV_BOT_EXECUTOR_ADDRESS || MEV_BOT_EXECUTOR_ADDRESS === "0x0000000000000000000000000000000000000000") {
-    console.log("3. ⏳ Set MEVBotExecutor address:");
-    console.log(`   await mevReceiver.setMEVBotExecutor("YOUR_MEV_BOT_ADDRESS");`);
-  } else {
-    console.log("3. ✅ MEVBotExecutor configured");
-  }
+  console.log("3. ✅ FlashBank ready for direct integration");
   
   console.log("4. 💰 Add liquidity to enable flash loans:");
   console.log(`   await l2FlashPool.deposit({ value: ethers.parseEther("50") });`);

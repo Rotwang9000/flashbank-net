@@ -13,12 +13,12 @@ async function main() {
   console.log("\n🔒 Deploying L2FlashPoolImmutable (NON-UPGRADEABLE)...");
   const L2FlashPoolImmutable = await ethers.getContractFactory("L2FlashPoolImmutable");
   
-  const flashLoanFeeRate = 5; // 0.05% fee (5 basis points)
+  const flashLoanFeeRate = 2; // 0.02% fee (2 basis points) - Ultra-competitive!
   
   // Deploy WITHOUT proxy - truly immutable!
   const l2FlashPool = await L2FlashPoolImmutable.deploy(
     await deployer.getAddress(), // owner
-    flashLoanFeeRate   // 0.05% fee
+    flashLoanFeeRate   // 0.02% fee
   );
   
   await l2FlashPool.waitForDeployment();

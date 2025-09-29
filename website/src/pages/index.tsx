@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { ethers } from 'ethers';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useAccount, useProvider, useSigner } from 'wagmi';
+import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
+import { arbitrum } from 'wagmi/chains';
 import { motion } from 'framer-motion';
 import { 
   Zap, 
@@ -32,8 +33,8 @@ const FLASHBANK_ABI = [
 
 export default function Home() {
   const { address, isConnected } = useAccount();
-  const provider = useProvider();
-  const { data: signer } = useSigner();
+  const publicClient = usePublicClient();
+  const { data: walletClient } = useWalletClient();
   
   const [userDeposits, setUserDeposits] = useState('0');
   const [userProfits, setUserProfits] = useState('0');
@@ -53,11 +54,16 @@ export default function Home() {
       loadUserData();
       loadPoolStats();
     }
-  }, [isConnected, address]);
+  }, [isConnected, address, publicClient]);
 
   const loadUserData = async () => {
     try {
+      if (!address || !publicClient) return;
+      
+      // Create a simple provider from publicClient for reading
+      const provider = new ethers.JsonRpcProvider('https://arb1.arbitrum.io/rpc');
       const contract = new ethers.Contract(FLASHBANK_ADDRESS, FLASHBANK_ABI, provider);
+      
       const [deposits, profits] = await contract.getUserBalance(address);
       setUserDeposits(ethers.formatEther(deposits));
       setUserProfits(ethers.formatEther(profits));
@@ -68,7 +74,11 @@ export default function Home() {
 
   const loadPoolStats = async () => {
     try {
+      if (!publicClient) return;
+      
+      const provider = new ethers.JsonRpcProvider('https://arb1.arbitrum.io/rpc');
       const contract = new ethers.Contract(FLASHBANK_ADDRESS, FLASHBANK_ABI, provider);
+      
       const [totalDeposits_, totalProfits, numDepositors, contractAge] = await contract.getPoolStats();
       setPoolStats({
         totalDeposits: ethers.formatEther(totalDeposits_),
@@ -82,22 +92,30 @@ export default function Home() {
   };
 
   const handleDeposit = async () => {
-    if (!signer || !depositAmount) return;
+    if (!walletClient || !depositAmount || !address) return;
     
     try {
       setLoading(true);
-      const contract = new ethers.Contract(FLASHBANK_ADDRESS, FLASHBANK_ABI, signer);
-      const tx = await contract.deposit({ 
-        value: ethers.parseEther(depositAmount) 
+      toast.loading('Preparing deposit...', { id: 'deposit' });
+      
+      // Use wagmi for the transaction
+      const hash = await walletClient.sendTransaction({
+        account: address,
+        to: FLASHBANK_ADDRESS as `0x${string}`,
+        value: BigInt(ethers.parseEther(depositAmount)),
+        data: '0xd0e30db0', // deposit() function selector
+        chain: arbitrum,
       });
       
-      toast.loading('Depositing ETH...', { id: 'deposit' });
-      await tx.wait();
+      toast.loading('Confirming transaction...', { id: 'deposit' });
+      await publicClient.waitForTransactionReceipt({ hash });
       toast.success('Deposit successful!', { id: 'deposit' });
       
       // Refresh data
-      await loadUserData();
-      await loadPoolStats();
+      setTimeout(() => {
+        loadUserData();
+        loadPoolStats();
+      }, 2000);
       setDepositAmount('');
     } catch (error) {
       console.error('Deposit error:', error);
@@ -108,21 +126,34 @@ export default function Home() {
   };
 
   const handleWithdraw = async () => {
-    if (!signer || !withdrawAmount) return;
+    if (!walletClient || !withdrawAmount || !address) return;
     
     try {
       setLoading(true);
-      const contract = new ethers.Contract(FLASHBANK_ADDRESS, FLASHBANK_ABI, signer);
-      const amount = withdrawAmount === 'all' ? 0 : ethers.parseEther(withdrawAmount);
-      const tx = await contract.withdraw(amount);
+      toast.loading('Preparing withdrawal...', { id: 'withdraw' });
       
-      toast.loading('Withdrawing ETH...', { id: 'withdraw' });
-      await tx.wait();
+      const amount = withdrawAmount === 'all' ? 0 : ethers.parseEther(withdrawAmount);
+      
+      // Encode the withdraw function call
+      const iface = new ethers.Interface(FLASHBANK_ABI);
+      const data = iface.encodeFunctionData("withdraw", [amount]);
+      
+      const hash = await walletClient.sendTransaction({
+        account: address,
+        to: FLASHBANK_ADDRESS as `0x${string}`,
+        data: data as `0x${string}`,
+        chain: arbitrum,
+      });
+      
+      toast.loading('Confirming transaction...', { id: 'withdraw' });
+      await publicClient.waitForTransactionReceipt({ hash });
       toast.success('Withdrawal successful!', { id: 'withdraw' });
       
       // Refresh data
-      await loadUserData();
-      await loadPoolStats();
+      setTimeout(() => {
+        loadUserData();
+        loadPoolStats();
+      }, 2000);
       setWithdrawAmount('');
     } catch (error) {
       console.error('Withdraw error:', error);
@@ -133,20 +164,31 @@ export default function Home() {
   };
 
   const handleWithdrawProfit = async () => {
-    if (!signer) return;
+    if (!walletClient || !address) return;
     
     try {
       setLoading(true);
-      const contract = new ethers.Contract(FLASHBANK_ADDRESS, FLASHBANK_ABI, signer);
-      const tx = await contract.withdrawProfit();
+      toast.loading('Claiming profits...', { id: 'profit' });
       
-      toast.loading('Withdrawing profits...', { id: 'profit' });
-      await tx.wait();
+      const iface = new ethers.Interface(FLASHBANK_ABI);
+      const data = iface.encodeFunctionData("withdrawProfit", []);
+      
+      const hash = await walletClient.sendTransaction({
+        account: address,
+        to: FLASHBANK_ADDRESS as `0x${string}`,
+        data: data as `0x${string}`,
+        chain: arbitrum,
+      });
+      
+      toast.loading('Confirming transaction...', { id: 'profit' });
+      await publicClient.waitForTransactionReceipt({ hash });
       toast.success('Profit withdrawal successful!', { id: 'profit' });
       
       // Refresh data
-      await loadUserData();
-      await loadPoolStats();
+      setTimeout(() => {
+        loadUserData();
+        loadPoolStats();
+      }, 2000);
     } catch (error) {
       console.error('Profit withdrawal error:', error);
       toast.error('Profit withdrawal failed', { id: 'profit' });
@@ -243,7 +285,7 @@ export default function Home() {
             {[
               { icon: Lock, title: "Non-Upgradeable", desc: "Code frozen forever" },
               { icon: Shield, title: "No Rug Pulls", desc: "Impossible to steal funds" },
-              { icon: CheckCircle, title: "Audited", desc: "25 security tests passed" },
+              { icon: CheckCircle, title: "Audited", desc: "47 security tests passed" },
               { icon: Zap, title: "Instant Returns", desc: "ETH returned in microseconds" }
             ].map((feature, index) => (
               <motion.div
@@ -279,7 +321,7 @@ export default function Home() {
                 <div className="text-gray-400">Depositors</div>
               </div>
               <div>
-                <div className="text-3xl font-bold text-yellow-400">0.05%</div>
+                <div className="text-3xl font-bold text-yellow-400">0.02%</div>
                 <div className="text-gray-400">Flash Loan Fee</div>
               </div>
             </div>

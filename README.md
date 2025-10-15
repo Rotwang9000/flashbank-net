@@ -2,12 +2,22 @@
 
 **The world's first IMMUTABLE flash loan network where your ETH never leaves your wallet**
 
-🌐 **Website**: [flashbank.net](https://flashbank.net)  
+## 🚀 Deployment Status (October 15, 2025)
+
+| Network | Status | Contract Address | Verified |
+|---------|--------|------------------|----------|
+| **Arbitrum** | ✅ Live | `0x5c0156da501BC97DD35017Fb20624B7f1Ce7E095` | ✅ Yes |
+| **Base** | ✅ Live | `0xBDcC71d5F73962d017756A04919FBba9d30F0795` | ⚠️ Manual needed |
+| **Ethereum** | ⏳ Pending | TBD | - |
+| **Website** | ⏳ Ready to deploy | `npm run deploy` | - |
+
+📋 **Detailed Status**: See [STATUS_SUMMARY.md](STATUS_SUMMARY.md) and [DEPLOYMENT_STATUS.md](DEPLOYMENT_STATUS.md)
+
+🌐 **Website**: [flashbank.net](https://flashbank.net) *(deploying soon)*  
 📚 **Docs**: [docs.flashbank.net](https://docs.flashbank.net)  
 💡 **How It Works**: [Flash Loan Concept Guide](FLASH_LOAN_CONCEPT.md)  
 🔧 **Correct Design**: [Revolutionary Architecture](CORRECT_ARCHITECTURE.md) ⚠️ **READ THIS FIRST**  
-🏊 **Current Pool**: [Pool Mechanics](POOL_MECHANICS.md) *(needs fixing)*  
-🔗 **Contract**: `0x5c0156da501BC97DD35017Fb20624B7f1Ce7E095` (Arbitrum)
+🏊 **Current Pool**: [Pool Mechanics](POOL_MECHANICS.md) *(needs fixing)*
 
 ---
 
@@ -17,11 +27,11 @@ FlashBank is a **revolutionary just-in-time flash loan network** where **your ET
 
 ### 🔥 **The Revolutionary Innovation**
 
-1. **🏦 Approval System**: You "approve" the contract to use your ETH (like ERC20 approvals)
-2. **💰 ETH Stays in Your Wallet**: Your funds remain in your wallet, earning elsewhere
-3. **⚡ Just-in-Time Liquidity**: Contract pulls ETH only when flash loan executes
-4. **🎯 Closest Match Selection**: Pulls from accounts with ETH closest to loan size
-5. **🎰 Lottery Profit System**: Only ETH that gets lent receives profits (no free-riding)
+1. **🏦 Approval System**: You approve FlashBank to temporarily use your ETH (stays in wallet)
+2. **💰 Capital Efficiency**: Your ETH can earn yield elsewhere while participating
+3. **⚡ Just-in-Time Liquidity**: Contract pulls ETH only when needed for flash loans
+4. **🎯 Closest Match Selection**: Pulls from accounts with ETH amounts closest to loan size
+5. **🎰 Fair Profit Distribution**: Only ETH that gets lent receives profits
 6. **🔄 Automatic Return**: ETH automatically returned to your wallet after flash loan
 
 ### 🚀 **Why This Changes Everything**
@@ -31,7 +41,7 @@ FlashBank is a **revolutionary just-in-time flash loan network** where **your ET
 | ETH locked in contract 24/7 | ETH stays in your wallet |
 | Permanent counterparty risk | Microsecond risk only |
 | Capital inefficiency | Maximum capital efficiency |
-| Proportional free-riding | Lottery profit system (no free-riding) |
+| Proportional free-riding | Fair lottery system (no free-riding) |
 | Manual commitments | Automatic balance checking |
 | Single-point-of-failure | Distributed just-in-time liquidity |
 | Must trust protocol | Trust only smart contract logic |
@@ -61,41 +71,49 @@ FlashBank is a **revolutionary just-in-time flash loan network** where **your ET
 
 ## 💰 Economics
 
-### **For Depositors**
-- **Earn 50-500% APY** from MEV flash loan fees
-- **Zero permanent risk** - ETH only at risk for microseconds
-- **Instant profit sharing** - earn from every successful flash loan
-- **Withdraw anytime** when no flash loans are active
+### **For ETH Holders (Lenders)**
+- **Earn from flash loan fees** - Get paid when your ETH is used for flash loans
+- **Zero permanent risk** - ETH only at risk during flash loan execution
+- **Capital efficiency** - Your ETH can earn elsewhere while participating
+- **Full control** - Pause, resume, or adjust participation anytime
 
-### **For MEV Bots**
-- **78% cost savings** vs Aave (0.02% vs 0.09% fees)
-- **Zero upfront capital** required
-- **Instant execution** - no waiting for liquidity
-- **Higher profits** due to lower costs
+### **For MEV Traders (Borrowers)**
+- **Lower borrowing costs** - Competitive fees compared to traditional protocols
+- **No capital required** - Access flash loans through committed liquidity
+- **Immutable security** - Contract cannot be changed or rug-pulled
+- **Reliable execution** - Trustless system with automatic returns
 
-### **Example Returns**
+### **Realistic Returns**
 ```
-Traditional Aave Flash Loan (100 ETH):
-- Fee: 0.09% = $360
-- Your cost: $360
+Flash Loan Example (100 ETH):
+- FlashBank Fee: 0.02% = 0.02 ETH
+- Traditional Protocol: 0.09% = 0.09 ETH
+- Savings per loan: 0.07 ETH
 
-FlashBank Flash Loan (100 ETH):  
-- Fee: 0.02% = $80
-- Your savings: $280 per loan!
-
-For depositors with $10K deposited:
-- One daily 100 ETH flash loan = $70 profit
-- Annual return: $25,550 = 256% APY!
+For participants with 10 ETH committed:
+- Typical monthly earnings: Variable based on flash loan volume
+- Annual returns: Depend on MEV opportunities and participation
 ```
 
 ---
 
 ## 🚀 Live Deployment
 
-### **Arbitrum Mainnet**
+### **Multi-Chain Deployment**
+
+#### **Arbitrum Mainnet** ✅
 - **FlashBank Pool**: `0x5c0156da501BC97DD35017Fb20624B7f1Ce7E095`
 - **MEV Receiver**: `0x6dAb2aCeF1cc2B545BcCc101e420fA711Bb03592`
 - **Deployment**: Block 23462096 (2025-09-28)
+- **Explorer**: [Arbiscan](https://arbiscan.io/address/0x5c0156da501BC97DD35017Fb20624B7f1Ce7E095)
+
+#### **Ethereum Mainnet** 🔄
+- **Status**: Ready for deployment
+- **Contract**: Same FlashBankRevolutionary.sol (compatible with all EVM chains)
+
+#### **Base** 🔄
+- **Status**: Ready for deployment
+- **Contract**: Same FlashBankRevolutionary.sol (compatible with all EVM chains)
 
 ### **Security Verification**
 ✅ Contract verified on [Arbiscan](https://arbiscan.io/address/0x5c0156da501BC97DD35017Fb20624B7f1Ce7E095)  
@@ -138,26 +156,25 @@ await flashBank.flashLoan(
 ```
 
 ### **Web Interface**
-Visit [flashbank.net](https://flashbank.net) for the user-friendly interface:
+Visit [flashbank.net](https://flashbank.net) for the multi-chain interface:
 - 🔗 **Connect Wallet** (MetaMask, WalletConnect)
-- 💰 **Deposit ETH** with one click  
-- 📊 **Monitor Earnings** in real-time
+- 🌐 **Switch Networks** (Arbitrum, Ethereum, Base)
+- 🏦 **Commit ETH** (approval-based, stays in wallet)
+- 📊 **Monitor Earnings** in real-time across all chains
+- ⏸️ **Pause/Resume** participation anytime
 - 💸 **Withdraw Profits** instantly
 
 ---
 
 ## 📊 Pool Statistics
 
-| Metric | Value |
-|--------|-------|
-| Total Deposits | 0 ETH (just launched!) |
-| Total Profits Generated | 0 ETH |
-| Number of Depositors | 0 |
-| Flash Loan Fee | 0.02% |
-| Maximum Fee (hardcoded) | 10% |
-| Contract Age | Live since Sept 2025 |
+| Network | Total Committed | Active Providers | Flash Loan Fee | Status |
+|---------|----------------|------------------|----------------|--------|
+| **Arbitrum** | 0 ETH | 0 | 0.02% | ✅ Live |
+| **Ethereum** | - | - | 0.02% | 🔄 Ready for Deployment |
+| **Base** | - | - | 0.02% | 🔄 Ready for Deployment |
 
-*Real-time stats available at [flashbank.net/stats](https://flashbank.net/stats)*
+*Real-time stats available at [flashbank.net](https://flashbank.net) - Switch between networks to see live data*
 
 ---
 
@@ -197,10 +214,9 @@ Visit [flashbank.net](https://flashbank.net) for the user-friendly interface:
 - **Modular architecture** for easy integration
 
 ### **Supported Networks**
-- ✅ **Arbitrum** (live)
-- 🔄 **Polygon** (coming soon)
-- 🔄 **Optimism** (coming soon)
-- 🔄 **Base** (coming soon)
+- ✅ **Arbitrum** (live) - `0x5c0156da501BC97DD35017Fb20624B7f1Ce7E095`
+- 🔄 **Ethereum Mainnet** (deployment ready)
+- 🔄 **Base** (deployment ready)
 
 ---
 
@@ -274,16 +290,41 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
+## 🌐 Website Deployment
+
+**📖 Complete Guide:** [WEBSITE_DEPLOYMENT.md](WEBSITE_DEPLOYMENT.md)
+
+### **Quick Start**
+
+**Local Development:**
+```bash
+npm run website:dev
+# Open http://localhost:3000
+```
+
+**Production Preview:**
+```bash
+npm run website:preview
+```
+
+**GitHub Pages:**
+- Automatic deployment on push to `main`
+- Manual: `npm run website:deploy`
+- Live URL: `https://yourusername.github.io/flashbank-net`
+
+---
+
 ## 🔗 Links
 
 - **Website**: [flashbank.net](https://flashbank.net)
 - **Documentation**: [docs.flashbank.net](https://docs.flashbank.net)
+- **GitHub Pages**: [https://yourusername.github.io/flashbank-net](https://yourusername.github.io/flashbank-net)
 - **Twitter**: [@FlashBankNet](https://twitter.com/FlashBankNet)
 - **Discord**: [discord.gg/flashbank](https://discord.gg/flashbank)
 - **Telegram**: [t.me/flashbank](https://t.me/flashbank)
 
 ---
 
-**Built with ❤️ for the DeFi community by the MEV community**
+**Built with ❤️ for the DeFi community**
 
-*"Banking the unbanked, flashing the unflashed"* 🏦⚡
+**Revolutionary trustless flash loans with zero permanent risk** 🏦⚡

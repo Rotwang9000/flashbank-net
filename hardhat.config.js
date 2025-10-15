@@ -33,7 +33,7 @@ module.exports = {
     },
     
     arbitrum: {
-      url: process.env.ARBITRUM_HTTP_URL || "https://arb1.arbitrum.io/rpc",
+      url: process.env.ARBITRUM_HTTP_URL || `https://rpc.ankr.com/arbitrum/${process.env.ANKR_API_KEY || ""}`,
       chainId: 42161,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       gasPrice: 100000000, // 0.1 gwei
@@ -44,12 +44,28 @@ module.exports = {
       chainId: 421613,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
     },
+
+	ethereum: {
+		url: process.env.ETHEREUM_HTTP_URL || "http://fin2:8545",
+		chainId: 1,
+		accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+		gasPrice: 20000000000, // 20 gwei for mainnet
+	},
+
+    base: {
+      url: process.env.BASE_HTTP_URL || "https://mainnet.base.org",
+      chainId: 8453,
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      gasPrice: 1000000000, // 1 gwei for Base
+    },
   },
   
   etherscan: {
     apiKey: {
-      arbitrumOne: process.env.ARBISCAN_API_KEY || "",
-      arbitrumGoerli: process.env.ARBISCAN_API_KEY || "",
+      arbitrumOne: process.env.ARBISCAN_API_KEY || process.env.ETHERSCAN_API_KEY || "",
+      arbitrumGoerli: process.env.ARBISCAN_API_KEY || process.env.ETHERSCAN_API_KEY || "",
+      mainnet: process.env.ETHERSCAN_API_KEY || "",
+      base: process.env.BASESCAN_API_KEY || process.env.ETHERSCAN_API_KEY || "",
     },
   },
   

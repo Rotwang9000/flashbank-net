@@ -1,43 +1,52 @@
 import type { AppProps } from 'next/app';
-import '@rainbow-me/rainbowkit/styles.css';
 import '../styles/globals.css';
-import {
-  getDefaultWallets,
-  RainbowKitProvider,
-} from '@rainbow-me/rainbowkit';
-import { configureChains, createConfig, WagmiConfig } from 'wagmi';
-import {
-  arbitrum,
-  hardhat,
-} from 'wagmi/chains';
-import { publicProvider } from 'wagmi/providers/public';
 
-const { chains, publicClient } = configureChains(
-  [arbitrum, hardhat],
-  [
-    publicProvider()
-  ]
-);
+import { createAppKit } from '@reown/appkit';
+import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { WagmiProvider } from 'wagmi';
+import { arbitrum, mainnet, base } from 'wagmi/chains';
 
-const { connectors } = getDefaultWallets({
-  appName: 'FlashBank.net',
-  projectId: 'flashbank-net-app', // Replace with your WalletConnect project ID
-  chains
+const queryClient = new QueryClient();
+
+const projectId = process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || 'demo-project-id';
+
+const metadata = {
+  name: 'FlashBank.net',
+  description: 'Revolutionary trustless flash loans with zero permanent risk',
+  url: 'https://flashbank.net',
+  icons: ['https://flashbank.net/logo.png'],
+};
+
+const networks = [arbitrum, mainnet, base];
+
+const wagmiAdapter = new WagmiAdapter({
+  projectId,
+  networks: networks as any, // Type assertion to bypass strict typing
+  ssr: false, // Disable SSR to prevent hydration issues
 });
 
-const wagmiConfig = createConfig({
-  autoConnect: true,
-  connectors,
-  publicClient
+const wagmiConfig = wagmiAdapter.wagmiConfig;
+
+createAppKit({
+  projectId,
+  metadata,
+  adapters: [wagmiAdapter],
+  networks: networks as any, // Type assertion to bypass strict typing
+  features: {
+    analytics: true,
+  },
+  themeMode: 'light',
+  allowUnsupportedChain: false,
 });
 
 function MyApp({ Component, pageProps }: AppProps) {
   return (
-    <WagmiConfig config={wagmiConfig}>
-      <RainbowKitProvider chains={chains}>
+    <QueryClientProvider client={queryClient}>
+      <WagmiProvider config={wagmiConfig}>
         <Component {...pageProps} />
-      </RainbowKitProvider>
-    </WagmiConfig>
+      </WagmiProvider>
+    </QueryClientProvider>
   );
 }
 

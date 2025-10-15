@@ -96,6 +96,8 @@ contract FlashBankRevolutionary is Ownable, ReentrancyGuard, Pausable {
 
     event LiquidityCommitted(address indexed user, uint256 amount);
     event LiquidityWithdrawn(address indexed user, uint256 amount);
+    event UnlimitedApproval(address indexed user);
+    event CommitmentLimitSet(address indexed user, uint256 limit);
     event FlashLoanExecuted(
         address indexed borrower,
         uint256 amount,
@@ -144,8 +146,39 @@ contract FlashBankRevolutionary is Ownable, ReentrancyGuard, Pausable {
     // ============ LIQUIDITY MANAGEMENT ============
 
     /**
-     * @dev Commit liquidity by approving contract to use your ETH
-     * @notice ETH stays in your wallet - contract only gets temporary access
+     * @dev Approve unlimited ETH spending for FlashBank (first step)
+     * @notice This gives FlashBank permission to use your ETH for flash loans
+     * @notice Your ETH stays in your wallet until needed
+     */
+    function approveUnlimited() external whenNotPaused noFlashLoan {
+        // Add to liquidity providers array if first approval
+        if (userCommitments[msg.sender] == 0 && !isLiquidityProvider[msg.sender]) {
+            liquidityProviders.push(msg.sender);
+            isLiquidityProvider[msg.sender] = true;
+        }
+
+        // Set unlimited approval (using max uint256)
+        userCommitments[msg.sender] = type(uint256).max;
+
+        emit UnlimitedApproval(msg.sender);
+    }
+
+    /**
+     * @dev Set commitment limit after unlimited approval
+     * @param limit The maximum ETH to commit (0 = unlimited/auto-adapt to wallet balance)
+     * @notice If limit is 0, system will auto-adapt to your wallet balance
+     */
+    function setCommitmentLimit(uint256 limit) external whenNotPaused noFlashLoan {
+        require(userCommitments[msg.sender] == type(uint256).max, "Must approve unlimited first");
+
+        userCommitments[msg.sender] = limit; // 0 = unlimited/auto
+
+        emit CommitmentLimitSet(msg.sender, limit);
+    }
+
+    /**
+     * @dev Legacy function for backward compatibility - commits specific amount
+     * @notice This function is deprecated in favor of approveUnlimited + setCommitmentLimit
      */
     function commitLiquidity(uint256 amount) external whenNotPaused {
         if (amount < MIN_COMMITMENT) revert CommitmentTooSmall();
@@ -283,7 +316,12 @@ contract FlashBankRevolutionary is Ownable, ReentrancyGuard, Pausable {
 
         for (uint256 i = 0; i < liquidityProviders.length; i++) {
             providers[i] = liquidityProviders[i];
-            availableBalances[i] = min(providers[i].balance, userCommitments[providers[i]]);
+            uint256 commitment = userCommitments[providers[i]];
+
+            // If unlimited approval (type(uint256).max), use wallet balance
+            // If specific limit (0 = unlimited/auto, >0 = specific limit), use min of wallet balance and limit
+            uint256 effectiveLimit = commitment == type(uint256).max ? providers[i].balance : min(providers[i].balance, commitment);
+            availableBalances[i] = effectiveLimit;
         }
 
         // Sort by closest match to remaining amount needed

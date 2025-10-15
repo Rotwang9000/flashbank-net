@@ -43,12 +43,12 @@ async function main() {
   console.log("  - Total profits:", ethers.formatEther(poolStats.totalProfits), "ETH");
   console.log("  - Number of providers:", poolStats.numProviders.toString());
   console.log("  - Contract age:", poolStats.contractAge.toString(), "seconds");
-  console.log("  - Flash loan fee rate:", FLASH_LOAN_FEE_RATE, "basis points (0.02%)");
 
   // Test fee calculation
+  const FLASH_LOAN_FEE_RATE = 2; // 0.02%
   const testAmount = ethers.parseEther("100"); // 100 ETH
   const fee = (testAmount * BigInt(FLASH_LOAN_FEE_RATE)) / BigInt(10000);
-  console.log("📋 Flash loan fee for 100 ETH:", ethers.formatEther(fee), "ETH");
+  console.log("📋 Flash loan fee for 100 ETH:", ethers.formatEther(fee), "ETH (0.02%)");
 
   // ============ DEPLOYMENT SUMMARY ============
 

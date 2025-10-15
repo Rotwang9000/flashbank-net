@@ -16,7 +16,11 @@
     "size": "hardhat size-contracts",
     "coverage": "hardhat coverage",
     "frontend:dev": "cd frontend && npm run dev",
-    "frontend:build": "cd frontend && npm run build"
+    "frontend:build": "cd frontend && npm run build",
+    "website:dev": "cd website && npm run dev",
+    "website:build": "cd website && npm run build",
+    "website:deploy": "cd website && npm run deploy",
+    "website:preview": "cd website && npm run preview"
   },
   "keywords": [
     "defi",
@@ -33,7 +37,7 @@
     "@nomicfoundation/hardhat-ethers": "^3.0.0",
     "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
     "@nomicfoundation/hardhat-toolbox": "^3.0.0",
-    "@nomicfoundation/hardhat-verify": "^1.0.0",
+    "@nomicfoundation/hardhat-verify": "^1.1.1",
     "@typechain/ethers-v6": "^0.4.0",
     "@typechain/hardhat": "^8.0.0",
     "@types/chai": "^4.2.0",

@@ -7,6 +7,9 @@ const nextConfig = {
   images: {
     unoptimized: true
   },
+  // GitHub Pages deployment configuration
+  basePath: process.env.NODE_ENV === 'production' ? '/flashbank-net' : '',
+  assetPrefix: process.env.NODE_ENV === 'production' ? '/flashbank-net/' : '',
   typescript: {
     // Skip type checking during build for now
     ignoreBuildErrors: true,
@@ -25,3 +28,5 @@ const nextConfig = {
     ]
   },
 }
+
+module.exports = nextConfig

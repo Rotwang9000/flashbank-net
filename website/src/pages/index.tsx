@@ -3,7 +3,7 @@ import Head from 'next/head';
 import { ethers } from 'ethers';
 import { useAppKitAccount } from '@reown/appkit/library/react';
 import { usePublicClient, useWalletClient } from 'wagmi';
-import { arbitrum, mainnet, base } from '@wagmi/core/chains';
+import { arbitrum, mainnet, base, sepolia } from '@wagmi/core/chains';
 import { useIsMounted } from '../hooks/useIsMounted';
 import { useChainId, useSwitchChain } from 'wagmi';
 import { motion } from 'framer-motion';
@@ -32,51 +32,62 @@ const CHAIN_CONFIGS = {
   [arbitrum.id]: {
     name: 'Arbitrum',
     flashbankAddress: process.env.NEXT_PUBLIC_ARBITRUM_FLASHBANK_ADDRESS || '0x5c0156da501BC97DD35017Fb20624B7f1Ce7E095',
-    rpcUrl: `https://rpc.ankr.com/arbitrum/${ANKR_API_KEY}`,
+    rpcUrl: 'https://arb1.arbitrum.io/rpc',
     explorerUrl: 'https://arbiscan.io',
     color: 'blue',
     icon: '🔷'
   },
   [mainnet.id]: {
     name: 'Ethereum',
-    flashbankAddress: process.env.NEXT_PUBLIC_ETHEREUM_FLASHBANK_ADDRESS || '0x0000000000000000000000000000000000000000',
-    rpcUrl: `https://rpc.ankr.com/eth/${ANKR_API_KEY}`,
+    flashbankAddress: process.env.NEXT_PUBLIC_ETHEREUM_FLASHBANK_ADDRESS || '0x54b9Bc0679f5106AC3682a74518b229409b4eA15',
+    rpcUrl: 'https://cloudflare-eth.com',
     explorerUrl: 'https://etherscan.io',
     color: 'purple',
     icon: '🔶'
   },
+  [sepolia.id]: {
+    name: 'Sepolia',
+    flashbankAddress: process.env.NEXT_PUBLIC_SEPOLIA_FLASHBANK_ADDRESS || '0xBDcC71d5F73962d017756A04919FBba9d30F0795',
+    rpcUrl: 'https://ethereum-sepolia-rpc.publicnode.com',
+    explorerUrl: 'https://sepolia.etherscan.io',
+    color: 'yellow',
+    icon: '🧪'
+  },
   [base.id]: {
     name: 'Base',
-    flashbankAddress: process.env.NEXT_PUBLIC_BASE_FLASHBANK_ADDRESS || '0xBDcC71d5F73962d017756A04919FBba9d30F0795',
-    rpcUrl: `https://rpc.ankr.com/base/${ANKR_API_KEY}`,
+    flashbankAddress: process.env.NEXT_PUBLIC_BASE_FLASHBANK_ADDRESS || '0x779F8D578F279738c17D9f26B33fe46d32b91Eb7',
+    rpcUrl: 'https://mainnet.base.org',
     explorerUrl: 'https://basescan.org',
     color: 'red',
     icon: '🔴'
   }
 };
 
-// FlashBank Revolutionary contract details
+// FlashBank Revolutionary contract ABI (JSON format for wagmi compatibility)
 const FLASHBANK_ABI = [
-  // Revolutionary approval system
-  "function approveUnlimited() external",
-  "function setCommitmentLimit(uint256 limit) external",
-  "function commitLiquidity(uint256 amount) external",
-  "function withdrawCommitment(uint256 amount) external",
-  "function withdrawProfits() external",
+  { "inputs": [], "name": "approveUnlimited", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+  { "inputs": [{ "internalType": "uint256", "name": "limit", "type": "uint256" }], "name": "setCommitmentLimit", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+  { "inputs": [{ "internalType": "uint256", "name": "amount", "type": "uint256" }], "name": "commitLiquidity", "outputs": [], "stateMutability": "payable", "type": "function" },
+  { "inputs": [{ "internalType": "uint256", "name": "amount", "type": "uint256" }], "name": "withdrawCommitment", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+  { "inputs": [], "name": "withdrawProfits", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+  { "inputs": [{ "internalType": "address", "name": "user", "type": "address" }], "name": "getUserBalance", "outputs": [{ "internalType": "uint256", "name": "commitment", "type": "uint256" }, { "internalType": "uint256", "name": "profits", "type": "uint256" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [], "name": "getPoolStats", "outputs": [{ "internalType": "uint256", "name": "totalCommitted", "type": "uint256" }, { "internalType": "uint256", "name": "totalProfits", "type": "uint256" }, { "internalType": "uint256", "name": "numProviders", "type": "uint256" }, { "internalType": "uint256", "name": "contractAge", "type": "uint256" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [{ "internalType": "uint256", "name": "amount", "type": "uint256" }], "name": "calculateFlashLoanFee", "outputs": [{ "internalType": "uint256", "name": "fee", "type": "uint256" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [], "name": "flashLoanFeeRate", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [], "name": "getSecurityInfo", "outputs": [{ "internalType": "bool", "name": "isUpgradeable", "type": "bool" }, { "internalType": "uint256", "name": "maxFeeRate", "type": "uint256" }, { "internalType": "uint256", "name": "absoluteMaxFlashLoan", "type": "uint256" }, { "internalType": "uint256", "name": "deployedAt", "type": "uint256" }, { "internalType": "uint256", "name": "creationBlock", "type": "uint256" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [{ "internalType": "address", "name": "user", "type": "address" }], "name": "userCommitments", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [], "name": "totalCommittedLiquidity", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [{ "internalType": "uint256", "name": "index", "type": "uint256" }], "name": "liquidityProviders", "outputs": [{ "internalType": "address", "name": "", "type": "address" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [{ "internalType": "address", "name": "user", "type": "address" }], "name": "isLiquidityProvider", "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }], "stateMutability": "view", "type": "function" }
+] as const;
 
-  // View functions
-  "function getUserBalance(address user) external view returns (uint256 commitment, uint256 profits)",
-  "function getPoolStats() external view returns (uint256 totalCommitted, uint256 totalProfits, uint256 numProviders, uint256 contractAge)",
-  "function calculateFlashLoanFee(uint256 amount) external view returns (uint256 fee)",
-  "function flashLoanFeeRate() external view returns (uint256)",
-  "function getSecurityInfo() external view returns (bool isUpgradeable, uint256 maxFeeRate, uint256 absoluteMaxFlashLoan, uint256 deployedAt, uint256 creationBlock)",
-
-  // Revolutionary features
-  "function userCommitments(address user) external view returns (uint256)",
-  "function totalCommittedLiquidity() external view returns (uint256)",
-  "function liquidityProviders(uint256 index) external view returns (address)",
-  "function isLiquidityProvider(address user) external view returns (bool)"
-];
+// Map colour keys to Tailwind classes to avoid dynamic class names
+const COLOR_CLASSES: Record<string, { bg100: string; text800: string; border200: string; bg50: string; text700: string; text600: string }>= {
+  blue:   { bg100: 'bg-blue-100',   text800: 'text-blue-800',   border200: 'border-blue-200',   bg50: 'bg-blue-50',   text700: 'text-blue-700',   text600: 'text-blue-600' },
+  purple: { bg100: 'bg-purple-100', text800: 'text-purple-800', border200: 'border-purple-200', bg50: 'bg-purple-50', text700: 'text-purple-700', text600: 'text-purple-600' },
+  yellow: { bg100: 'bg-yellow-100', text800: 'text-yellow-800', border200: 'border-yellow-200', bg50: 'bg-yellow-50', text700: 'text-yellow-700', text600: 'text-yellow-600' },
+  red:    { bg100: 'bg-red-100',    text800: 'text-red-800',    border200: 'border-red-200',    bg50: 'bg-red-50',    text700: 'text-red-700',    text600: 'text-red-600' },
+};
 
 export default function Home() {
   const isMounted = useIsMounted();
@@ -101,6 +112,12 @@ export default function Home() {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [unlimitedToggle, setUnlimitedToggle] = useState(false);
+  const [removeAllToggle, setRemoveAllToggle] = useState(false);
+
+  // Soft-launch: enable actions only on Sepolia
+  const SOFT_LAUNCH_CHAIN_ID = sepolia.id;
+  const actionsDisabled = isConnected && chainId !== SOFT_LAUNCH_CHAIN_ID;
 
   // Load user data and pool stats
   useEffect(() => {
@@ -114,29 +131,100 @@ export default function Home() {
     return CHAIN_CONFIGS[chainId as keyof typeof CHAIN_CONFIGS] || CHAIN_CONFIGS[arbitrum.id];
   };
 
+  // Helpers to persist last commitment across sessions per chain and address
+  const getLastCommitmentKey = (addr: string | undefined, id: number) => `flashbank:lastCommitment:${id}:${(addr || '').toLowerCase()}`;
+  const saveLastCommitment = (addr: string, id: number, value: string) => {
+    try { localStorage.setItem(getLastCommitmentKey(addr, id), value); } catch {}
+  };
+  const loadLastCommitment = (addr: string, id: number): string | null => {
+    try { return localStorage.getItem(getLastCommitmentKey(addr, id)); } catch { return null; }
+  };
+  const clearLastCommitment = (addr: string, id: number) => {
+    try { localStorage.removeItem(getLastCommitmentKey(addr, id)); } catch {}
+  };
+
+  // Safe write helper: simulate first; fallback with conservative gas on estimation failures
+  const safeWriteContract = async (
+    functionName: keyof typeof FLASHBANK_ABI extends never ? string : any,
+    args: any[] = [],
+    value?: bigint
+  ): Promise<`0x${string}`> => {
+    if (!walletClient || !publicClient || !address) throw new Error('Wallet not ready');
+    const chainConfig = getCurrentChainConfig();
+    try {
+      const { request } = await publicClient.simulateContract({
+        address: chainConfig.flashbankAddress as `0x${string}`,
+        abi: FLASHBANK_ABI as any,
+        functionName: functionName as any,
+        args,
+        value,
+        account: address as `0x${string}`,
+        chain: undefined as any,
+      } as any);
+      return await walletClient.writeContract(request as any);
+    } catch (err) {
+      const fallbackGas: Record<string, bigint> = {
+        approveUnlimited: 120000n,
+        setCommitmentLimit: 140000n,
+        commitLiquidity: 220000n,
+        withdrawCommitment: 220000n,
+        withdrawProfits: 140000n,
+      };
+      const gas = fallbackGas[String(functionName)] || 220000n;
+      return await walletClient.writeContract({
+        address: chainConfig.flashbankAddress as `0x${string}`,
+        abi: FLASHBANK_ABI as any,
+        functionName: functionName as any,
+        args,
+        account: address as `0x${string}`,
+        gas,
+        chain: {
+          id: chainId,
+          name: chainConfig.name,
+          nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+          rpcUrls: { default: { http: [chainConfig.rpcUrl] } },
+          blockExplorers: { default: { name: chainConfig.name, url: chainConfig.explorerUrl } }
+        } as any,
+      } as any);
+    }
+  };
+
   const loadUserData = async () => {
     try {
       if (!address || !publicClient) return;
 
       const chainConfig = getCurrentChainConfig();
-      // Create a simple provider from publicClient for reading
       const provider = new ethers.JsonRpcProvider(chainConfig.rpcUrl);
       const contract = new ethers.Contract(chainConfig.flashbankAddress, FLASHBANK_ABI, provider);
 
-      const [commitment, profits] = await contract.getUserBalance(address);
-      const userCommitmentAmount = await contract.userCommitments(address);
+      let commitment: bigint = 0n;
+      let profits: bigint = 0n;
+      try {
+        const res = await contract.getUserBalance(address);
+        commitment = res[0];
+        profits = res[1];
+      } catch {}
 
-      setUserCommitment(ethers.formatEther(userCommitmentAmount));
+      let userCommitmentAmount: bigint = commitment;
+      try {
+        userCommitmentAmount = await contract.userCommitments(address);
+      } catch {}
+
+      const isUnlimited = userCommitmentAmount === ethers.MaxUint256;
+      setUserCommitment(isUnlimited ? 'Unlimited' : ethers.formatEther(userCommitmentAmount));
       setUserProfits(ethers.formatEther(profits));
 
-      // Check approval status
-      const maxUint256 = ethers.MaxUint256;
-      if (userCommitmentAmount === maxUint256) {
-        setApprovalStep('approved');
-      } else if (userCommitmentAmount > BigInt(0)) {
-        setApprovalStep('limit-set');
-      } else {
+      // Derive approval/paused state
+      const hadLast = loadLastCommitment(address, chainId);
+      if (userCommitmentAmount === 0n) {
+        setIsPaused(!!hadLast);
         setApprovalStep('not-approved');
+      } else if (isUnlimited) {
+        setIsPaused(false);
+        setApprovalStep('approved');
+      } else {
+        setIsPaused(false);
+        setApprovalStep('limit-set');
       }
     } catch (error) {
       console.error('Error loading user data:', error);
@@ -146,11 +234,11 @@ export default function Home() {
   const loadPoolStats = async () => {
     try {
       if (!publicClient) return;
-
       const chainConfig = getCurrentChainConfig();
       const provider = new ethers.JsonRpcProvider(chainConfig.rpcUrl);
       const contract = new ethers.Contract(chainConfig.flashbankAddress, FLASHBANK_ABI, provider);
 
+      try {
       const [totalCommitted, totalProfits, numProviders, contractAge] = await contract.getPoolStats();
       setPoolStats({
         totalCommitted: ethers.formatEther(totalCommitted),
@@ -158,6 +246,9 @@ export default function Home() {
         numProviders: numProviders.toString(),
         contractAge: contractAge.toString()
       });
+      } catch {
+        // Keep previous stats if call fails
+      }
     } catch (error) {
       console.error('Error loading pool stats:', error);
     }
@@ -165,28 +256,18 @@ export default function Home() {
 
   const handleApproveUnlimited = async () => {
     if (!walletClient || !address) return;
+    if (actionsDisabled) { toast.error('Soft launch: Sepolia only'); return; }
 
     try {
       setLoading(true);
       toast.loading('Approving unlimited access...', { id: 'approve' });
 
-      const chainConfig = getCurrentChainConfig();
-
-      // Use wagmi for the transaction - approve unlimited
-      const hash = await walletClient.writeContract({
-        address: chainConfig.flashbankAddress as `0x${string}`,
-        abi: FLASHBANK_ABI,
-        functionName: 'approveUnlimited',
-        args: [],
-        account: address as `0x${string}`,
-        chain: { id: chainId, name: chainConfig.name, nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: [chainConfig.rpcUrl] } }, blockExplorers: { default: { name: chainConfig.name, url: chainConfig.explorerUrl } } } as any,
-      });
-      await publicClient.waitForTransactionReceipt({ hash });
+      const hash = await safeWriteContract('approveUnlimited', []);
+      await publicClient!.waitForTransactionReceipt({ hash });
 
       toast.success('Unlimited approval granted!', { id: 'approve' });
       setApprovalStep('approved');
 
-      // Refresh data
       setTimeout(() => {
         loadUserData();
         loadPoolStats();
@@ -201,25 +282,28 @@ export default function Home() {
 
   const handleSetCommitmentLimit = async () => {
     if (!walletClient || !address) return;
+    if (actionsDisabled) { toast.error('Soft launch: Sepolia only'); return; }
 
     try {
       setLoading(true);
       toast.loading('Setting commitment limit...', { id: 'limit' });
 
       const chainConfig = getCurrentChainConfig();
-      const limit = commitmentLimit === '0' ? BigInt(0) : ethers.parseEther(commitmentLimit);
-
-      // Use wagmi for the transaction - set commitment limit
-      const hash = await walletClient.writeContract({
-        address: chainConfig.flashbankAddress as `0x${string}`,
-        abi: FLASHBANK_ABI,
-        functionName: 'setCommitmentLimit',
-        args: [limit],
-        account: address as `0x${string}`,
-        chain: { id: chainId, name: chainConfig.name, nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: [chainConfig.rpcUrl] } }, blockExplorers: { default: { name: chainConfig.name, url: chainConfig.explorerUrl } } } as any,
-      });
-      await publicClient.waitForTransactionReceipt({ hash });
-
+      if (unlimitedToggle) {
+        const hash = await safeWriteContract('approveUnlimited', []);
+        await publicClient!.waitForTransactionReceipt({ hash });
+      } else if (removeAllToggle) {
+        const hash = await safeWriteContract('setCommitmentLimit', [0n]);
+        await publicClient!.waitForTransactionReceipt({ hash });
+      } else {
+        const limit = commitmentLimit === '0' ? 0n : ethers.parseEther(commitmentLimit);
+        const hash = await safeWriteContract('setCommitmentLimit', [limit]);
+        await publicClient!.waitForTransactionReceipt({ hash });
+      }
+      setUnlimitedToggle(false);
+      setRemoveAllToggle(false);
+      // Immediate refresh
+      await Promise.all([loadUserData(), loadPoolStats()]);
       toast.success('Commitment limit set!', { id: 'limit' });
       setApprovalStep('limit-set');
 
@@ -237,28 +321,16 @@ export default function Home() {
     }
   };
 
-
   const handleWithdrawCommitment = async () => {
     if (!walletClient || !withdrawAmount || !address) return;
+    if (actionsDisabled) { toast.error('Soft launch: Sepolia only'); return; }
 
     try {
       setLoading(true);
       toast.loading('Withdrawing commitment...', { id: 'withdraw' });
 
-      const chainConfig = getCurrentChainConfig();
-      const amount = withdrawAmount === 'all' ? 0 : ethers.parseEther(withdrawAmount);
-
-      // Use wagmi for the transaction
-      const hash = await walletClient.writeContract({
-        address: chainConfig.flashbankAddress as `0x${string}`,
-        abi: FLASHBANK_ABI,
-        functionName: 'withdrawCommitment',
-        args: [amount],
-        account: address as `0x${string}`,
-        chain: { id: chainId, name: chainConfig.name, nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: [chainConfig.rpcUrl] } }, blockExplorers: { default: { name: chainConfig.name, url: chainConfig.explorerUrl } } } as any,
-      });
-      await publicClient.waitForTransactionReceipt({ hash });
-
+      const amount = withdrawAmount === 'all' ? 0n : ethers.parseEther(withdrawAmount);
+      await safeWriteContract('withdrawCommitment', [amount]);
       toast.success('Commitment withdrawn successfully!', { id: 'withdraw' });
       
       // Refresh data
@@ -277,6 +349,7 @@ export default function Home() {
 
   const handlePauseCommitment = async () => {
     if (!walletClient || !address) return;
+    if (actionsDisabled) { toast.error('Soft launch: Sepolia only'); return; }
 
     try {
       setLoading(true);
@@ -284,27 +357,29 @@ export default function Home() {
 
       const chainConfig = getCurrentChainConfig();
 
-      // For now, pause by withdrawing all commitment
-      const currentCommitment = (await publicClient.readContract({
+      // Read current commitment
+      const currentCommitment = (await publicClient!.readContract({
         address: chainConfig.flashbankAddress as `0x${string}`,
-        abi: FLASHBANK_ABI,
+        abi: FLASHBANK_ABI as any,
         functionName: 'userCommitments',
         args: [address],
       } as any)) as bigint;
 
-      if (currentCommitment > BigInt(0)) {
-        const hash = await walletClient.writeContract({
-          address: chainConfig.flashbankAddress as `0x${string}`,
-          abi: FLASHBANK_ABI,
-          functionName: 'withdrawCommitment',
-          args: [0], // Withdraw all
-          account: address as `0x${string}`,
-          chain: { id: chainId, name: chainConfig.name, nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: [chainConfig.rpcUrl] } }, blockExplorers: { default: { name: chainConfig.name, url: chainConfig.explorerUrl } } } as any,
-        });
-        await publicClient.waitForTransactionReceipt({ hash });
+      if (currentCommitment > 0n) {
+        // Persist last commitment
+        if (currentCommitment === ethers.MaxUint256) {
+          saveLastCommitment(address, chainId, 'UNLIMITED');
+        } else {
+          saveLastCommitment(address, chainId, currentCommitment.toString());
+        }
+        // Set limit to 0 to pause
+        const hash = await safeWriteContract('setCommitmentLimit', [0n]);
+        await publicClient!.waitForTransactionReceipt({ hash });
 
         setIsPaused(true);
         toast.success('Commitment paused successfully!', { id: 'pause' });
+      } else {
+        toast.success('No commitment to pause', { id: 'pause' });
       }
     } catch (error) {
       console.error('Pause commitment error:', error);
@@ -316,13 +391,49 @@ export default function Home() {
 
   const handleResumeCommitment = async () => {
     if (!walletClient || !address) return;
+    if (actionsDisabled) { toast.error('Soft launch: Sepolia only'); return; }
 
     try {
       setLoading(true);
       toast.loading('Resuming commitment...', { id: 'resume' });
 
-      // Resume by committing again (user needs to set amount)
-      toast('Please set your commitment amount to resume', { id: 'resume' });
+      const last = loadLastCommitment(address, chainId);
+      if (!last) {
+        const chainConfig = getCurrentChainConfig();
+        const current = (await publicClient!.readContract({
+          address: chainConfig.flashbankAddress as `0x${string}`,
+          abi: FLASHBANK_ABI as any,
+          functionName: 'userCommitments',
+          args: [address],
+        } as any)) as bigint;
+        if (current > 0n) {
+          setIsPaused(false);
+          toast.success('Already active', { id: 'resume' });
+          setLoading(false);
+          return;
+        }
+        toast.error('No previous commitment found', { id: 'resume' });
+        setLoading(false);
+        return;
+      }
+
+      if (last === 'UNLIMITED') {
+        const hash = await safeWriteContract('approveUnlimited', []);
+        await publicClient!.waitForTransactionReceipt({ hash });
+      } else {
+        const amount = BigInt(last);
+        const hash = await safeWriteContract('setCommitmentLimit', [amount]);
+        await publicClient!.waitForTransactionReceipt({ hash });
+      }
+
+      clearLastCommitment(address, chainId);
+      setIsPaused(false);
+      toast.success('Commitment resumed!', { id: 'resume' });
+
+      setTimeout(() => {
+        loadUserData();
+        loadPoolStats();
+      }, 2000);
     } catch (error) {
       console.error('Resume commitment error:', error);
       toast.error('Resume failed', { id: 'resume' });
@@ -343,7 +454,7 @@ export default function Home() {
       const hash = await walletClient.writeContract({
         address: chainConfig.flashbankAddress as `0x${string}`,
         abi: FLASHBANK_ABI,
-        functionName: 'withdrawProfit',
+        functionName: 'withdrawProfits',
         args: [],
         account: address as `0x${string}`,
         chain: { id: chainId, name: chainConfig.name, nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: [chainConfig.rpcUrl] } }, blockExplorers: { default: { name: chainConfig.name, url: chainConfig.explorerUrl } } } as any,
@@ -419,7 +530,7 @@ export default function Home() {
                         onClick={() => switchChain({ chainId: buttonChainId })}
                         className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
                           isActive
-                            ? `bg-${config.color}-100 text-${config.color}-800 border border-${config.color}-200`
+                            ? `${COLOR_CLASSES[config.color].bg100} ${COLOR_CLASSES[config.color].text800} ${COLOR_CLASSES[config.color].border200} border`
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
                       >
@@ -448,6 +559,11 @@ export default function Home() {
                 {isConnected ? (
           /* User Dashboard - Primary content when connected */
           <main className="py-8">
+            {actionsDisabled && (
+              <div className="mb-4 p-3 rounded bg-yellow-50 border border-yellow-200 text-yellow-800 text-sm">
+                Soft launch: Actions are enabled on Sepolia only. Switch to Sepolia to interact.
+              </div>
+            )}
             <div className="container mx-auto px-6">
               <div className="mb-8">
                 <h1 className="text-4xl font-bold text-gray-900 mb-2">Your Participation Dashboard</h1>
@@ -473,21 +589,23 @@ export default function Home() {
               </div>
 
               {/* Action Cards */}
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+              <div className="flex flex-wrap justify-center gap-6 mb-12">
                 {/* Step 1: Approve Unlimited */}
                 {approvalStep === 'not-approved' && (
-                  <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
-                      <Shield className="h-5 w-5 text-blue-600 mr-2" />
-                      Step 1: Approve Access
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Give FlashBank permission to use your ETH for flash loans
-                    </p>
+                  <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm flex flex-col w-full md:w-1/2 lg:w-1/3 xl:w-1/4">
+                    <div className="flex-grow">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                        <Shield className="h-5 w-5 text-blue-600 mr-2" />
+                        Step 1: Approve Access
+                      </h3>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Give FlashBank permission to use your ETH for flash loans
+                      </p>
+                    </div>
                     <button
                       onClick={handleApproveUnlimited}
-                      disabled={loading}
-                      className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-3 rounded-lg text-sm font-medium transition-colors"
+                      disabled={loading || actionsDisabled}
+                      className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-3 rounded-lg text-sm font-medium transition-colors mt-auto"
                     >
                       {loading ? 'Approving...' : 'Approve Unlimited'}
                     </button>
@@ -495,59 +613,58 @@ export default function Home() {
                 )}
 
                 {/* Step 2: Set Optional Limit */}
-                {approvalStep === 'approved' && (
-                  <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
-                      <Target className="h-5 w-5 text-green-600 mr-2" />
-                      Step 2: Set Limit (Optional)
-                  </h3>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Set a maximum ETH limit or leave as "Auto" for unlimited
-                    </p>
-                  <input
-                      type="text"
-                      placeholder="ETH limit or '0' for auto"
-                      value={commitmentLimit}
-                      onChange={(e) => setCommitmentLimit(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
-                  <button
-                      onClick={handleSetCommitmentLimit}
-                      disabled={loading}
-                      className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white py-3 rounded-lg text-sm font-medium transition-colors"
-                    >
-                      {loading ? 'Setting...' : 'Set Limit'}
-                  </button>
-                </div>
+                {approvalStep !== 'not-approved' && (
+                  <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm flex flex-col w-full md:w-1/2 lg:w-1/3 xl:w-1/4">
+                    <div className="flex-grow">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                        <Target className="h-5 w-5 text-green-600 mr-2" />
+                        Step 2: Set/Change Limit
+                      </h3>
+                      <p className="text-sm text-gray-600 mb-2">
+                        Current limit: <span className="font-semibold">{userCommitment}</span>
+                      </p>
+                      <p className="text-xs text-gray-500 mb-4">
+                        Enter a new limit in ETH. Use 0 to pause. For unlimited, use "Approve Access".
+                      </p>
+                      <div className="flex items-center gap-6 mb-3">
+                        <label className="flex items-center gap-2 text-sm text-gray-700">
+                          <input type="checkbox" checked={unlimitedToggle} onChange={(e) => { setUnlimitedToggle(e.target.checked); if (e.target.checked) setRemoveAllToggle(false); }} />
+                          Unlimited
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-gray-700">
+                          <input type="checkbox" checked={removeAllToggle} onChange={(e) => { setRemoveAllToggle(e.target.checked); if (e.target.checked) setUnlimitedToggle(false); }} />
+                          Remove all
+                        </label>
+                      </div>
+                    </div>
+                    <div className="mt-auto">
+                      <input
+                        type="text"
+                        placeholder="New ETH limit (0 to pause)"
+                        value={commitmentLimit}
+                        onChange={(e) => setCommitmentLimit(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        disabled={actionsDisabled || unlimitedToggle || removeAllToggle}
+                      />
+                      <button
+                        onClick={handleSetCommitmentLimit}
+                        disabled={loading || actionsDisabled}
+                        className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white py-3 rounded-lg text-sm font-medium transition-colors"
+                      >
+                        {loading ? 'Setting...' : 'Set Limit'}
+                      </button>
+                    </div>
+                  </div>
                 )}
 
                 {/* Withdraw */}
-                <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
-                    <ArrowRight className="h-5 w-5 text-purple-600 mr-2 rotate-180" />
-                    Withdraw Commitment
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Reduce or remove your ETH commitment
-                  </p>
-                  <input
-                    type="text"
-                    placeholder="Amount or 'all'"
-                    value={withdrawAmount}
-                    onChange={(e) => setWithdrawAmount(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                  <button
-                    onClick={handleWithdrawCommitment}
-                    disabled={loading || !withdrawAmount}
-                    className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white py-3 rounded-lg text-sm font-medium transition-colors"
-                  >
-                    {loading ? 'Withdrawing...' : 'Withdraw'}
-                  </button>
-                </div>
+                {false && (
+                  <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm flex flex-col"></div>
+                )}
 
                 {/* Pause/Resume */}
-                <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm flex flex-col w-full md:w-1/2 lg:w-1/3 xl:w-1/4">
+                  <div className="flex-grow">
                   <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
                     {isPaused ? <CheckCircle className="h-5 w-5 text-green-600 mr-2" /> : <AlertTriangle className="h-5 w-5 text-orange-600 mr-2" />}
                     {isPaused ? 'Resume' : 'Pause'} Participation
@@ -555,10 +672,11 @@ export default function Home() {
                   <p className="text-sm text-gray-600 mb-4">
                     {isPaused ? 'Resume earning from flash loans' : 'Temporarily stop participation'}
                   </p>
+                  </div>
                   <button
                     onClick={isPaused ? handleResumeCommitment : handlePauseCommitment}
-                    disabled={loading}
-                    className={`w-full text-white py-3 rounded-lg text-sm font-medium transition-colors ${
+                    disabled={loading || actionsDisabled}
+                    className={`w-full text-white py-3 rounded-lg text-sm font-medium transition-colors mt-auto ${
                       isPaused
                         ? 'bg-green-600 hover:bg-green-700 disabled:bg-gray-400'
                         : 'bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400'
@@ -569,7 +687,8 @@ export default function Home() {
                 </div>
 
                 {/* Claim Profits */}
-                <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm flex flex-col w-full md:w-1/2 lg:w-1/3 xl:w-1/4">
+                  <div className="flex-grow">
                   <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
                     <TrendingUp className="h-5 w-5 text-green-600 mr-2" />
                     Claim Profits
@@ -578,10 +697,11 @@ export default function Home() {
                     Withdraw your earnings from flash loan fees
                   </p>
                   <div className="text-2xl font-bold text-green-600 mb-3">{userProfits} ETH</div>
+                  </div>
                   <button
                     onClick={handleWithdrawProfit}
-                    disabled={loading || parseFloat(userProfits) === 0}
-                    className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white py-3 rounded-lg text-sm font-medium transition-colors"
+                    disabled={loading || parseFloat(userProfits) === 0 || actionsDisabled}
+                    className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white py-3 rounded-lg text-sm font-medium transition-colors mt-auto"
                   >
                     {loading ? 'Claiming...' : 'Claim Profits'}
                   </button>
@@ -893,13 +1013,13 @@ export default function Home() {
                           }`}>
                             <div className="flex items-center justify-between mb-3">
                               <h4 className={`font-semibold flex items-center ${
-                                isCurrentChain ? `text-${config.color}-800` : 'text-gray-700'
+                                isCurrentChain ? `${COLOR_CLASSES[config.color].text800}` : 'text-gray-700'
                               }`}>
                                 {config.icon} {config.name}
                               </h4>
                               <span className={`px-2 py-1 rounded text-xs font-medium ${
                                 isCurrentChain
-                                  ? `bg-${config.color}-100 text-${config.color}-800`
+                                  ? `${COLOR_CLASSES[config.color].bg100} ${COLOR_CLASSES[config.color].text800}`
                                   : 'bg-gray-100 text-gray-600'
                               }`}>
                                 {isCurrentChain ? 'Current' : 'Switch'}
@@ -909,7 +1029,7 @@ export default function Home() {
                               <div>
                                 <span className="text-gray-600">Total Committed:</span>
                                 <div className={`font-semibold ${
-                                  isCurrentChain ? `text-${config.color}-700` : 'text-gray-700'
+                                  isCurrentChain ? `${COLOR_CLASSES[config.color].text700}` : 'text-gray-700'
                                 }`}>
                                   {statsChainId === arbitrum.id ? poolStats.totalCommitted : '0.00'} ETH
                                 </div>
@@ -917,7 +1037,7 @@ export default function Home() {
                               <div>
                                 <span className="text-gray-600">Active Providers:</span>
                                 <div className={`font-semibold ${
-                                  isCurrentChain ? `text-${config.color}-700` : 'text-gray-700'
+                                  isCurrentChain ? `${COLOR_CLASSES[config.color].text700}` : 'text-gray-700'
                                 }`}>
                                   {statsChainId === arbitrum.id ? poolStats.numProviders : '0'}
                                 </div>
@@ -925,7 +1045,7 @@ export default function Home() {
                               <div>
                                 <span className="text-gray-600">Total Profits:</span>
                                 <div className={`font-semibold ${
-                                  isCurrentChain ? `text-${config.color}-700` : 'text-gray-700'
+                                  isCurrentChain ? `${COLOR_CLASSES[config.color].text700}` : 'text-gray-700'
                                 }`}>
                                   {statsChainId === arbitrum.id ? poolStats.totalProfits : '0.00'} ETH
                                 </div>
@@ -933,7 +1053,7 @@ export default function Home() {
                               <div>
                                 <span className="text-gray-600">Flash Loan Fee:</span>
                                 <div className={`font-semibold ${
-                                  isCurrentChain ? `text-${config.color}-700` : 'text-gray-700'
+                                  isCurrentChain ? `${COLOR_CLASSES[config.color].text700}` : 'text-gray-700'
                                 }`}>
                                   0.02%
                                 </div>
@@ -945,7 +1065,7 @@ export default function Home() {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className={`text-xs hover:underline ${
-                                  isCurrentChain ? `text-${config.color}-600` : 'text-gray-500'
+                                  isCurrentChain ? `${COLOR_CLASSES[config.color].text600}` : 'text-gray-500'
                                 }`}
                               >
                                 View Contract →

@@ -6,16 +6,16 @@ require("dotenv").config();
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
-  solidity: {
-    version: "0.8.19",
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200,
-      },
-      viaIR: true,
-    },
-  },
+	solidity: {
+		version: "0.8.24",
+		settings: {
+			optimizer: {
+				enabled: true,
+				runs: 200,
+			},
+			evmVersion: "paris",
+		},
+	},
   
   networks: {
     hardhat: {
@@ -52,6 +52,13 @@ module.exports = {
 		gasPrice: 20000000000, // 20 gwei for mainnet
 	},
 
+	sepolia: {
+		url: process.env.SEPOLIA_HTTP_URL || "https://ethereum-sepolia-rpc.publicnode.com",
+		chainId: 11155111,
+		accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+		gasPrice: 2000000000, // 2 gwei for testnet
+	},
+
     base: {
       url: process.env.BASE_HTTP_URL || "https://mainnet.base.org",
       chainId: 8453,
@@ -65,6 +72,7 @@ module.exports = {
       arbitrumOne: process.env.ARBISCAN_API_KEY || process.env.ETHERSCAN_API_KEY || "",
       arbitrumGoerli: process.env.ARBISCAN_API_KEY || process.env.ETHERSCAN_API_KEY || "",
       mainnet: process.env.ETHERSCAN_API_KEY || "",
+      sepolia: process.env.ETHERSCAN_API_KEY || "",
       base: process.env.BASESCAN_API_KEY || process.env.ETHERSCAN_API_KEY || "",
     },
   },

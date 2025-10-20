@@ -2,18 +2,18 @@
 
 **The world's first IMMUTABLE flash loan network where your ETH never leaves your wallet**
 
-## 🚀 Deployment Status (October 15, 2025)
+## 🚀 Deployment Status (October 17, 2025)
 
 | Network | Status | Contract Address | Verified |
 |---------|--------|------------------|----------|
 | **Arbitrum** | ✅ Live | `0x5c0156da501BC97DD35017Fb20624B7f1Ce7E095` | ✅ Yes |
 | **Base** | ✅ Live | `0xBDcC71d5F73962d017756A04919FBba9d30F0795` | ⚠️ Manual needed |
-| **Ethereum** | ⏳ Pending | TBD | - |
-| **Website** | ⏳ Ready to deploy | `npm run deploy` | - |
+| **Ethereum** | ✅ Live | `0xBDcC71d5F73962d017756A04919FBba9d30F0795` | ⏳ Pending |
+| **Website** | ✅ Live | [flashbank.net](https://flashbank.net) | ✅ Yes |
 
 📋 **Detailed Status**: See [STATUS_SUMMARY.md](STATUS_SUMMARY.md) and [DEPLOYMENT_STATUS.md](DEPLOYMENT_STATUS.md)
 
-🌐 **Website**: [flashbank.net](https://flashbank.net) *(deploying soon)*  
+🌐 **Website**: [flashbank.net](https://flashbank.net) ✅ **LIVE**  
 📚 **Docs**: [docs.flashbank.net](https://docs.flashbank.net)  
 💡 **How It Works**: [Flash Loan Concept Guide](FLASH_LOAN_CONCEPT.md)  
 🔧 **Correct Design**: [Revolutionary Architecture](CORRECT_ARCHITECTURE.md) ⚠️ **READ THIS FIRST**  

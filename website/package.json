@@ -5,11 +5,11 @@
   "private": true,
 	"scripts": {
 		"dev": "next dev",
-		"build": "next build && touch out/.nojekyll",
+		"build": "next build && touch out/.nojekyll && echo 'flashbank.net' > out/CNAME",
 		"start": "next start",
 		"lint": "next lint",
 		"export": "next build && next export",
-		"deploy": "npm run build && gh-pages -d out",
+		"deploy": "npm run build && gh-pages -d out --dotfiles",
 		"preview": "npm run build && npx serve out"
 	},
   "dependencies": {

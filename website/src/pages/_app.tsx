@@ -5,7 +5,7 @@ import { createAppKit } from '@reown/appkit';
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WagmiProvider } from 'wagmi';
-import { arbitrum, mainnet, base } from 'wagmi/chains';
+import { arbitrum, mainnet, base, sepolia } from 'wagmi/chains';
 
 const queryClient = new QueryClient();
 
@@ -18,7 +18,7 @@ const metadata = {
   icons: ['https://flashbank.net/logo.png'],
 };
 
-const networks = [arbitrum, mainnet, base];
+const networks = [arbitrum, mainnet, sepolia, base];
 
 const wagmiAdapter = new WagmiAdapter({
   projectId,

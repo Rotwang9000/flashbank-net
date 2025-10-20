@@ -2,15 +2,13 @@
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
-  output: 'export',
-  trailingSlash: true,
-  images: {
-    unoptimized: true
-  },
-  // GitHub Pages deployment configuration
-  basePath: process.env.NODE_ENV === 'production' ? '/flashbank-net' : '',
-  assetPrefix: process.env.NODE_ENV === 'production' ? '/flashbank-net/' : '',
-  typescript: {
+	output: 'export',
+	trailingSlash: true,
+	images: {
+		unoptimized: true
+	},
+	// Custom domain - no basePath needed
+	typescript: {
     // Skip type checking during build for now
     ignoreBuildErrors: true,
   },

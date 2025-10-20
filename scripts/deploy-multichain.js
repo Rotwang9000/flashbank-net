@@ -17,14 +17,61 @@ async function main() {
 		process.exit(1);
 	}
 
+	// ============ GAS ESTIMATION & OPTIMISATION ============
+
+	const FlashBankRevolutionary = await ethers.getContractFactory("FlashBankRevolutionary");
+	
+	// Estimate gas needed
+	console.log("\n⛽ Estimating gas requirements...");
+	const deployTransaction = await FlashBankRevolutionary.getDeployTransaction(await deployer.getAddress());
+	const estimatedGas = await ethers.provider.estimateGas({
+		...deployTransaction,
+		from: await deployer.getAddress()
+	});
+	console.log("  - Estimated gas units:", estimatedGas.toString());
+	
+	// Get current network gas price
+	const feeData = await ethers.provider.getFeeData();
+	const networkGasPrice = feeData.gasPrice;
+	console.log("  - Network gas price:", ethers.formatUnits(networkGasPrice, "gwei"), "gwei");
+	
+	// Calculate max gas price we can afford (leaving 1% buffer)
+	const gasBuffer = estimatedGas + (estimatedGas * 10n / 100n); // +10% buffer
+	const maxAffordableGasPrice = (balance * 99n / 100n) / gasBuffer; // Use 99% of balance
+	console.log("  - Max affordable gas price:", ethers.formatUnits(maxAffordableGasPrice, "gwei"), "gwei");
+	
+	// Use the lower of network or affordable
+	const useGasPrice = networkGasPrice < maxAffordableGasPrice ? networkGasPrice : maxAffordableGasPrice;
+	const estimatedCost = gasBuffer * useGasPrice;
+	
+	console.log("\n💰 Deployment cost estimate:");
+	console.log("  - Using gas price:", ethers.formatUnits(useGasPrice, "gwei"), "gwei");
+	console.log("  - Estimated cost:", ethers.formatEther(estimatedCost), "ETH");
+	console.log("  - Remaining balance:", ethers.formatEther(balance - estimatedCost), "ETH");
+	
+	if (estimatedCost > balance) {
+		console.error("\n❌ Insufficient funds for deployment!");
+		console.error("  - Need:", ethers.formatEther(estimatedCost), "ETH");
+		console.error("  - Have:", ethers.formatEther(balance), "ETH");
+		console.error("  - Short:", ethers.formatEther(estimatedCost - balance), "ETH");
+		console.error("\n💡 Deploy when gas price drops to:", ethers.formatUnits(maxAffordableGasPrice, "gwei"), "gwei or lower");
+		process.exit(1);
+	}
+	
+	if (useGasPrice < networkGasPrice) {
+		console.log("\n⚠️  Using lower gas price than network average.");
+		console.log("    Transaction may take longer to confirm.");
+		console.log("    Consider deploying when gas drops to:", ethers.formatUnits(networkGasPrice, "gwei"), "gwei");
+	}
+
 	// ============ DEPLOY REVOLUTIONARY CONTRACT ============
 
 	console.log("\n🔥 Deploying FlashBankRevolutionary...");
-	const FlashBankRevolutionary = await ethers.getContractFactory("FlashBankRevolutionary");
-
+	
 	// Deploy WITHOUT proxy - truly immutable!
 	const flashBank = await FlashBankRevolutionary.deploy(
-		await deployer.getAddress() // owner
+		await deployer.getAddress(), // owner
+		{ gasPrice: useGasPrice }
 	);
 
 	await flashBank.waitForDeployment();

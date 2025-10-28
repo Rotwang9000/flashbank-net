@@ -18,27 +18,31 @@ const metadata = {
   icons: ['https://flashbank.net/logo.png'],
 };
 
-const networks = [arbitrum, mainnet, sepolia, base];
+const networks = [sepolia, arbitrum, mainnet, base];
 
 const wagmiAdapter = new WagmiAdapter({
-  projectId,
-  networks: networks as any, // Type assertion to bypass strict typing
-  ssr: false, // Disable SSR to prevent hydration issues
-});
+	projectId,
+	networks: networks as any, // Type assertion to bypass strict typing
+	ssr: false, // Disable SSR to prevent hydration issues
+	// Prefer Sepolia as initial chain if possible
+	defaultChain: sepolia as any,
+} as any);
 
 const wagmiConfig = wagmiAdapter.wagmiConfig;
 
 createAppKit({
-  projectId,
-  metadata,
-  adapters: [wagmiAdapter],
-  networks: networks as any, // Type assertion to bypass strict typing
-  features: {
-    analytics: true,
-  },
-  themeMode: 'light',
-  allowUnsupportedChain: false,
-});
+	projectId,
+	metadata,
+	adapters: [wagmiAdapter],
+	networks: networks as any, // Type assertion to bypass strict typing
+	features: {
+		analytics: true,
+	},
+	themeMode: 'light',
+	allowUnsupportedChain: false,
+	// Prefer Sepolia as default in the connect modal
+	defaultNetwork: sepolia as any,
+} as any);
 
 function MyApp({ Component, pageProps }: AppProps) {
   return (

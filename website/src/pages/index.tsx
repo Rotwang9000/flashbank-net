@@ -27,6 +27,7 @@ import toast, { Toaster } from 'react-hot-toast';
 
 // Chain configurations - Load from environment variables
 const ANKR_API_KEY = process.env.NEXT_PUBLIC_ANKR_API_KEY || '2e8f34fc656bf1d606b8bec1dcb00db2398ed0529bb68fe0fc39f080865397fd';
+const DONATION_ADDRESS = (process.env.NEXT_PUBLIC_DONATION_ADDRESS || '').toLowerCase();
 
 const CHAIN_CONFIGS = {
   [arbitrum.id]: {
@@ -114,6 +115,7 @@ export default function Home() {
   const [isPaused, setIsPaused] = useState(false);
   const [unlimitedToggle, setUnlimitedToggle] = useState(false);
   const [removeAllToggle, setRemoveAllToggle] = useState(false);
+  const [donationPercent, setDonationPercent] = useState(10); // default 10%
 
   // Soft-launch: enable actions only on Sepolia
   const SOFT_LAUNCH_CHAIN_ID = sepolia.id;
@@ -444,12 +446,19 @@ export default function Home() {
 
   const handleWithdrawProfit = async () => {
     if (!walletClient || !address) return;
+    if (actionsDisabled) { toast.error('Soft launch: Sepolia only'); return; }
 
     try {
       setLoading(true);
       toast.loading('Claiming profits...', { id: 'profit' });
 
       const chainConfig = getCurrentChainConfig();
+
+      // Capture current profits before withdrawing
+      let preWithdrawProfitsWei = 0n;
+      try {
+        preWithdrawProfitsWei = ethers.parseEther(userProfits || '0');
+      } catch {}
 
       const hash = await walletClient.writeContract({
         address: chainConfig.flashbankAddress as `0x${string}`,
@@ -462,13 +471,36 @@ export default function Home() {
 
       toast.loading('Confirming transaction...', { id: 'profit' });
       await publicClient.waitForTransactionReceipt({ hash });
-      toast.success('Profit withdrawal successful!', { id: 'profit' });
-      
+
+      // Optional donation after withdraw
+      const hasDonationAddress = DONATION_ADDRESS.match(/^0x[a-f0-9]{40}$/);
+      if (hasDonationAddress && donationPercent > 0 && preWithdrawProfitsWei > 0n) {
+        const donationWei = (preWithdrawProfitsWei * BigInt(donationPercent)) / 100n;
+        if (donationWei > 0n) {
+          try {
+            const donateHash = await walletClient.sendTransaction({
+              to: DONATION_ADDRESS as `0x${string}`,
+              value: donationWei,
+              account: address as `0x${string}`,
+              chain: { id: chainId, name: chainConfig.name, nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: [chainConfig.rpcUrl] } }, blockExplorers: { default: { name: chainConfig.name, url: chainConfig.explorerUrl } } } as any,
+            } as any);
+            await publicClient.waitForTransactionReceipt({ hash: donateHash });
+            toast.success(`Donated ${ethers.formatEther(donationWei)} ETH`, { id: 'profit' });
+          } catch (e) {
+            console.error('Donation failed:', e);
+            toast.error('Donation failed (skipped)', { id: 'profit' });
+          }
+        }
+      }
+
       // Refresh data
       setTimeout(() => {
         loadUserData();
         loadPoolStats();
       }, 2000);
+      await Promise.all([loadUserData(), loadPoolStats()]);
+      toast.success('Profit withdrawal successful!', { id: 'profit' });
+      
     } catch (error) {
       console.error('Profit withdrawal error:', error);
       toast.error('Profit withdrawal failed', { id: 'profit' });
@@ -490,16 +522,16 @@ export default function Home() {
         <Toaster position="top-right" />
 
         {/* Security Notice Banner */}
-        <div className="bg-yellow-50 border-b border-yellow-200">
-          <div className="container mx-auto px-6 py-3">
-            <div className="flex items-center justify-center space-x-2 text-sm">
+        <div className="bg-yellow-50 border-b border-yellow-200 overflow-hidden">
+          <div className="container mx-auto max-w-full px-4 sm:px-6 py-3">
+            <div className="flex flex-wrap items-center justify-center gap-2 text-sm text-center">
               <AlertTriangle className="h-4 w-4 text-yellow-600" />
               <span className="text-yellow-800">
                 <strong>Security Notice:</strong> FlashBank has not been externally audited yet.
               </span>
               <a
                 href="/security-audit"
-                className="text-yellow-900 underline font-medium hover:text-yellow-700"
+                className="text-yellow-900 underline font-medium hover:text-yellow-700 truncate"
               >
                 View our detailed line-by-line security analysis →
               </a>
@@ -509,18 +541,18 @@ export default function Home() {
         
         {/* Header - Always visible */}
         <header className="bg-white border-b border-gray-200">
-          <div className="container mx-auto px-6 py-4">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center space-x-3">
+          <div className="container mx-auto max-w-full px-4 sm:px-6 py-4">
+            <div className="flex flex-wrap justify-between items-center gap-3">
+              <div className="flex items-center space-x-3 min-w-0">
                 <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
                   <Zap className="h-6 w-6 text-white" />
                 </div>
-                <h1 className="text-2xl font-bold text-gray-900">FlashBank.net</h1>
+                <h1 className="text-2xl font-bold text-gray-900 truncate">FlashBank.net</h1>
               </div>
 
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center flex-wrap gap-3">
                 {/* Chain Selector */}
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar max-w-full">
                   {Object.entries(CHAIN_CONFIGS).map(([chainIdStr, config]) => {
                     const buttonChainId = Number(chainIdStr);
                     const isActive = buttonChainId === chainId;
@@ -689,14 +721,24 @@ export default function Home() {
                 {/* Claim Profits */}
                 <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm flex flex-col w-full md:w-1/2 lg:w-1/3 xl:w-1/4">
                   <div className="flex-grow">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
-                    <TrendingUp className="h-5 w-5 text-green-600 mr-2" />
-                    Claim Profits
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Withdraw your earnings from flash loan fees
-                  </p>
-                  <div className="text-2xl font-bold text-green-600 mb-3">{userProfits} ETH</div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                      <TrendingUp className="h-5 w-5 text-green-600 mr-2" />
+                      Claim Profits
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Withdraw your earnings from flash loan fees
+                    </p>
+                    <div className="text-2xl font-bold text-green-600 mb-3">{userProfits} ETH</div>
+                   <div className="mb-3">
+                     <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                       <span>Donation</span>
+                       <span>{donationPercent}%</span>
+                     </div>
+                     <input type="range" min={0} max={100} value={donationPercent} onChange={(e) => setDonationPercent(parseInt(e.target.value || '0'))} className="w-full" disabled={actionsDisabled || !(DONATION_ADDRESS && DONATION_ADDRESS.startsWith('0x'))} />
+                     {!(DONATION_ADDRESS && DONATION_ADDRESS.startsWith('0x')) && (
+                       <div className="text-xs text-gray-500 mt-1">Set NEXT_PUBLIC_DONATION_ADDRESS to enable donations.</div>
+                     )}
+                   </div>
                   </div>
                   <button
                     onClick={handleWithdrawProfit}
@@ -735,6 +777,138 @@ export default function Home() {
                   </div>
                 </div>
               </div>
+
+              {/* Instructions & Statistics (Connected) */}
+              <section id="instructions" className="py-12 bg-white">
+                <div className="container mx-auto px-0 md:px-6">
+                  <div className="text-center mb-12">
+                    <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">📚 Instructions & Statistics</h2>
+                    <p className="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto">
+                      Complete guide to using FlashBank and real-time statistics for each supported network
+                    </p>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-12 mb-12">
+                    {/* Instructions */}
+                    <div>
+                      <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                        <BookOpen className="h-6 w-6 text-blue-600 mr-3" />
+                        How to Use FlashBank
+                      </h3>
+                      <div className="space-y-6">
+                        <div className="bg-blue-50 rounded-lg p-6">
+                          <h4 className="font-semibold text-blue-900 mb-3">1. Connect Your Wallet</h4>
+                          <p className="text-blue-700 text-sm">
+                            Use MetaMask, WalletConnect, or any supported wallet to connect to FlashBank.
+                            Make sure you're on <strong>Sepolia (soft launch)</strong>.
+                          </p>
+                        </div>
+                        <div className="bg-green-50 rounded-lg p-6">
+                          <h4 className="font-semibold text-green-900 mb-3">2. Approve Access</h4>
+                          <p className="text-green-700 text-sm">
+                            Grant FlashBank permission to temporarily use your ETH for flash loans.
+                            Your ETH stays in your wallet - only used during loan execution.
+                          </p>
+                        </div>
+                        <div className="bg-purple-50 rounded-lg p-6">
+                          <h4 className="font-semibold text-purple-900 mb-3">3. Set Commitment (Optional)</h4>
+                          <p className="text-purple-700 text-sm">
+                            Set a maximum ETH limit or leave as "Auto" for unlimited participation.
+                            You can change this anytime.
+                          </p>
+                        </div>
+                        <div className="bg-orange-50 rounded-lg p-6">
+                          <h4 className="font-semibold text-orange-900 mb-3">4. Start Earning</h4>
+                          <p className="text-orange-700 text-sm">
+                            Your ETH will be used for flash loans when needed. Earn fees proportional
+                            to the amount lent. Withdraw profits anytime.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Network Statistics */}
+                    <div>
+                      <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                        <TrendingUp className="h-6 w-6 text-green-600 mr-3" />
+                        Network Statistics
+                      </h3>
+                      <div className="space-y-4">
+                        {Object.entries(CHAIN_CONFIGS).map(([chainIdStr, config]) => {
+                          const statsChainId = Number(chainIdStr);
+                          const isCurrentChain = statsChainId === chainId;
+                          return (
+                            <div key={chainIdStr} className={`border rounded-lg p-4 ${
+                              isCurrentChain ? `border-${config.color}-200 bg-${config.color}-50` : 'border-gray-200 bg-gray-50'
+                            }`}>
+                              <div className="flex items-center justify-between mb-3">
+                                <h4 className={`font-semibold flex items-center ${
+                                  isCurrentChain ? `${COLOR_CLASSES[config.color].text800}` : 'text-gray-700'
+                                }`}>
+                                  {config.icon} {config.name}
+                                </h4>
+                                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                  isCurrentChain
+                                    ? `${COLOR_CLASSES[config.color].bg100} ${COLOR_CLASSES[config.color].text800}`
+                                    : 'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {isCurrentChain ? 'Current' : 'Switch'}
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                  <span className="text-gray-600">Total Committed:</span>
+                                  <div className={`font-semibold ${
+                                    isCurrentChain ? `${COLOR_CLASSES[config.color].text700}` : 'text-gray-700'
+                                  }`}>
+                                    {statsChainId === chainId ? poolStats.totalCommitted : '0.00'} ETH
+                                  </div>
+                                </div>
+                                <div>
+                                  <span className="text-gray-600">Active Providers:</span>
+                                  <div className={`font-semibold ${
+                                    isCurrentChain ? `${COLOR_CLASSES[config.color].text700}` : 'text-gray-700'
+                                  }`}>
+                                    {statsChainId === chainId ? poolStats.numProviders : '0'}
+                                  </div>
+                                </div>
+                                <div>
+                                  <span className="text-gray-600">Total Profits:</span>
+                                  <div className={`font-semibold ${
+                                    isCurrentChain ? `${COLOR_CLASSES[config.color].text700}` : 'text-gray-700'
+                                  }`}>
+                                    {statsChainId === chainId ? poolStats.totalProfits : '0.00'} ETH
+                                  </div>
+                                </div>
+                                <div>
+                                  <span className="text-gray-600">Flash Loan Fee:</span>
+                                  <div className={`font-semibold ${
+                                    isCurrentChain ? `${COLOR_CLASSES[config.color].text700}` : 'text-gray-700'
+                                  }`}>
+                                    0.02%
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="mt-3 pt-3 border-top border-gray-200">
+                                <a
+                                  href={config.explorerUrl + '/address/' + config.flashbankAddress}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={`text-xs hover:underline ${
+                                    isCurrentChain ? `${COLOR_CLASSES[config.color].text600}` : 'text-gray-500'
+                                  }`}
+                                >
+                                  View Contract →
+                                </a>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
             </div>
           </main>
         ) : (
@@ -847,7 +1021,7 @@ export default function Home() {
                         {
                           icon: Shield,
                           title: "Zero Permanent Risk",
-                          desc: "Your ETH only leaves your wallet during flash loan execution - typically microseconds"
+                          desc: "Your ETH only leaves wallet during flash loan execution - typically microseconds"
                         },
                         {
                           icon: Clock,
@@ -1031,7 +1205,7 @@ export default function Home() {
                                 <div className={`font-semibold ${
                                   isCurrentChain ? `${COLOR_CLASSES[config.color].text700}` : 'text-gray-700'
                                 }`}>
-                                  {statsChainId === arbitrum.id ? poolStats.totalCommitted : '0.00'} ETH
+                                  {statsChainId === chainId ? poolStats.totalCommitted : '0.00'} ETH
                                 </div>
                               </div>
                               <div>
@@ -1039,7 +1213,7 @@ export default function Home() {
                                 <div className={`font-semibold ${
                                   isCurrentChain ? `${COLOR_CLASSES[config.color].text700}` : 'text-gray-700'
                                 }`}>
-                                  {statsChainId === arbitrum.id ? poolStats.numProviders : '0'}
+                                  {statsChainId === chainId ? poolStats.numProviders : '0'}
                                 </div>
                               </div>
                               <div>
@@ -1047,7 +1221,7 @@ export default function Home() {
                                 <div className={`font-semibold ${
                                   isCurrentChain ? `${COLOR_CLASSES[config.color].text700}` : 'text-gray-700'
                                 }`}>
-                                  {statsChainId === arbitrum.id ? poolStats.totalProfits : '0.00'} ETH
+                                  {statsChainId === chainId ? poolStats.totalProfits : '0.00'} ETH
                                 </div>
                               </div>
                               <div>

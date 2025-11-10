@@ -328,3 +328,26 @@ npm run website:preview
 **Built with ❤️ for the DeFi community**
 
 **Revolutionary trustless flash loans with zero permanent risk** 🏦⚡
+
+---
+
+## 🧪 Demo Flash Loan (Sepolia)
+
+- A minimal borrower `DemoFlashBorrower.sol` is included to prove end-to-end flash loan flow.
+- Deploy it with:
+
+```bash
+# Use known pool address by network, or override via env
+FLASHBANK_ADDRESS=0xBDcC71d5F73962d017756A04919FBba9d30F0795 \
+npx hardhat run scripts/deploy-demo-borrower.js --network sepolia
+```
+
+- Set the website env to enable the button:
+
+```bash
+NEXT_PUBLIC_SEPOLIA_DEMO_BORROWER_ADDRESS=0xYourDeployedDemo
+```
+
+- On the website (Sepolia default), use "One‑click Demo" to run a small flash loan.
+  - You approve the tx, pay gas + exact fee (auto‑calculated), and get proof via events.
+  - The UI decodes `FlashLoanExecuted` and demo events from the tx receipt.

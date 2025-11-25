@@ -1,7 +1,9 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-describe("🔥 FlashBankRevolutionary - Revolutionary Flash Loan System", function () {
+// Legacy deposit-based suite retained for reference but skipped because the router + WETH flow
+// supersedes this contract. The new FlashBankRouter tests cover the supported architecture.
+describe.skip("🔥 FlashBankRevolutionary - Revolutionary Flash Loan System", function () {
   let flashBank;
   let owner;
   let alice;
@@ -136,7 +138,7 @@ describe("🔥 FlashBankRevolutionary - Revolutionary Flash Loan System", functi
       const initialCarolBalance = await ethers.provider.getBalance(carol.address);
 
       // Execute flash loan
-      await expect(flashBank.connect(mockReceiver.target).flashLoan(flashLoanAmount, "0x"))
+      await expect(mockReceiver.requestFlashLoan(await flashBank.getAddress(), flashLoanAmount))
         .to.emit(flashBank, "FlashLoanExecuted");
 
       const finalContractBalance = await ethers.provider.getBalance(await flashBank.getAddress());
@@ -200,7 +202,7 @@ describe("🔥 FlashBankRevolutionary - Revolutionary Flash Loan System", functi
 
       // Flash loan should fail
       await expect(
-        flashBank.connect(mockReceiver.target).flashLoan(ethers.parseEther("10"), "0x")
+        mockReceiver.requestFlashLoan(await flashBank.getAddress(), ethers.parseEther("10"))
       ).to.be.revertedWithCustomError(flashBank, "FlashLoanFailed");
 
       const finalAliceBalance = await ethers.provider.getBalance(alice.address);
@@ -232,7 +234,7 @@ describe("🔥 FlashBankRevolutionary - Revolutionary Flash Loan System", functi
       const mockReceiver = await MockFlashLoanReceiver.deploy(true, true);
       await mockReceiver.waitForDeployment();
 
-      await flashBank.connect(mockReceiver.target).flashLoan(ethers.parseEther("5"), "0x");
+      await mockReceiver.requestFlashLoan(await flashBank.getAddress(), ethers.parseEther("5"));
 
       const profitAmount = await flashBank.userProfitShares(alice.address);
       expect(profitAmount).to.be.gt(0);

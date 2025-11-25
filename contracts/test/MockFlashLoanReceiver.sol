@@ -3,6 +3,10 @@ pragma solidity ^0.8.19;
 
 import "../IL2FlashLoan.sol";
 
+interface IFlashBankLegacy {
+	function flashLoan(uint256 amount, bytes calldata data) external;
+}
+
 /**
  * @title MockFlashLoanReceiver
  * @dev Mock contract for testing flash loan scenarios
@@ -34,4 +38,8 @@ contract MockFlashLoanReceiver is IL2FlashLoan {
     
     // Function to fund this contract for testing
     function fund() external payable {}
+
+	function requestFlashLoan(address flashBank, uint256 amount) external {
+		IFlashBankLegacy(flashBank).flashLoan(amount, "");
+	}
 }

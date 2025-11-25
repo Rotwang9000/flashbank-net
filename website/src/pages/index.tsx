@@ -1,1663 +1,1273 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Head from 'next/head';
 import { ethers } from 'ethers';
 import { useAppKitAccount } from '@reown/appkit/library/react';
-import { usePublicClient, useWalletClient } from 'wagmi';
-import { arbitrum, mainnet, base, sepolia } from '@wagmi/core/chains';
-import { useIsMounted } from '../hooks/useIsMounted';
-import { useChainId, useSwitchChain } from 'wagmi';
-import { motion } from 'framer-motion';
-import {
-  Zap,
-  Shield,
-  TrendingUp,
-  Users,
-  DollarSign,
-  Lock,
-  ArrowRight,
-  CheckCircle,
-  AlertTriangle,
-  Wallet,
-  Clock,
-  Target,
-  Coins,
-  BookOpen
-} from 'lucide-react';
+import { useChainId, useSwitchChain, usePublicClient, useWalletClient, useDisconnect } from 'wagmi';
 import toast, { Toaster } from 'react-hot-toast';
+import { Zap, Repeat, Shield, PauseCircle, PlayCircle, ArrowRightCircle, BookOpen, Code, ExternalLink } from 'lucide-react';
+import { useIsMounted } from '../hooks/useIsMounted';
 
-// Chain configurations - Load from environment variables
-const ANKR_API_KEY = process.env.NEXT_PUBLIC_ANKR_API_KEY || '2e8f34fc656bf1d606b8bec1dcb00db2398ed0529bb68fe0fc39f080865397fd';
-const DONATION_ADDRESS = (process.env.NEXT_PUBLIC_DONATION_ADDRESS || '').toLowerCase();
-const APPROX_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
-const APPROX_ENABLED = (process.env.NEXT_PUBLIC_APPROX_COMMIT_ENABLED || 'true') === 'true';
-const APPROX_SCAN_MAX = Number(process.env.NEXT_PUBLIC_APPROX_COMMIT_SCAN_MAX || '20');
-
-const CHAIN_CONFIGS = {
-  [arbitrum.id]: {
-    name: 'Arbitrum',
-    flashbankAddress: process.env.NEXT_PUBLIC_ARBITRUM_FLASHBANK_ADDRESS || '0x5c0156da501BC97DD35017Fb20624B7f1Ce7E095',
-    demoBorrowerAddress: process.env.NEXT_PUBLIC_ARBITRUM_DEMO_BORROWER_ADDRESS || '',
-    proofSinkAddress: process.env.NEXT_PUBLIC_ARBITRUM_PROOF_SINK_ADDRESS || '',
-    rpcUrl: 'https://arb1.arbitrum.io/rpc',
-    explorerUrl: 'https://arbiscan.io',
-    color: 'blue',
-    icon: '🔷'
-  },
-  [mainnet.id]: {
+const NETWORKS = {
+	1: {
     name: 'Ethereum',
-    flashbankAddress: process.env.NEXT_PUBLIC_ETHEREUM_FLASHBANK_ADDRESS || '0x54b9Bc0679f5106AC3682a74518b229409b4eA15',
-    demoBorrowerAddress: process.env.NEXT_PUBLIC_ETHEREUM_DEMO_BORROWER_ADDRESS || '',
-    proofSinkAddress: process.env.NEXT_PUBLIC_ETHEREUM_PROOF_SINK_ADDRESS || '',
-    rpcUrl: 'https://cloudflare-eth.com',
-    explorerUrl: 'https://etherscan.io',
+		rpcUrl: process.env.NEXT_PUBLIC_MAINNET_RPC_URL || 'https://cloudflare-eth.com',
+		router: process.env.NEXT_PUBLIC_MAINNET_ROUTER_ADDRESS || '',
+		explorer: 'https://etherscan.io',
     color: 'purple',
-    icon: '🔶'
-  },
-  [sepolia.id]: {
-    name: 'Sepolia',
-    flashbankAddress: process.env.NEXT_PUBLIC_SEPOLIA_FLASHBANK_ADDRESS || '0xBDcC71d5F73962d017756A04919FBba9d30F0795',
-    demoBorrowerAddress: process.env.NEXT_PUBLIC_SEPOLIA_DEMO_BORROWER_ADDRESS || '',
-    proofSinkAddress: process.env.NEXT_PUBLIC_SEPOLIA_PROOF_SINK_ADDRESS || '',
-    rpcUrl: 'https://ethereum-sepolia-rpc.publicnode.com',
-    explorerUrl: 'https://sepolia.etherscan.io',
-    color: 'yellow',
-    icon: '🧪'
-  },
-  [base.id]: {
+		tokens: [
+			{
+				key: 'weth',
+				name: 'Wrapped Ether',
+				symbol: 'WETH',
+				address: process.env.NEXT_PUBLIC_MAINNET_WETH_ADDRESS || '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+				decimals: 18,
+				supportsPermit: true
+			}
+		],
+		demoBorrower: process.env.NEXT_PUBLIC_MAINNET_DEMO_BORROWER_ADDRESS || '',
+		proofSink: process.env.NEXT_PUBLIC_MAINNET_PROOF_SINK_ADDRESS || '',
+		demoCounter: process.env.NEXT_PUBLIC_MAINNET_DEMO_COUNTER_ADDRESS || ''
+	},
+	8453: {
     name: 'Base',
-    flashbankAddress: process.env.NEXT_PUBLIC_BASE_FLASHBANK_ADDRESS || '0x779F8D578F279738c17D9f26B33fe46d32b91Eb7',
-    demoBorrowerAddress: process.env.NEXT_PUBLIC_BASE_DEMO_BORROWER_ADDRESS || '',
-    proofSinkAddress: process.env.NEXT_PUBLIC_BASE_PROOF_SINK_ADDRESS || '',
-    rpcUrl: 'https://mainnet.base.org',
-    explorerUrl: 'https://basescan.org',
-    color: 'red',
-    icon: '🔴'
-  }
-};
+		rpcUrl: process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org',
+		router: process.env.NEXT_PUBLIC_BASE_ROUTER_ADDRESS || '',
+		explorer: 'https://basescan.org',
+		color: 'blue',
+		tokens: [
+			{
+				key: 'weth',
+				name: 'Wrapped Ether',
+				symbol: 'WETH',
+				address: process.env.NEXT_PUBLIC_BASE_WETH_ADDRESS || '0x4200000000000000000000000000000000000006',
+				decimals: 18,
+				supportsPermit: true
+			}
+		],
+		demoBorrower: process.env.NEXT_PUBLIC_BASE_DEMO_BORROWER_ADDRESS || '',
+		proofSink: process.env.NEXT_PUBLIC_BASE_PROOF_SINK_ADDRESS || '',
+		demoCounter: process.env.NEXT_PUBLIC_BASE_DEMO_COUNTER_ADDRESS || ''
+	},
+	42161: {
+		name: 'Arbitrum',
+		rpcUrl: process.env.NEXT_PUBLIC_ARBITRUM_RPC_URL || 'https://arb1.arbitrum.io/rpc',
+		router: process.env.NEXT_PUBLIC_ARBITRUM_ROUTER_ADDRESS || '',
+		explorer: 'https://arbiscan.io',
+		color: 'green',
+		tokens: [
+			{
+				key: 'weth',
+				name: 'Wrapped Ether',
+				symbol: 'WETH',
+				address: process.env.NEXT_PUBLIC_ARBITRUM_WETH_ADDRESS || '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
+				decimals: 18,
+				supportsPermit: true
+			}
+		],
+		demoBorrower: process.env.NEXT_PUBLIC_ARBITRUM_DEMO_BORROWER_ADDRESS || '',
+		proofSink: process.env.NEXT_PUBLIC_ARBITRUM_PROOF_SINK_ADDRESS || '',
+		demoCounter: process.env.NEXT_PUBLIC_ARBITRUM_DEMO_COUNTER_ADDRESS || ''
+	},
+	11155111: {
+		name: 'Sepolia',
+		rpcUrl: process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com',
+		router: process.env.NEXT_PUBLIC_SEPOLIA_ROUTER_ADDRESS || '',
+		explorer: 'https://sepolia.etherscan.io',
+		color: 'yellow',
+		tokens: [
+			{
+				key: 'weth',
+				name: 'Wrapped Ether',
+				symbol: 'WETH',
+				address: process.env.NEXT_PUBLIC_SEPOLIA_WETH_ADDRESS || '0xdd13E55209Fd76AfE204dBda4007C227904f0a81',
+				decimals: 18,
+				supportsPermit: false
+			}
+		],
+		demoBorrower: process.env.NEXT_PUBLIC_SEPOLIA_DEMO_BORROWER_ADDRESS || '',
+		proofSink: process.env.NEXT_PUBLIC_SEPOLIA_PROOF_SINK_ADDRESS || '',
+		demoCounter: process.env.NEXT_PUBLIC_SEPOLIA_DEMO_COUNTER_ADDRESS || ''
+	}
+} as const;
 
-// FlashBank Revolutionary contract ABI (JSON format for wagmi compatibility)
-const FLASHBANK_ABI = [
-  { "inputs": [], "name": "approveUnlimited", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
-  { "inputs": [{ "internalType": "uint256", "name": "limit", "type": "uint256" }], "name": "setCommitmentLimit", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
-  { "inputs": [{ "internalType": "uint256", "name": "amount", "type": "uint256" }], "name": "commitLiquidity", "outputs": [], "stateMutability": "payable", "type": "function" },
-  { "inputs": [{ "internalType": "uint256", "name": "amount", "type": "uint256" }], "name": "withdrawCommitment", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
-  { "inputs": [], "name": "withdrawProfits", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
-  { "inputs": [{ "internalType": "address", "name": "user", "type": "address" }], "name": "getUserBalance", "outputs": [{ "internalType": "uint256", "name": "commitment", "type": "uint256" }, { "internalType": "uint256", "name": "profits", "type": "uint256" }], "stateMutability": "view", "type": "function" },
-  { "inputs": [], "name": "getPoolStats", "outputs": [{ "internalType": "uint256", "name": "totalCommitted", "type": "uint256" }, { "internalType": "uint256", "name": "totalProfits", "type": "uint256" }, { "internalType": "uint256", "name": "numProviders", "type": "uint256" }, { "internalType": "uint256", "name": "contractAge", "type": "uint256" }], "stateMutability": "view", "type": "function" },
-  { "inputs": [{ "internalType": "uint256", "name": "amount", "type": "uint256" }], "name": "calculateFlashLoanFee", "outputs": [{ "internalType": "uint256", "name": "fee", "type": "uint256" }], "stateMutability": "view", "type": "function" },
-  { "inputs": [], "name": "flashLoanFeeRate", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },
-  { "inputs": [], "name": "getSecurityInfo", "outputs": [{ "internalType": "bool", "name": "isUpgradeable", "type": "bool" }, { "internalType": "uint256", "name": "maxFeeRate", "type": "uint256" }, { "internalType": "uint256", "name": "absoluteMaxFlashLoan", "type": "uint256" }, { "internalType": "uint256", "name": "deployedAt", "type": "uint256" }, { "internalType": "uint256", "name": "creationBlock", "type": "uint256" }], "stateMutability": "view", "type": "function" },
-  { "inputs": [{ "internalType": "address", "name": "user", "type": "address" }], "name": "userCommitments", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },
-  { "inputs": [], "name": "totalCommittedLiquidity", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },
-  { "inputs": [{ "internalType": "uint256", "name": "index", "type": "uint256" }], "name": "liquidityProviders", "outputs": [{ "internalType": "address", "name": "", "type": "address" }], "stateMutability": "view", "type": "function" },
-  { "inputs": [{ "internalType": "address", "name": "user", "type": "address" }], "name": "isLiquidityProvider", "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }], "stateMutability": "view", "type": "function" }
+const ROUTER_ABI = [
+	{
+		inputs: [
+			{ internalType: 'address', name: 'token', type: 'address' },
+			{ components: [
+				{ internalType: 'bool', name: 'enabled', type: 'bool' },
+				{ internalType: 'bool', name: 'supportsPermit', type: 'bool' },
+				{ internalType: 'uint16', name: 'feeBps', type: 'uint16' },
+				{ internalType: 'uint256', name: 'maxFlashLoan', type: 'uint256' },
+				{ internalType: 'address', name: 'wrapper', type: 'address' }
+			], internalType: 'struct FlashBankRouter.TokenConfig', name: 'config', type: 'tuple' }
+		],
+		name: 'setTokenConfig',
+		outputs: [],
+		stateMutability: 'nonpayable',
+		type: 'function'
+	},
+	{
+		inputs: [
+			{ internalType: 'address', name: 'token', type: 'address' },
+			{ internalType: 'uint256', name: 'limit', type: 'uint256' },
+			{ internalType: 'uint48', name: 'expiry', type: 'uint48' },
+			{ internalType: 'bool', name: 'paused', type: 'bool' }
+		],
+		name: 'setCommitment',
+		outputs: [],
+		stateMutability: 'nonpayable',
+		type: 'function'
+	},
+	{
+		inputs: [
+			{ internalType: 'address', name: 'token', type: 'address' },
+			{ internalType: 'uint256', name: 'amount', type: 'uint256' }
+		],
+		name: 'quoteFee',
+		outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+		stateMutability: 'view',
+		type: 'function'
+	},
+	{
+		inputs: [
+			{ internalType: 'address', name: 'token', type: 'address' },
+			{ internalType: 'address', name: 'provider', type: 'address' }
+		],
+		name: 'getProviderInfo',
+		outputs: [
+			{ internalType: 'uint256', name: 'limit', type: 'uint256' },
+			{ internalType: 'uint256', name: 'inUse', type: 'uint256' },
+			{ internalType: 'uint48', name: 'expiry', type: 'uint48' },
+			{ internalType: 'bool', name: 'paused', type: 'bool' },
+			{ internalType: 'bool', name: 'registered', type: 'bool' }
+		],
+		stateMutability: 'view',
+		type: 'function'
+	},
+	{
+		inputs: [{ internalType: 'address', name: 'token', type: 'address' }],
+		name: 'getTokenStats',
+		outputs: [
+			{ internalType: 'uint256', name: 'committed', type: 'uint256' },
+			{ internalType: 'uint256', name: 'activeProviders', type: 'uint256' },
+			{ internalType: 'uint16', name: 'feeBps', type: 'uint16' },
+			{ internalType: 'uint256', name: 'maxFlashLoan', type: 'uint256' },
+			{ internalType: 'bool', name: 'supportsPermit', type: 'bool' },
+			{ internalType: 'uint16', name: 'maxBorrowBps', type: 'uint16' }
+		],
+		stateMutability: 'view',
+		type: 'function'
+	},
+	{
+		inputs: [{ internalType: 'address', name: 'token', type: 'address' }],
+		name: 'getProviders',
+		outputs: [{ internalType: 'address[]', name: '', type: 'address[]' }],
+		stateMutability: 'view',
+		type: 'function'
+	}
 ] as const;
 
-// Event interface to decode proof from tx receipt
-const FLASHBANK_EVENTS_ABI = [
-  { "anonymous": false, "inputs": [
-    { "indexed": true, "internalType": "address", "name": "borrower", "type": "address" },
-    { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" },
-    { "indexed": false, "internalType": "uint256", "name": "fee", "type": "uint256" },
-    { "indexed": false, "internalType": "bool", "name": "success", "type": "bool" }
-  ], "name": "FlashLoanExecuted", "type": "event" }
-];
+const ERC20_ABI = [
+	{ inputs: [], name: 'deposit', outputs: [], stateMutability: 'payable', type: 'function' },
+	{ inputs: [{ internalType: 'uint256', name: 'amount', type: 'uint256' }], name: 'withdraw', outputs: [], stateMutability: 'nonpayable', type: 'function' },
+	{ inputs: [{ internalType: 'address', name: 'spender', type: 'address' }, { internalType: 'uint256', name: 'amount', type: 'uint256' }], name: 'approve', outputs: [{ internalType: 'bool', name: '', type: 'bool' }], stateMutability: 'nonpayable', type: 'function' },
+	{ inputs: [{ internalType: 'address', name: 'owner', type: 'address' }, { internalType: 'address', name: 'spender', type: 'address' }], name: 'allowance', outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }], stateMutability: 'view', type: 'function' },
+	{ inputs: [{ internalType: 'address', name: 'account', type: 'address' }], name: 'balanceOf', outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }], stateMutability: 'view', type: 'function' }
+] as const;
 
-// Demo borrower minimal ABI
 const DEMO_BORROWER_ABI = [
-  { "inputs": [{ "internalType": "uint256", "name": "amount", "type": "uint256" }], "name": "runDemo", "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }], "stateMutability": "payable", "type": "function" },
-  { "inputs": [{ "internalType": "uint256", "name": "amount", "type": "uint256" }], "name": "runDemoFail", "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }], "stateMutability": "payable", "type": "function" },
-  { "anonymous": false, "inputs": [ { "indexed": true, "internalType": "address", "name": "user", "type": "address" }, { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }, { "indexed": false, "internalType": "uint256", "name": "expectedFee", "type": "uint256" } ], "name": "DemoStart", "type": "event" },
-  { "anonymous": false, "inputs": [ { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }, { "indexed": false, "internalType": "uint256", "name": "fee", "type": "uint256" }, { "indexed": false, "internalType": "uint256", "name": "balanceBefore", "type": "uint256" } ], "name": "DemoReceived", "type": "event" },
-  { "anonymous": false, "inputs": [ { "indexed": false, "internalType": "uint256", "name": "totalRepaid", "type": "uint256" } ], "name": "DemoRepaid", "type": "event" }
-];
+	{
+		inputs: [{ internalType: 'uint256', name: 'amount', type: 'uint256' }],
+		name: 'runDemo',
+		outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
+		stateMutability: 'payable',
+		type: 'function'
+	},
+	{
+		inputs: [{ internalType: 'uint256', name: 'amount', type: 'uint256' }],
+		name: 'runDemoFail',
+		outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
+		stateMutability: 'payable',
+		type: 'function'
+	}
+] as const;
 
-// Map colour keys to Tailwind classes to avoid dynamic class names
-const COLOR_CLASSES: Record<string, { bg100: string; text800: string; border200: string; bg50: string; text700: string; text600: string }>= {
-  blue:   { bg100: 'bg-blue-100',   text800: 'text-blue-800',   border200: 'border-blue-200',   bg50: 'bg-blue-50',   text700: 'text-blue-700',   text600: 'text-blue-600' },
-  purple: { bg100: 'bg-purple-100', text800: 'text-purple-800', border200: 'border-purple-200', bg50: 'bg-purple-50', text700: 'text-purple-700', text600: 'text-purple-600' },
-  yellow: { bg100: 'bg-yellow-100', text800: 'text-yellow-800', border200: 'border-yellow-200', bg50: 'bg-yellow-50', text700: 'text-yellow-700', text600: 'text-yellow-600' },
-  red:    { bg100: 'bg-red-100',    text800: 'text-red-800',    border200: 'border-red-200',    bg50: 'bg-red-50',    text700: 'text-red-700',    text600: 'text-red-600' },
+const DEMO_COUNTER_ABI = [
+	{
+		inputs: [],
+		name: 'getStats',
+		outputs: [
+			{ internalType: 'uint256', name: 'total', type: 'uint256' },
+			{ internalType: 'uint256', name: 'count', type: 'uint256' }
+		],
+		stateMutability: 'view',
+		type: 'function'
+	}
+] as const;
+
+const FLASHLOAN_EVENT_ABI = [
+	{
+		anonymous: false,
+		inputs: [
+			{ indexed: true, internalType: 'address', name: 'borrower', type: 'address' },
+			{ indexed: false, internalType: 'address', name: 'token', type: 'address' },
+			{ indexed: false, internalType: 'uint256', name: 'amount', type: 'uint256' },
+			{ indexed: false, internalType: 'uint256', name: 'fee', type: 'uint256' },
+			{ indexed: false, internalType: 'bool', name: 'toNative', type: 'bool' }
+		],
+		name: 'FlashLoanExecuted',
+		type: 'event'
+	}
+] as const;
+
+const formatEth = (value?: string | bigint | null, decimals = 4) => {
+	if (!value) return '0';
+	const num = typeof value === 'bigint' ? Number(ethers.formatEther(value)) : Number(value);
+	// Check if it's essentially MaxUint256 (unlimited)
+	if (num > 1e20) return 'Unlimited';
+	return num.toFixed(decimals);
 };
 
-const PROOF_OF_FUNDS_ABI = [
-  { "anonymous": false, "inputs": [
-    { "indexed": true, "internalType": "address", "name": "from", "type": "address" },
-    { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" },
-    { "indexed": false, "internalType": "bytes", "name": "data", "type": "bytes" }
-  ], "name": "Proof", "type": "event" }
-];
+const formatAddress = (addr?: string | null) => {
+	if (!addr) return '';
+	return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+};
 
 export default function Home() {
-  const isMounted = useIsMounted();
   const { address, isConnected } = useAppKitAccount();
-  const publicClient = usePublicClient();
-  const { data: walletClient } = useWalletClient();
   const chainId = useChainId();
+	const publicClient = usePublicClient({ chainId });
+	const { data: walletClient } = useWalletClient();
   const { switchChain } = useSwitchChain();
+	const { disconnect } = useDisconnect();
+	const isMounted = useIsMounted();
 
-  const [userCommitment, setUserCommitment] = useState('0');
-  const [userProfits, setUserProfits] = useState('0');
-  const [poolStats, setPoolStats] = useState({
-    totalCommitted: '0',
-    totalProfits: '0',
-    numProviders: '0',
-    contractAge: '0'
-  });
+	const [selectedTokenKey, setSelectedTokenKey] = useState('weth');
+	const [providerLimit, setProviderLimit] = useState<string>('0');
+	const [providerLimitWei, setProviderLimitWei] = useState<bigint>(0n);
+	const [providerPaused, setProviderPaused] = useState(true);
+	const [providerExpiry, setProviderExpiry] = useState<string>('None');
+	const [providerRegistered, setProviderRegistered] = useState(false);
+	const [allowance, setAllowance] = useState('0');
+	const [allowanceWei, setAllowanceWei] = useState<bigint>(0n);
+	const [wethBalance, setWethBalance] = useState('0');
+	const [ethBalance, setEthBalance] = useState('0');
+	const [limitInput, setLimitInput] = useState('');
+	const [isUnlimitedCommitment, setIsUnlimitedCommitment] = useState(true);
+	const [limitDirty, setLimitDirty] = useState(false);
+	const [wrapAmount, setWrapAmount] = useState('0.1');
+	const [unwrapAmount, setUnwrapAmount] = useState('0.1');
+	const [poolStats, setPoolStats] = useState({ committed: '0', providers: '0', feeBps: 0 });
+	const [quoteFee, setQuoteFee] = useState('0');
+	const [demoAmount, setDemoAmount] = useState('0.1');
+	const [isRunningDemo, setIsRunningDemo] = useState(false);
+	const [demoTxHash, setDemoTxHash] = useState<string | null>(null);
+	const [demoResult, setDemoResult] = useState<{ amount: string; fee: string } | null>(null);
+	const [demoFailMode, setDemoFailMode] = useState(false);
+	const [demoOutcome, setDemoOutcome] = useState<'none' | 'success' | 'blocked'>('none');
+	const [demoError, setDemoError] = useState<string | null>(null);
+	const [demoCounterTotal, setDemoCounterTotal] = useState('0');
 
-  // New workflow state
-  const [approvalStep, setApprovalStep] = useState<'not-approved' | 'approved' | 'limit-set'>('not-approved');
-  const [commitmentLimit, setCommitmentLimit] = useState('0'); // 0 = unlimited/auto
-  const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [unlimitedToggle, setUnlimitedToggle] = useState(false);
-  const [removeAllToggle, setRemoveAllToggle] = useState(false);
-  const [donationPercent, setDonationPercent] = useState(10); // default 10%
-  const [approxCommitted, setApproxCommitted] = useState<string | null>(null);
-  // Demo flash loan state
-  const [demoAmount, setDemoAmount] = useState('0.01');
-  const [demoFee, setDemoFee] = useState<string | null>(null);
-  const [isRunningDemo, setIsRunningDemo] = useState(false);
-  const [demoTxHash, setDemoTxHash] = useState<string | null>(null);
-  const [demoProof, setDemoProof] = useState<{ amount: string; fee: string; success: boolean } | null>(null);
-  const [externalProof, setExternalProof] = useState<{ amount: string } | null>(null);
-  const [demoFailMode, setDemoFailMode] = useState(false);
+	const networkConfig = NETWORKS[chainId as keyof typeof NETWORKS] || NETWORKS[11155111];
+	const selectedToken = useMemo(() => {
+		return networkConfig.tokens.find((token) => token.key === selectedTokenKey) || networkConfig.tokens[0];
+	}, [networkConfig, selectedTokenKey]);
 
-  // Soft-launch: enable actions only on Sepolia
-  const SOFT_LAUNCH_CHAIN_ID = sepolia.id;
-  const actionsDisabled = isConnected && chainId !== SOFT_LAUNCH_CHAIN_ID;
-
-  // Load user data and pool stats
   useEffect(() => {
-    if (isMounted && isConnected && address) {
-      loadUserData();
-    }
-  }, [isMounted, isConnected, address]);
+		if (!networkConfig.tokens.find((token) => token.key === selectedTokenKey)) {
+			setSelectedTokenKey(networkConfig.tokens[0].key);
+		}
+	}, [networkConfig, selectedTokenKey]);
 
-  // Always load pool stats for current chain (even if not connected)
-  useEffect(() => {
-    if (isMounted) {
-      loadPoolStats();
-    }
-  }, [isMounted, chainId]);
+	const routerReady = networkConfig.router && selectedToken?.address;
 
-  const getCurrentChainConfig = () => {
-    return CHAIN_CONFIGS[chainId as keyof typeof CHAIN_CONFIGS] || CHAIN_CONFIGS[arbitrum.id];
-  };
+	const refreshPoolStats = useCallback(async () => {
+		if (!routerReady || !selectedToken || !networkConfig.router || !publicClient) {
+			setPoolStats({ committed: '0', providers: '0', feeBps: 0 });
+			setQuoteFee('0');
+			return;
+		}
 
-  // Helpers to persist last commitment across sessions per chain and address
-  const getLastCommitmentKey = (addr: string | undefined, id: number) => `flashbank:lastCommitment:${id}:${(addr || '').toLowerCase()}`;
-  const saveLastCommitment = (addr: string, id: number, value: string) => {
-    try { localStorage.setItem(getLastCommitmentKey(addr, id), value); } catch {}
-  };
-  const loadLastCommitment = (addr: string, id: number): string | null => {
-    try { return localStorage.getItem(getLastCommitmentKey(addr, id)); } catch { return null; }
-  };
-  const clearLastCommitment = (addr: string, id: number) => {
-    try { localStorage.removeItem(getLastCommitmentKey(addr, id)); } catch {}
-  };
+		try {
+			const stats = await publicClient.readContract({
+				address: networkConfig.router as `0x${string}`,
+				abi: ROUTER_ABI,
+				functionName: 'getTokenStats',
+				args: [selectedToken.address]
+			});
+			
+			// Get actual available liquidity by checking provider balances
+			const providerAddresses = await publicClient.readContract({
+				address: networkConfig.router as `0x${string}`,
+				abi: ROUTER_ABI,
+				functionName: 'getProviders',
+				args: [selectedToken.address]
+			}) as `0x${string}`[];
 
-  // Safe write helper: simulate first; fallback with conservative gas on estimation failures
-  const safeWriteContract = async (
-    functionName: keyof typeof FLASHBANK_ABI extends never ? string : any,
-    args: any[] = [],
-    value?: bigint
-  ): Promise<`0x${string}`> => {
-    if (!walletClient || !publicClient || !address) throw new Error('Wallet not ready');
-    const chainConfig = getCurrentChainConfig();
-    try {
-      const { request } = await publicClient.simulateContract({
-        address: chainConfig.flashbankAddress as `0x${string}`,
-        abi: FLASHBANK_ABI as any,
-        functionName: functionName as any,
-        args,
-        value,
-        account: address as `0x${string}`,
-        chain: undefined as any,
-      } as any);
-      return await walletClient.writeContract(request as any);
-    } catch (err) {
-      const fallbackGas: Record<string, bigint> = {
-        approveUnlimited: BigInt(120000),
-        setCommitmentLimit: BigInt(140000),
-        commitLiquidity: BigInt(220000),
-        withdrawCommitment: BigInt(220000),
-        withdrawProfits: BigInt(140000),
-      };
-      const gas = fallbackGas[String(functionName)] || BigInt(220000);
-      return await walletClient.writeContract({
-        address: chainConfig.flashbankAddress as `0x${string}`,
-        abi: FLASHBANK_ABI as any,
-        functionName: functionName as any,
-        args,
-        account: address as `0x${string}`,
-        gas,
-        chain: {
-          id: chainId,
-          name: chainConfig.name,
-          nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-          rpcUrls: { default: { http: [chainConfig.rpcUrl] } },
-          blockExplorers: { default: { name: chainConfig.name, url: chainConfig.explorerUrl } }
-        } as any,
-      } as any);
-    }
-  };
+			let actualCommitted = 0n;
+			for (const provider of providerAddresses) {
+				const info = await publicClient.readContract({
+					address: networkConfig.router as `0x${string}`,
+					abi: ROUTER_ABI,
+					functionName: 'getProviderInfo',
+					args: [selectedToken.address, provider]
+				});
+				const limit = info[0] as bigint;
+				const paused = info[3] as boolean;
+				if (!paused && limit > 0n) {
+					const balance = await publicClient.readContract({
+						address: selectedToken.address as `0x${string}`,
+						abi: ERC20_ABI,
+						functionName: 'balanceOf',
+						args: [provider]
+					}) as bigint;
+					// Available = min(limit, balance)
+					actualCommitted += balance < limit ? balance : limit;
+				}
+			}
 
-  const loadUserData = async () => {
-    try {
-      if (!address || !publicClient) return;
-
-      const chainConfig = getCurrentChainConfig();
-      const provider = new ethers.JsonRpcProvider(chainConfig.rpcUrl);
-      const contract = new ethers.Contract(chainConfig.flashbankAddress, FLASHBANK_ABI, provider);
-
-      let commitment: bigint = BigInt(0);
-      let profits: bigint = BigInt(0);
-      try {
-        const res = await contract.getUserBalance(address);
-        commitment = res[0];
-        profits = res[1];
-      } catch {}
-
-      let userCommitmentAmount: bigint = commitment;
-      try {
-        userCommitmentAmount = await contract.userCommitments(address);
-      } catch {}
-
-      const isUnlimited = userCommitmentAmount === ethers.MaxUint256;
-      setUserCommitment(isUnlimited ? 'Unlimited' : ethers.formatEther(userCommitmentAmount));
-      setUserProfits(ethers.formatEther(profits));
-
-      // Derive approval/paused state
-      const hadLast = loadLastCommitment(address, chainId);
-      if (userCommitmentAmount === BigInt(0)) {
-        setIsPaused(!!hadLast);
-        setApprovalStep('not-approved');
-      } else if (isUnlimited) {
-        setIsPaused(false);
-        setApprovalStep('approved');
-      } else {
-        setIsPaused(false);
-        setApprovalStep('limit-set');
-      }
-    } catch (error) {
-      console.error('Error loading user data:', error);
-    }
-  };
-
-  const loadPoolStats = async () => {
-    try {
-      const chainConfig = getCurrentChainConfig();
-      const provider = new ethers.JsonRpcProvider(chainConfig.rpcUrl);
-      const contract = new ethers.Contract(chainConfig.flashbankAddress, FLASHBANK_ABI, provider);
-
-      try {
-      const [totalCommitted, totalProfits, numProviders, contractAge] = await contract.getPoolStats();
       setPoolStats({
-        totalCommitted: ethers.formatEther(totalCommitted),
-        totalProfits: ethers.formatEther(totalProfits),
-        numProviders: numProviders.toString(),
-        contractAge: contractAge.toString()
-      });
-      // Approximate committed liquidity when on-chain value may be 0 due to unlimited approvals
-      const numProvidersNum = Number(numProviders);
-      const cacheKey = `flashbank:approxCommitted:${chainId}`;
-
-      // Only try to approximate if feature is enabled and on-chain total is zero
-      if (APPROX_ENABLED && totalCommitted === BigInt(0) && numProvidersNum > 0) {
-        // Try cache first
-        try {
-          const cachedRaw = localStorage.getItem(cacheKey);
-          if (cachedRaw) {
-            const cached = JSON.parse(cachedRaw);
-            if (cached && typeof cached.value === 'string' && typeof cached.ts === 'number' && (Date.now() - cached.ts) < APPROX_CACHE_TTL_MS) {
-              setApproxCommitted(cached.value);
-            }
-          }
-        } catch {}
-
-        // Decide if recompute is needed
-        let shouldRecompute = true;
-        try {
-          const cachedRaw = localStorage.getItem(cacheKey);
-          if (cachedRaw) {
-            const cached = JSON.parse(cachedRaw);
-            if (cached && typeof cached.ts === 'number' && (Date.now() - cached.ts) < APPROX_CACHE_TTL_MS) {
-              shouldRecompute = false;
-            }
-          }
-        } catch {}
-
-        if (shouldRecompute) {
-          try {
-            const scanCount = Math.min(numProvidersNum, APPROX_SCAN_MAX);
-            const indexes = Array.from({ length: scanCount }, (_, i) => i);
-            const addrs: string[] = await Promise.all(indexes.map((i) => contract.liquidityProviders(i)));
-
-            // Fetch commitments (chunked)
-            const chunkSize = 20;
-            const commitmentsAll: bigint[] = [];
-            for (let i = 0; i < addrs.length; i += chunkSize) {
-              const chunk = addrs.slice(i, i + chunkSize);
-              const commitments = await Promise.all(chunk.map((a) => contract.userCommitments(a)));
-              commitmentsAll.push(...commitments);
-            }
-
-            // Fetch balances ONLY for unlimited/auto entries
-            let sum = BigInt(0);
-            const balanceFetch: Array<{ addr: string; idx: number }> = [];
-            for (let i = 0; i < addrs.length; i++) {
-              const c = commitmentsAll[i];
-              const isUnlimited = c === ethers.MaxUint256;
-              const isAuto = c === BigInt(0); // 0 = unlimited/auto in this design
-              if (isUnlimited || isAuto) balanceFetch.push({ addr: addrs[i], idx: i });
-            }
-
-            const balancesMap = new Map<number, bigint>();
-            for (let i = 0; i < balanceFetch.length; i += chunkSize) {
-              const chunk = balanceFetch.slice(i, i + chunkSize);
-              const bals = await Promise.all(chunk.map((it) => provider.getBalance(it.addr)));
-              for (let j = 0; j < chunk.length; j++) {
-                balancesMap.set(chunk[j].idx, bals[j]);
-              }
-            }
-
-            for (let i = 0; i < addrs.length; i++) {
-              const commitment = commitmentsAll[i];
-              const bal = balancesMap.get(i);
-              const isUnlimited = commitment === ethers.MaxUint256;
-              const isAuto = commitment === BigInt(0);
-              if (isUnlimited || isAuto) {
-                sum += bal || BigInt(0);
-              } else {
-                // For finite commitments, approximate by the commitment itself to avoid extra balance calls
-                sum += commitment;
-              }
-            }
-
-            const formatted = ethers.formatEther(sum);
-            setApproxCommitted(formatted);
-            try { localStorage.setItem(cacheKey, JSON.stringify({ value: formatted, ts: Date.now(), n: scanCount })); } catch {}
-          } catch (e) {
-            // Keep previous/cached approximation on failure
-          }
-        }
-      } else {
-        // If on-chain has non-zero total or feature disabled, clear approx
-        setApproxCommitted(null);
-      }
-       } catch {
-         // Keep previous stats if call fails
-       }
+				committed: ethers.formatEther(actualCommitted),
+				providers: (stats[1] as bigint).toString(),
+				feeBps: Number(stats[2])
+			});
+			const fee = await publicClient.readContract({
+				address: networkConfig.router as `0x${string}`,
+				abi: ROUTER_ABI,
+				functionName: 'quoteFee',
+				args: [selectedToken.address, ethers.parseEther(demoAmount || '0')]
+			});
+			setQuoteFee(ethers.formatEther(fee));
     } catch (error) {
-      console.error('Error loading pool stats:', error);
-    }
-  };
+			console.error('Failed to load pool stats', error);
+			setPoolStats({ committed: '0', providers: '0', feeBps: 0 });
+			setQuoteFee('0');
+		}
+	}, [routerReady, selectedToken, networkConfig, demoAmount, publicClient]);
 
-  const handleApproveUnlimited = async () => {
-    if (!walletClient || !address) return;
-    if (actionsDisabled) { toast.error('Soft launch: Sepolia only'); return; }
+	const loadAccountState = useCallback(async () => {
+	if (!publicClient || !isMounted || !selectedToken) {
+			setProviderLimit('Not set');
+			setProviderLimitWei(0n);
+			setProviderPaused(true);
+			setProviderExpiry('None');
+			setProviderRegistered(false);
+			setAllowance('0');
+			setAllowanceWei(0n);
+			setWethBalance('0');
+			setEthBalance('0');
+			return;
+		}
 
-    try {
-      setLoading(true);
-      toast.loading('Approving unlimited access...', { id: 'approve' });
+	if (!isConnected || !address) {
+			setProviderLimit('Not set');
+			setProviderLimitWei(0n);
+			setProviderPaused(true);
+			setProviderExpiry('None');
+			setProviderRegistered(false);
+			setAllowance('0');
+			setAllowanceWei(0n);
+			setWethBalance('0');
+			setEthBalance('0');
+			return;
+		}
 
-      const hash = await safeWriteContract('approveUnlimited', []);
-      await publicClient!.waitForTransactionReceipt({ hash });
+		try {
+			// Always load ETH and WETH balances first
+			const balanceWei = await publicClient.readContract({
+				address: selectedToken.address as `0x${string}`,
+				abi: ERC20_ABI,
+				functionName: 'balanceOf',
+				args: [address as `0x${string}`]
+			});
+			setWethBalance(ethers.formatEther(balanceWei));
 
-      toast.success('Unlimited approval granted!', { id: 'approve' });
-      setApprovalStep('approved');
+			const signerBalance = await publicClient.getBalance({ address: address as `0x${string}` });
+			setEthBalance(ethers.formatEther(signerBalance));
 
-      setTimeout(() => {
-        loadUserData();
-        loadPoolStats();
-      }, 2000);
+			// Now load router-specific info if available
+			if (routerReady && networkConfig.router) {
+				const info = await publicClient.readContract({
+					address: networkConfig.router as `0x${string}`,
+					abi: ROUTER_ABI,
+					functionName: 'getProviderInfo',
+					args: [selectedToken.address, address as `0x${string}`]
+				});
+				const limitValue = info[0] as bigint;
+				const registered = Boolean(info[4]);
+				setProviderRegistered(registered);
+
+				if (!registered) {
+					setProviderLimit('Not set');
+					setProviderLimitWei(0n);
+					if (!limitDirty) {
+						setIsUnlimitedCommitment(true);
+						setLimitInput('');
+					}
+					setProviderPaused(false);
+				} else {
+					const isUnlimited = limitValue === ethers.MaxUint256;
+					setProviderLimit(isUnlimited ? 'Unlimited' : ethers.formatEther(limitValue));
+					setProviderLimitWei(limitValue);
+					setProviderPaused(Boolean(info[3]));
+					if (!limitDirty) {
+						setIsUnlimitedCommitment(isUnlimited);
+						setLimitInput(isUnlimited ? '' : ethers.formatEther(limitValue));
+					}
+				}
+
+				const expiry = info[2] as bigint;
+				setProviderExpiry(expiry && expiry > 0n ? new Date(Number(expiry) * 1000).toLocaleString() : 'None');
+
+				const allowanceWeiValue = await publicClient.readContract({
+					address: selectedToken.address as `0x${string}`,
+					abi: ERC20_ABI,
+					functionName: 'allowance',
+					args: [address as `0x${string}`, networkConfig.router as `0x${string}`]
+				}) as bigint;
+				setAllowanceWei(allowanceWeiValue);
+				if (allowanceWeiValue === ethers.MaxUint256) {
+					setAllowance('Unlimited');
+				} else if (allowanceWeiValue === 0n) {
+					setAllowance('0');
+				} else {
+					setAllowance(ethers.formatEther(allowanceWeiValue));
+				}
+			} else {
+				setProviderLimit('Not set');
+				setProviderLimitWei(0n);
+				setProviderRegistered(false);
+				if (!limitDirty) {
+					setIsUnlimitedCommitment(true);
+					setLimitInput('');
+				}
+				setProviderPaused(true);
+				setProviderExpiry('None');
+				setAllowance('0');
+				setAllowanceWei(0n);
+			}
     } catch (error) {
-      console.error('Approve unlimited error:', error);
-      toast.error('Approval failed', { id: 'approve' });
-    } finally {
-      setLoading(false);
-    }
-  };
+			console.error('Failed to load account state', error);
+		}
+	}, [isMounted, isConnected, address, routerReady, selectedToken, networkConfig, publicClient]);
 
-  const handleSetCommitmentLimit = async () => {
-    if (!walletClient || !address) return;
-    if (actionsDisabled) { toast.error('Soft launch: Sepolia only'); return; }
+	useEffect(() => {
+		refreshPoolStats();
+	}, [refreshPoolStats]);
 
-    try {
-      setLoading(true);
-      toast.loading('Setting commitment limit...', { id: 'limit' });
+	useEffect(() => {
+		loadAccountState();
+	}, [loadAccountState]);
 
-      const chainConfig = getCurrentChainConfig();
-      if (unlimitedToggle) {
-        const hash = await safeWriteContract('approveUnlimited', []);
-        await publicClient!.waitForTransactionReceipt({ hash });
-      } else if (removeAllToggle) {
-        const hash = await safeWriteContract('setCommitmentLimit', [BigInt(0)]);
-        await publicClient!.waitForTransactionReceipt({ hash });
-      } else {
-        const limit = commitmentLimit === '0' ? BigInt(0) : ethers.parseEther(commitmentLimit);
-        const hash = await safeWriteContract('setCommitmentLimit', [limit]);
-        await publicClient!.waitForTransactionReceipt({ hash });
-      }
-      setUnlimitedToggle(false);
-      setRemoveAllToggle(false);
-      // Immediate refresh
-      await Promise.all([loadUserData(), loadPoolStats()]);
-      toast.success('Commitment limit set!', { id: 'limit' });
-      setApprovalStep('limit-set');
+	useEffect(() => {
+		if (!providerRegistered && !limitDirty) {
+			setIsUnlimitedCommitment(true);
+			setLimitInput('');
+		}
+	}, [providerRegistered, limitDirty]);
 
-      // Refresh data
-      setTimeout(() => {
-        loadUserData();
-        loadPoolStats();
-      }, 2000);
-      setCommitmentLimit('0');
-    } catch (error) {
-      console.error('Set commitment limit error:', error);
-      toast.error('Setting limit failed', { id: 'limit' });
-    } finally {
-      setLoading(false);
-    }
-  };
+	const loadDemoCounter = useCallback(async () => {
+		if (!publicClient || !networkConfig.demoCounter) {
+			setDemoCounterTotal('0');
+			return;
+		}
+		try {
+			const stats = await publicClient.readContract({
+				address: networkConfig.demoCounter as `0x${string}`,
+				abi: DEMO_COUNTER_ABI,
+				functionName: 'getStats'
+			});
+			setDemoCounterTotal(ethers.formatEther(stats[0] as bigint));
+		} catch (error) {
+			console.error('Failed to load demo counter', error);
+			setDemoCounterTotal('0');
+		}
+	}, [publicClient, networkConfig]);
 
-  const handleWithdrawCommitment = async () => {
-    if (!walletClient || !withdrawAmount || !address) return;
-    if (actionsDisabled) { toast.error('Soft launch: Sepolia only'); return; }
+	useEffect(() => {
+		loadDemoCounter();
+	}, [loadDemoCounter]);
 
-    try {
-      setLoading(true);
-      toast.loading('Withdrawing commitment...', { id: 'withdraw' });
+	const safeWrite = async (
+		contractAddress: `0x${string}`,
+		abi: any,
+		functionName: string,
+		args: any[] = [],
+		options: { value?: bigint; allowRevert?: boolean } = {}
+	) => {
+		if (!walletClient || !publicClient || !address) throw new Error('Wallet not ready');
+		const { value, allowRevert } = options;
+		try {
+			const { request } = await publicClient.simulateContract({
+				address: contractAddress,
+				abi,
+				functionName: functionName as any,
+				args,
+				account: address,
+				value
+			} as any);
+			return await walletClient.writeContract(request);
+		} catch (error: any) {
+			if (allowRevert) {
+				console.warn('Simulation reverted but allowRevert=true, sending tx anyway');
+				return await walletClient.writeContract({
+					address: contractAddress,
+					abi,
+					functionName,
+					args,
+					account: address,
+					value
+				} as any);
+			}
+			console.error(error);
+			throw error;
+		}
+	};
 
-      const amount = withdrawAmount === 'all' ? BigInt(0) : ethers.parseEther(withdrawAmount);
-      await safeWriteContract('withdrawCommitment', [amount]);
-      toast.success('Commitment withdrawn successfully!', { id: 'withdraw' });
-      
-      // Refresh data
-      setTimeout(() => {
-        loadUserData();
-        loadPoolStats();
-      }, 2000);
-      setWithdrawAmount('');
-    } catch (error) {
-      console.error('Withdraw commitment error:', error);
-      toast.error('Withdrawal failed', { id: 'withdraw' });
-    } finally {
-      setLoading(false);
-    }
-  };
+	const handleApproveAndCommit = async () => {
+		if (!routerReady) {
+			toast.error('Router address not configured for this network');
+			return;
+		}
+		if (!selectedToken || !publicClient) return;
+		try {
+			// If not approved yet, approve first
+			if (allowanceWei === 0n) {
+				await toast.promise(
+					(async () => {
+						const hash = await safeWrite(selectedToken.address as `0x${string}`, ERC20_ABI, 'approve', [networkConfig.router, ethers.MaxUint256]);
+						await publicClient.waitForTransactionReceipt({ hash });
+						await loadAccountState();
+					})(),
+					{
+						loading: 'Step 1/2: Approving router...',
+						success: 'Approved! Now setting commitment...',
+						error: 'Approval failed'
+					}
+				);
+			}
 
-  const handlePauseCommitment = async () => {
-    if (!walletClient || !address) return;
-    if (actionsDisabled) { toast.error('Soft launch: Sepolia only'); return; }
+			// Then set commitment
+			let limitWei: bigint;
+			try {
+				limitWei = isUnlimitedCommitment ? ethers.MaxUint256 : ethers.parseEther(limitInput || '0');
+			} catch {
+				toast.error('Enter a valid limit amount');
+				return;
+			}
+			const expirySeconds = 0n;
+			await toast.promise(
+				(async () => {
+					const hash = await safeWrite(networkConfig.router as `0x${string}`, ROUTER_ABI, 'setCommitment', [selectedToken.address, limitWei, expirySeconds, false]);
+					await publicClient.waitForTransactionReceipt({ hash });
+					await loadAccountState();
+					await refreshPoolStats();
+					setLimitDirty(false);
+				})(),
+				{
+					loading: allowanceWei === 0n ? 'Step 2/2: Setting commitment...' : 'Setting commitment...',
+					success: 'Commitment active!',
+					error: 'Commitment failed'
+				}
+			);
+		} catch {}
+	};
 
-    try {
-      setLoading(true);
-      toast.loading('Pausing commitment...', { id: 'pause' });
+	const handlePauseResume = async () => {
+		if (!routerReady) {
+			toast.error('Router address not configured for this network');
+			return;
+		}
+		if (!selectedToken || !publicClient) return;
+		try {
+			const limitWei = providerLimitWei;
+			const expirySeconds = 0n;
+			const newPausedState = !providerPaused;
+			await toast.promise(
+				(async () => {
+					const hash = await safeWrite(networkConfig.router as `0x${string}`, ROUTER_ABI, 'setCommitment', [selectedToken.address, limitWei, expirySeconds, newPausedState]);
+					await publicClient.waitForTransactionReceipt({ hash });
+					await loadAccountState();
+					await refreshPoolStats();
+					setLimitDirty(false);
+				})(),
+				{
+					loading: newPausedState ? 'Pausing...' : 'Resuming...',
+					success: newPausedState ? 'Paused' : 'Resumed',
+					error: 'Update failed'
+				}
+			);
+		} catch {}
+	};
 
-      const chainConfig = getCurrentChainConfig();
+	const handleWrap = async () => {
+		if (!selectedToken || !publicClient) return;
+		try {
+			const amountWei = ethers.parseEther(wrapAmount || '0');
+			await toast.promise(
+				(async () => {
+					const hash = await safeWrite(selectedToken.address as `0x${string}`, ERC20_ABI, 'deposit', [], { value: amountWei });
+        await publicClient.waitForTransactionReceipt({ hash });
+					await loadAccountState();
+				})(),
+				{
+					loading: 'Wrapping ETH...',
+					success: 'Wrapped successfully',
+					error: 'Wrap failed'
+				}
+			);
+		} catch {}
+	};
 
-      // Read current commitment
-      const currentCommitment = (await publicClient!.readContract({
-        address: chainConfig.flashbankAddress as `0x${string}`,
-        abi: FLASHBANK_ABI as any,
-        functionName: 'userCommitments',
-        args: [address],
-      } as any)) as bigint;
+	const handleUnwrap = async () => {
+		if (!selectedToken || !publicClient) return;
+		try {
+			const amountWei = ethers.parseEther(unwrapAmount || '0');
+			await toast.promise(
+				(async () => {
+					const hash = await safeWrite(selectedToken.address as `0x${string}`, ERC20_ABI, 'withdraw', [amountWei]);
+					await publicClient.waitForTransactionReceipt({ hash });
+					await loadAccountState();
+				})(),
+				{
+					loading: 'Unwrapping WETH...',
+					success: 'Unwrapped successfully',
+					error: 'Unwrap failed'
+				}
+			);
+		} catch {}
+	};
 
-      if (currentCommitment > BigInt(0)) {
-        // Persist last commitment
-        if (currentCommitment === ethers.MaxUint256) {
-          saveLastCommitment(address, chainId, 'UNLIMITED');
-        } else {
-          saveLastCommitment(address, chainId, currentCommitment.toString());
-        }
-        // Set limit to 0 to pause
-        const hash = await safeWriteContract('setCommitmentLimit', [BigInt(0)]);
-        await publicClient!.waitForTransactionReceipt({ hash });
+	const handleRunDemo = async (failModeOverride: boolean) => {
+		setDemoFailMode(failModeOverride);
+		setDemoOutcome('none');
+		setDemoError(null);
+		if (!selectedToken || !networkConfig.demoBorrower || !networkConfig.router || !publicClient) {
+			toast.error('Demo not configured for this network');
+			return;
+		}
+		try {
+			setIsRunningDemo(true);
+			setDemoTxHash(null);
+			setDemoResult(null);
+			setDemoCounterTotal('0');
+			const amountWei = ethers.parseEther(demoAmount || '0');
+			const feeWei: bigint = await publicClient.readContract({
+				address: networkConfig.router as `0x${string}`,
+				abi: ROUTER_ABI,
+				functionName: 'quoteFee',
+				args: [selectedToken.address, amountWei]
+			});
 
-        setIsPaused(true);
-        toast.success('Commitment paused successfully!', { id: 'pause' });
-      } else {
-        toast.success('No commitment to pause', { id: 'pause' });
-      }
-    } catch (error) {
-      console.error('Pause commitment error:', error);
-      toast.error('Pause failed', { id: 'pause' });
-    } finally {
-      setLoading(false);
-    }
-  };
+			const fn = failModeOverride ? 'runDemoFail' : 'runDemo';
+			const hash = await safeWrite(
+				networkConfig.demoBorrower as `0x${string}`,
+				DEMO_BORROWER_ABI,
+				fn,
+				[amountWei],
+				{ value: feeWei, allowRevert: failModeOverride }
+			);
+			setDemoTxHash(hash);
 
-  const handleResumeCommitment = async () => {
-    if (!walletClient || !address) return;
-    if (actionsDisabled) { toast.error('Soft launch: Sepolia only'); return; }
+			let receipt;
+			try {
+				receipt = await publicClient.waitForTransactionReceipt({ hash });
+			} catch (err) {
+				receipt = await publicClient.getTransactionReceipt({ hash }).catch(() => null);
+				if (!receipt) throw err;
+			}
 
-    try {
-      setLoading(true);
-      toast.loading('Resuming commitment...', { id: 'resume' });
-
-      const last = loadLastCommitment(address, chainId);
-      if (!last) {
-        const chainConfig = getCurrentChainConfig();
-        const current = (await publicClient!.readContract({
-          address: chainConfig.flashbankAddress as `0x${string}`,
-          abi: FLASHBANK_ABI as any,
-          functionName: 'userCommitments',
-          args: [address],
-        } as any)) as bigint;
-        if (current > BigInt(0)) {
-          setIsPaused(false);
-          toast.success('Already active', { id: 'resume' });
-          setLoading(false);
-          return;
-        }
-        toast.error('No previous commitment found', { id: 'resume' });
-        setLoading(false);
-        return;
-      }
-
-      if (last === 'UNLIMITED') {
-        const hash = await safeWriteContract('approveUnlimited', []);
-        await publicClient!.waitForTransactionReceipt({ hash });
-      } else {
-        const amount = BigInt(last);
-        const hash = await safeWriteContract('setCommitmentLimit', [amount]);
-        await publicClient!.waitForTransactionReceipt({ hash });
-      }
-
-      clearLastCommitment(address, chainId);
-      setIsPaused(false);
-      toast.success('Commitment resumed!', { id: 'resume' });
-
-      setTimeout(() => {
-        loadUserData();
-        loadPoolStats();
-      }, 2000);
-    } catch (error) {
-      console.error('Resume commitment error:', error);
-      toast.error('Resume failed', { id: 'resume' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleWithdrawProfit = async () => {
-    if (!walletClient || !address) return;
-    if (actionsDisabled) { toast.error('Soft launch: Sepolia only'); return; }
-
-    try {
-      setLoading(true);
-      toast.loading('Claiming profits...', { id: 'profit' });
-
-      const chainConfig = getCurrentChainConfig();
-
-      // Capture current profits before withdrawing
-      let preWithdrawProfitsWei = BigInt(0);
-      try {
-        preWithdrawProfitsWei = ethers.parseEther(userProfits || '0');
-      } catch {}
-
-      const hash = await walletClient.writeContract({
-        address: chainConfig.flashbankAddress as `0x${string}`,
-        abi: FLASHBANK_ABI,
-        functionName: 'withdrawProfits',
-        args: [],
-        account: address as `0x${string}`,
-        chain: { id: chainId, name: chainConfig.name, nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: [chainConfig.rpcUrl] } }, blockExplorers: { default: { name: chainConfig.name, url: chainConfig.explorerUrl } } } as any,
-      });
-
-      toast.loading('Confirming transaction...', { id: 'profit' });
-      await publicClient.waitForTransactionReceipt({ hash });
-
-      // Optional donation after withdraw
-      const hasDonationAddress = DONATION_ADDRESS.match(/^0x[a-f0-9]{40}$/);
-      if (hasDonationAddress && donationPercent > 0 && preWithdrawProfitsWei > BigInt(0)) {
-        const donationWei = (preWithdrawProfitsWei * BigInt(donationPercent)) / BigInt(100);
-        if (donationWei > BigInt(0)) {
-          try {
-            const donateHash = await walletClient.sendTransaction({
-              to: DONATION_ADDRESS as `0x${string}`,
-              value: donationWei,
-              account: address as `0x${string}`,
-              chain: { id: chainId, name: chainConfig.name, nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: [chainConfig.rpcUrl] } }, blockExplorers: { default: { name: chainConfig.name, url: chainConfig.explorerUrl } } } as any,
-            } as any);
-            await publicClient.waitForTransactionReceipt({ hash: donateHash });
-            toast.success(`Donated ${ethers.formatEther(donationWei)} ETH`, { id: 'profit' });
-          } catch (e) {
-            console.error('Donation failed:', e);
-            toast.error('Donation failed (skipped)', { id: 'profit' });
-          }
-        }
-      }
-      
-      // Refresh data
-      setTimeout(() => {
-        loadUserData();
-        loadPoolStats();
-      }, 2000);
-      await Promise.all([loadUserData(), loadPoolStats()]);
-      toast.success('Profit withdrawal successful!', { id: 'profit' });
-      
-    } catch (error) {
-      console.error('Profit withdrawal error:', error);
-      toast.error('Profit withdrawal failed', { id: 'profit' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Generic write helper for arbitrary contracts
-  const safeWriteGeneric = async (
-    contractAddress: `0x${string}`,
-    abi: any,
-    functionName: string,
-    args: any[] = [],
-    value?: bigint,
-    fallbackGas?: bigint
-  ): Promise<`0x${string}`> => {
-    if (!walletClient || !publicClient || !address) throw new Error('Wallet not ready');
-    const chainConfig = getCurrentChainConfig();
-    try {
-      const { request } = await publicClient.simulateContract({
-        address: contractAddress,
-        abi,
-        functionName: functionName as any,
-        args,
-        value,
-        account: address as `0x${string}`,
-      } as any);
-      return await walletClient.writeContract(request as any);
-    } catch {
-      return await walletClient.writeContract({
-        address: contractAddress,
-        abi,
-        functionName: functionName as any,
-        args,
-        account: address as `0x${string}`,
-        gas: fallbackGas || BigInt(300000),
-        chain: {
-          id: chainId,
-          name: chainConfig.name,
-          nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-          rpcUrls: { default: { http: [chainConfig.rpcUrl] } },
-          blockExplorers: { default: { name: chainConfig.name, url: chainConfig.explorerUrl } }
-        } as any,
-        value,
-      } as any);
-    }
-  };
-
-  // Recompute demo fee when amount or chain changes
-  useEffect(() => {
-    (async () => {
-      try {
-        const config = getCurrentChainConfig();
-        if (!publicClient || !config.flashbankAddress) return;
-        const provider = new ethers.JsonRpcProvider(config.rpcUrl);
-        const contract = new ethers.Contract(config.flashbankAddress, FLASHBANK_ABI, provider);
-        const amt = demoAmount && Number(demoAmount) > 0 ? ethers.parseEther(demoAmount) : BigInt(0);
-        if (amt > BigInt(0)) {
-          const feeWei = await contract.calculateFlashLoanFee(amt);
-          setDemoFee(ethers.formatEther(feeWei));
-        } else {
-          setDemoFee(null);
-        }
-      } catch {
-        setDemoFee(null);
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chainId, demoAmount, isMounted]);
-
-  const handleRunDemo = async () => {
-    const config = getCurrentChainConfig();
-    const demoAddr = (config as any).demoBorrowerAddress as string;
-    if (!demoAddr) {
-      toast.error('Demo not available on this network');
-      return;
-    }
-    try {
-      setIsRunningDemo(true);
-      setDemoTxHash(null);
-      setDemoProof(null);
-      setExternalProof(null);
-      const amtWei = ethers.parseEther(demoAmount || '0');
-      if (amtWei < ethers.parseEther('0.01')) {
-        toast.error('Minimum demo amount is 0.01 ETH');
-        setIsRunningDemo(false);
-        return;
-      }
-      // Ensure sufficient on-chain liquidity
-      const providerPre = new ethers.JsonRpcProvider(config.rpcUrl);
-      const fbPre = new ethers.Contract(config.flashbankAddress, FLASHBANK_ABI, providerPre);
-      const onchainTotal: bigint = await fbPre.totalCommittedLiquidity();
-      if (onchainTotal < amtWei) {
-        toast.error('Not enough committed liquidity on this network for the demo amount');
-        setIsRunningDemo(false);
-        return;
-      }
-      // Fetch exact fee
-      const provider = new ethers.JsonRpcProvider(config.rpcUrl);
-      const fb = new ethers.Contract(config.flashbankAddress, FLASHBANK_ABI, provider);
-      const feeWei: bigint = await fb.calculateFlashLoanFee(amtWei);
-      // Submit tx to demo borrower
-      const fn = demoFailMode ? 'runDemoFail' : 'runDemo';
-      const hash = await safeWriteGeneric(demoAddr as `0x${string}`, DEMO_BORROWER_ABI as any, fn, [amtWei], feeWei, BigInt(400000));
-      setDemoTxHash(hash);
-      toast.success('Demo tx sent');
-      await publicClient!.waitForTransactionReceipt({ hash });
-      // Decode proof from logs using ethers receipt for reliable topics field
-      try {
-        const fbInterface = new ethers.Interface(FLASHBANK_EVENTS_ABI as any);
-        const eReceipt = await new ethers.JsonRpcProvider(config.rpcUrl).getTransactionReceipt(hash);
-        const log = eReceipt?.logs?.find((l: any) => l.address.toLowerCase() === config.flashbankAddress.toLowerCase());
-        if (log) {
-          const parsed = fbInterface.parseLog(log as any);
-          const amount = ethers.formatEther(parsed.args[1] as bigint);
-          const fee = ethers.formatEther(parsed.args[2] as bigint);
-          const success = Boolean(parsed.args[3]);
-          setDemoProof({ amount, fee, success });
-        }
-        // Also decode external ProofOfFunds event if configured
-        const sinkAddr = (config as any).proofSinkAddress as string;
-        if (sinkAddr) {
-          const sinkInterface = new ethers.Interface(PROOF_OF_FUNDS_ABI as any);
-          const slog = eReceipt?.logs?.find((l: any) => l.address.toLowerCase() === sinkAddr.toLowerCase());
-          if (slog) {
-            const parsed2 = sinkInterface.parseLog(slog as any);
-            const amt2 = ethers.formatEther(parsed2.args[1] as bigint);
-            setExternalProof({ amount: amt2 });
-          }
-        }
-      } catch {}
-    } catch (e: any) {
-      const msg = e?.shortMessage || e?.message || 'Demo failed';
-      toast.error(msg);
-    } finally {
-      setIsRunningDemo(false);
-    }
-  };
+			if (receipt.status === 'reverted') {
+				if (failModeOverride) {
+					setDemoResult({ amount: demoAmount, fee: ethers.formatEther(feeWei) });
+					setDemoOutcome('blocked');
+					const message = 'FlashLoanFailed (expected) – router blocked the theft attempt.';
+					setDemoError(message);
+					toast.success('Borrow attempt blocked – funds stayed in the pool');
+				} else {
+					throw new Error('Demo transaction reverted');
+				}
+			} else {
+				setDemoResult({ amount: demoAmount, fee: ethers.formatEther(feeWei) });
+				setDemoOutcome(failModeOverride ? 'blocked' : 'success');
+				await loadAccountState();
+				await refreshPoolStats();
+				await loadDemoCounter();
+				toast.success(failModeOverride ? 'Borrow attempt executed and repaid' : 'Demo completed successfully!');
+			}
+		} catch (error: any) {
+			const msg = error?.shortMessage || error?.message || 'Demo failed';
+			toast.error(msg);
+		} finally {
+			setIsRunningDemo(false);
+		}
+	};
 
   return (
     <>
       <Head>
-        <title>FlashBank.net - Trustless Flash Loan Network</title>
-        <meta name="description" content="The world's first immutable flash loan network where your ETH stays in your wallet. Earn from MEV opportunities with microsecond risk exposure." />
+				<title>FlashBank Router - WETH Liquidity</title>
+				<meta name="description" content="Provide WETH liquidity directly from your wallet and earn flash loan fees." />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-
-      <div className="min-h-screen bg-white">
+			<div className="min-h-screen bg-gray-50">
         <Toaster position="top-right" />
-
-        {/* Security Notice Banner */}
-        <div className="bg-yellow-50 border-b border-yellow-200 overflow-hidden">
-          <div className="container mx-auto max-w-full px-4 sm:px-6 py-3">
-            <div className="flex flex-wrap items-center justify-center gap-2 text-sm text-center">
-              <AlertTriangle className="h-4 w-4 text-yellow-600" />
-              <span className="text-yellow-800">
-                <strong>Security Notice:</strong> FlashBank has not been externally audited yet.
-              </span>
-              <a
-                href="/security-audit"
-                className="text-yellow-900 underline font-medium hover:text-yellow-700 truncate"
-              >
-                View our detailed line-by-line security analysis →
-              </a>
-            </div>
-          </div>
-        </div>
-        
-        {/* Header - Always visible */}
         <header className="bg-white border-b border-gray-200">
-          <div className="container mx-auto max-w-full px-4 sm:px-6 py-4">
-            <div className="flex flex-wrap justify-between items-center gap-3">
-              <div className="flex items-center space-x-3 min-w-0">
+					<div className="container mx-auto px-6 py-4 flex flex-wrap gap-4 justify-between items-center">
+						<div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
                   <Zap className="h-6 w-6 text-white" />
                 </div>
-                <h1 className="text-2xl font-bold text-gray-900 truncate">FlashBank.net</h1>
+							<div>
+								<h1 className="text-xl font-bold text-gray-900">FlashBank Router</h1>
+								<p className="text-sm text-gray-500">Permit-based WETH commitments (no deposits)</p>
               </div>
-
-              <div className="flex items-center flex-wrap gap-3">
-                {/* Chain Selector */}
-                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar max-w-full">
-                  {Object.entries(CHAIN_CONFIGS).map(([chainIdStr, config]) => {
-                    const buttonChainId = Number(chainIdStr);
-                    const isActive = buttonChainId === chainId;
-                    return (
-                      <button
-                        key={chainIdStr}
-                        onClick={() => switchChain({ chainId: buttonChainId })}
-                        className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                          isActive
-                            ? `${COLOR_CLASSES[config.color].bg100} ${COLOR_CLASSES[config.color].text800} ${COLOR_CLASSES[config.color].border200} border`
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                      >
-                        {config.icon} {config.name}
-                      </button>
-                    );
-                  })}
                 </div>
-
-                {/* Instructions & Stats Link */}
-                <a
-                  href="#instructions"
-                  className="text-blue-600 hover:text-blue-800 flex items-center space-x-1 text-sm font-medium"
-                >
-                  <BookOpen className="h-4 w-4" />
-                  <span>Instructions & Stats</span>
-                </a>
-
-                <appkit-connect-button />
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* Main Content - Dashboard takes priority when connected */}
-                {isConnected ? (
-          /* User Dashboard - Primary content when connected */
-          <main className="py-8">
-            {actionsDisabled && (
-              <div className="mb-4 p-3 rounded bg-yellow-50 border border-yellow-200 text-yellow-800 text-sm">
-                Soft launch: Actions are enabled on Sepolia only. Switch to Sepolia to interact.
-              </div>
-            )}
-            <div className="container mx-auto px-6">
-              <div className="mb-8">
-                <h1 className="text-4xl font-bold text-gray-900 mb-2">Your Participation Dashboard</h1>
-                <p className="text-gray-600">Manage your ETH commitments and track your earnings</p>
-              </div>
-              
-              {/* User Stats */}
-              <div className="grid md:grid-cols-3 gap-8 mb-12">
-                <div className="bg-blue-50 rounded-lg p-8 text-center">
-                  <div className="text-3xl font-bold text-blue-600 mb-2">{userCommitment} ETH</div>
-                  <div className="text-gray-600">Your Commitment</div>
-                </div>
-                <div className="bg-green-50 rounded-lg p-8 text-center">
-                  <div className="text-3xl font-bold text-green-600 mb-2">{userProfits} ETH</div>
-                  <div className="text-gray-600">Available Profits</div>
-                </div>
-                <div className="bg-purple-50 rounded-lg p-8 text-center">
-                  <div className="text-3xl font-bold text-purple-600 mb-2">
-                    {isPaused ? '⏸️ Paused' : '✅ Active'}
-                  </div>
-                  <div className="text-gray-600">Status</div>
-                </div>
-              </div>
-
-              {/* Action Cards */}
-              <div className="flex flex-wrap justify-center gap-6 mb-12">
-                {/* Step 1: Approve Unlimited */}
-                {approvalStep === 'not-approved' && (
-                  <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm flex flex-col w-full md:w-1/2 lg:w-1/3 xl:w-1/4">
-                    <div className="flex-grow">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
-                      <Shield className="h-5 w-5 text-blue-600 mr-2" />
-                      Step 1: Approve Access
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Give FlashBank permission to use your ETH for flash loans
-                    </p>
-                    </div>
+						<div className="flex flex-wrap gap-2 items-center">
+							{Object.entries(NETWORKS).map(([id, cfg]) => (
                     <button
-                      onClick={handleApproveUnlimited}
-                      disabled={loading || actionsDisabled}
-                      className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-3 rounded-lg text-sm font-medium transition-colors mt-auto"
-                    >
-                      {loading ? 'Approving...' : 'Approve Unlimited'}
+									key={id}
+									onClick={() => switchChain({ chainId: Number(id) })}
+									className={`px-3 py-1 rounded-full text-sm ${Number(id) === chainId ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}
+								>
+									{cfg.name}
                     </button>
-                  </div>
-                )}
-
-                {/* Step 2: Set Optional Limit */}
-                {approvalStep !== 'not-approved' && (
-                  <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm flex flex-col w-full md:w-1/2 lg:w-1/3 xl:w-1/4">
-                    <div className="flex-grow">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
-                      <Target className="h-5 w-5 text-green-600 mr-2" />
-                        Step 2: Set/Change Limit
-                  </h3>
-                      <p className="text-sm text-gray-600 mb-2">
-                        Current limit: <span className="font-semibold">{userCommitment}</span>
-                      </p>
-                      <p className="text-xs text-gray-500 mb-4">
-                        Enter a new limit in ETH. Use 0 to pause. For unlimited, use "Approve Access".
-                      </p>
-                      <div className="flex items-center gap-6 mb-3">
-                        <label className="flex items-center gap-2 text-sm text-gray-700">
-                          <input type="checkbox" checked={unlimitedToggle} onChange={(e) => { setUnlimitedToggle(e.target.checked); if (e.target.checked) setRemoveAllToggle(false); }} />
-                          Unlimited
-                        </label>
-                        <label className="flex items-center gap-2 text-sm text-gray-700">
-                          <input type="checkbox" checked={removeAllToggle} onChange={(e) => { setRemoveAllToggle(e.target.checked); if (e.target.checked) setUnlimitedToggle(false); }} />
-                          Remove all
-                        </label>
-                      </div>
-                    </div>
-                    <div className="mt-auto">
-                  <input
-                      type="text"
-                        placeholder="New ETH limit (0 to pause)"
-                      value={commitmentLimit}
-                      onChange={(e) => setCommitmentLimit(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-green-500"
-                        disabled={actionsDisabled || unlimitedToggle || removeAllToggle}
-                  />
+							))}
+							{isConnected && address ? (
+								<div className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-700">
+									<span className="font-mono">{formatAddress(address)}</span>
                   <button
-                      onClick={handleSetCommitmentLimit}
-                        disabled={loading || actionsDisabled}
-                      className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white py-3 rounded-lg text-sm font-medium transition-colors"
+										onClick={() => disconnect()}
+										className="text-blue-600 hover:text-blue-800 transition-colors"
                     >
-                      {loading ? 'Setting...' : 'Set Limit'}
-                  </button>
-                    </div>
-                </div>
-                )}
-
-                {/* Withdraw */}
-                {false && (
-                  <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm flex flex-col"></div>
-                )}
-
-                {/* Pause/Resume */}
-                <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm flex flex-col w-full md:w-1/2 lg:w-1/3 xl:w-1/4">
-                  <div className="flex-grow">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
-                    {isPaused ? <CheckCircle className="h-5 w-5 text-green-600 mr-2" /> : <AlertTriangle className="h-5 w-5 text-orange-600 mr-2" />}
-                    {isPaused ? 'Resume' : 'Pause'} Participation
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    {isPaused ? 'Resume earning from flash loans' : 'Temporarily stop participation'}
-                  </p>
-                  </div>
-                  <button
-                    onClick={isPaused ? handleResumeCommitment : handlePauseCommitment}
-                    disabled={loading || actionsDisabled}
-                    className={`w-full text-white py-3 rounded-lg text-sm font-medium transition-colors mt-auto ${
-                      isPaused
-                        ? 'bg-green-600 hover:bg-green-700 disabled:bg-gray-400'
-                        : 'bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400'
-                    }`}
-                  >
-                    {loading ? 'Processing...' : (isPaused ? 'Resume' : 'Pause')}
+										Disconnect
                   </button>
                 </div>
-
-                {/* Claim Profits */}
-                <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm flex flex-col w-full md:w-1/2 lg:w-1/3 xl:w-1/4">
-                  <div className="flex-grow">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
-                    <TrendingUp className="h-5 w-5 text-green-600 mr-2" />
-                    Claim Profits
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Withdraw your earnings from flash loan fees
-                  </p>
-                  <div className="text-2xl font-bold text-green-600 mb-3">{userProfits} ETH</div>
-                   <div className="mb-3">
-                     <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
-                       <span>Donation</span>
-                       <span>{donationPercent}%</span>
-                     </div>
-                     <input type="range" min={0} max={100} value={donationPercent} onChange={(e) => setDonationPercent(parseInt(e.target.value || '0'))} className="w-full" disabled={actionsDisabled || !(DONATION_ADDRESS && DONATION_ADDRESS.startsWith('0x'))} />
-                     {!(DONATION_ADDRESS && DONATION_ADDRESS.startsWith('0x')) && (
-                       <div className="text-xs text-gray-500 mt-1">Set NEXT_PUBLIC_DONATION_ADDRESS to enable donations.</div>
-                     )}
-                   </div>
-                  </div>
-                  <button
-                    onClick={handleWithdrawProfit}
-                    disabled={loading || parseFloat(userProfits) === 0 || actionsDisabled}
-                    className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white py-3 rounded-lg text-sm font-medium transition-colors mt-auto"
-                  >
-                    {loading ? 'Claiming...' : 'Claim Profits'}
-                  </button>
-                </div>
-              </div>
-
-              {/* How It Works Summary */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-blue-900 mb-4">How Your Participation Works</h3>
-                <div className="grid md:grid-cols-3 gap-6 text-sm">
-                  <div className="text-center">
-                    <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <Wallet className="h-6 w-6 text-white" />
-                    </div>
-                    <h4 className="font-semibold text-blue-900 mb-2">1. ETH Stays Safe</h4>
-                    <p className="text-blue-700">Your ETH remains in your wallet. FlashBank only gets temporary approval to use it.</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <Target className="h-6 w-6 text-white" />
-                    </div>
-                    <h4 className="font-semibold text-green-900 mb-2">2. Smart Selection</h4>
-                    <p className="text-green-700">When flash loans need ETH, the system pulls from wallets with amounts closest to the loan size.</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <Coins className="h-6 w-6 text-white" />
-                    </div>
-                    <h4 className="font-semibold text-purple-900 mb-2">3. Fair Rewards</h4>
-                    <p className="text-purple-700">Only ETH that actually gets lent receives profits - ensuring fair distribution.</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Instructions & Statistics (Connected) */}
-              <section id="instructions" className="py-12 bg-white">
-                <div className="container mx-auto px-0 md:px-6">
-                  <div className="text-center mb-12">
-                    <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">📚 Instructions & Statistics</h2>
-                    <p className="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto">
-                      Complete guide to using FlashBank and real-time statistics for each supported network
-                    </p>
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-12 mb-12">
-                    {/* Borrower Instructions */}
-                    <div>
-                      <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                        <BookOpen className="h-6 w-6 text-blue-600 mr-3" />
-                        How to Borrow with FlashBank (for MEV/Arb bots)
-                      </h3>
-                      <div className="space-y-6">
-                        <div className="bg-blue-50 rounded-lg p-6">
-                          <h4 className="font-semibold text-blue-900 mb-3">1) Deploy a borrower contract</h4>
-                          <p className="text-blue-700 text-sm">
-                            Implement <code>executeFlashLoan(uint256 amount, uint256 fee, bytes data)</code> and return <code>true</code> on success.
-                          </p>
-                          <details className="mt-3">
-                            <summary className="cursor-pointer text-sm text-blue-700 underline">Show minimal interfaces</summary>
-                            <pre className="text-xs bg-white border border-blue-100 rounded p-3 mt-3 overflow-x-auto"><code>{`interface IL2FlashLoan { function executeFlashLoan(uint256 amount, uint256 fee, bytes calldata data) external returns (bool); }
-interface IFlashBank { function flashLoan(uint256 amount, bytes calldata data) external; }`}</code></pre>
-                            <div className="text-xs text-blue-700 mt-2"><a className="underline" href="/guides/borrow">Read the full Borrower Guide →</a></div>
-                          </details>
-                        </div>
-                        <div className="bg-green-50 rounded-lg p-6">
-                          <h4 className="font-semibold text-green-900 mb-3">2) Start a loan</h4>
-                          <p className="text-green-700 text-sm">From your EOA/script, call your borrower's entrypoint that internally calls <code>flashLoan</code>.</p>
-                          <details className="mt-3">
-                            <summary className="cursor-pointer text-sm text-green-700 underline">Show ethers v6 script snippet</summary>
-                            <pre className="text-xs bg-white border border-green-100 rounded p-3 mt-3 overflow-x-auto"><code>{`await borrower.start(ethers.parseEther("10"), "0x");`}</code></pre>
-                          </details>
-                        </div>
-                        <div className="bg-purple-50 rounded-lg p-6">
-                          <h4 className="font-semibold text-purple-900 mb-3">3) Repay inside callback</h4>
-                          <ul className="list-disc pl-5 text-purple-700 text-sm space-y-1">
-                            <li>Minimum: 0.01 ETH; Maximum: 10,000 ETH (and cannot exceed available liquidity)</li>
-                            <li>Fee: 0.02% of amount (<code>fee = (amount * 2) / 10000</code>)</li>
-                            <li>Repay <strong>amount + fee</strong> to FlashBank before returning from <code>executeFlashLoan</code></li>
-                          </ul>
-                        </div>
-                        <div className="bg-orange-50 rounded-lg p-6">
-                          <h4 className="font-semibold text-orange-900 mb-3">4) Strategy tips</h4>
-                          <ul className="list-disc pl-5 text-orange-700 text-sm space-y-1">
-                            <li>Encode DEX routes/pools into <code>data</code> for use in your strategy.</li>
-                            <li>Return <code>false</code> (or revert) if the strategy fails; funds auto-return to providers.</li>
-                            <li>Optimise gas; your EOA funds the transaction.</li>
-                          </ul>
-                        </div>
-                        {/* Lender Guide - More Info */}
-                        <details className="bg-gray-50 rounded-lg p-6">
-                          <summary className="cursor-pointer font-semibold text-gray-900">More: Lender Guide (Provide Liquidity)</summary>
-                          <div className="mt-4 space-y-4 text-sm text-gray-700">
-                            <p><strong>Approve Access</strong>: Allow FlashBank to temporarily use your ETH during flash loans. Your ETH remains in your wallet.</p>
-                            <p><strong>Set/Change Limit</strong>: Optionally cap the maximum amount FlashBank can pull from you. Use 0 to pause; choose Unlimited for hands‑off participation.</p>
-                            <p><strong>Pause/Resume</strong>: Temporarily stop and later resume participation without losing your previous preference.</p>
-                            <p><strong>Claim Profits</strong>: Withdraw accumulated profits anytime.</p>
-                            <div><a className="underline text-blue-700" href="/guides/lend">Read the full Lender Guide →</a></div>
-                          </div>
-                        </details>
-                      </div>
-                    </div>
-
-                    {/* Network Statistics */}
-                    <div>
-                      <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                        <TrendingUp className="h-6 w-6 text-green-600 mr-3" />
-                        Network Statistics
-                      </h3>
-                      <div className="space-y-4">
-                        {Object.entries(CHAIN_CONFIGS).map(([chainIdStr, config]) => {
-                          const statsChainId = Number(chainIdStr);
-                          const isCurrentChain = statsChainId === chainId;
-                          return (
-                            <div key={chainIdStr} className={`border rounded-lg p-4 ${
-                              isCurrentChain ? `border-${config.color}-200 bg-${config.color}-50` : 'border-gray-200 bg-gray-50'
-                            }`}>
-                              <div className="flex items-center justify-between mb-3">
-                                <h4 className={`font-semibold flex items-center ${
-                                  isCurrentChain ? `${COLOR_CLASSES[config.color].text800}` : 'text-gray-700'
-                                }`}>
-                                  {config.icon} {config.name}
-                                </h4>
-                                <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                  isCurrentChain
-                                    ? `${COLOR_CLASSES[config.color].bg100} ${COLOR_CLASSES[config.color].text800}`
-                                    : 'bg-gray-100 text-gray-600'
-                                }`}>
-                                  {isCurrentChain ? 'Current' : 'Switch'}
-                                </span>
-                              </div>
-                              <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                  <span className="text-gray-600">Total Committed:</span>
-                                  <div className={`font-semibold ${
-                                    isCurrentChain ? `${COLOR_CLASSES[config.color].text700}` : 'text-gray-700'
-                                  }`}>
-                                    {statsChainId === chainId ? (approxCommitted ? `≈ ${approxCommitted}` : poolStats.totalCommitted) : '0.00'} ETH
-                                  </div>
-                                </div>
-                                <div>
-                                  <span className="text-gray-600">Active Providers:</span>
-                                  <div className={`font-semibold ${
-                                    isCurrentChain ? `${COLOR_CLASSES[config.color].text700}` : 'text-gray-700'
-                                  }`}>
-                                    {statsChainId === chainId ? poolStats.numProviders : '0'}
-                                  </div>
-                                </div>
-                                <div>
-                                  <span className="text-gray-600">Total Profits:</span>
-                                  <div className={`font-semibold ${
-                                    isCurrentChain ? `${COLOR_CLASSES[config.color].text700}` : 'text-gray-700'
-                                  }`}>
-                                    {statsChainId === chainId ? poolStats.totalProfits : '0.00'} ETH
-                                  </div>
-                                </div>
-                                <div>
-                                  <span className="text-gray-600">Flash Loan Fee:</span>
-                                  <div className={`font-semibold ${
-                                    isCurrentChain ? `${COLOR_CLASSES[config.color].text700}` : 'text-gray-700'
-                                  }`}>
-                                    0.02%
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="mt-3 pt-3 border-top border-gray-200">
-                                <a
-                                  href={config.explorerUrl + '/address/' + config.flashbankAddress}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className={`text-xs hover:underline ${
-                                    isCurrentChain ? `${COLOR_CLASSES[config.color].text600}` : 'text-gray-500'
-                                  }`}
-                                >
-                                  View Contract →
-                                </a>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </section>
-            </div>
-          </main>
-        ) : (
-          /* Marketing Content - Shown when not connected */
-          <>
-            {/* Hero Section */}
-            <section className="bg-gradient-to-br from-blue-50 to-indigo-100 py-20">
-              <div className="container mx-auto px-6 text-center">
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8 }}
-                >
-                  <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
-                    Trustless Flash Loans
-                    <span className="block text-blue-600">Zero Permanent Risk</span>
-                  </h1>
-                  <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-                    The world's first immutable flash loan network where your ETH stays in your wallet.
-                    Earn from MEV opportunities with microsecond risk exposure.
-                  </p>
-
-                  <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+							) : (
                     <appkit-connect-button />
-
-                    <a
-                      href="https://arbiscan.io/address/0x5c0156da501BC97DD35017Fb20624B7f1Ce7E095"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-gray-600 hover:text-gray-900 flex items-center space-x-2 transition-colors"
-                    >
-                      <Shield className="h-5 w-5" />
-                      <span>View Contract</span>
-                    </a>
+							)}
                   </div>
-                </motion.div>
               </div>
-            </section>
+				</header>
 
-            {/* How It Works */}
-            <section id="how-it-works" className="py-20 bg-white">
-              <div className="container mx-auto px-6">
-                <div className="text-center mb-16">
-                  <h2 className="text-3xl font-bold text-gray-900 mb-4">How FlashBank Works</h2>
-                  <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-                    A revolutionary approach where your ETH stays in your wallet while earning from flash loans
-                  </p>
+				<main className="container mx-auto px-6 py-8 space-y-8">
+					{/* Welcome Banner with Links */}
+					<div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-xl shadow-lg p-6 text-white">
+						<div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+							<div>
+								<h2 className="text-2xl font-bold mb-2">🏦 Welcome to FlashBank</h2>
+								<p className="text-blue-100 text-sm">
+									The only flash loan protocol where <strong>funds stay in your wallet</strong>. No deposits, just approve & commit.
+								</p>
+							</div>
+							<div className="flex flex-wrap gap-2">
+								<a
+									href="/guides/lend"
+									className="inline-flex items-center gap-1 bg-white text-blue-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-50 transition-colors"
+								>
+									<BookOpen className="h-4 w-4" />
+									Lender Guide
+								</a>
+								<a
+									href="/guides/borrow"
+									className="inline-flex items-center gap-1 bg-white text-blue-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-50 transition-colors"
+								>
+									<Code className="h-4 w-4" />
+									Borrower Guide
+								</a>
+								<a
+									href="/security"
+									className="inline-flex items-center gap-1 bg-white text-blue-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-50 transition-colors"
+								>
+									<Shield className="h-4 w-4" />
+									Security Audit
+								</a>
+							</div>
+						</div>
+					</div>
+
+					{/* Contract Info */}
+					{networkConfig.router && (
+						<div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+							<div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+								<div>
+									<p className="text-sm font-semibold text-blue-900 mb-1">📝 FlashBankRouter Contract</p>
+									<p className="text-xs text-blue-700 font-mono break-all">{networkConfig.router}</p>
+								</div>
+								<a
+									href={`https://${chainId === 11155111 ? 'sepolia.' : ''}etherscan.io/address/${networkConfig.router}#code`}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="inline-flex items-center gap-1 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors whitespace-nowrap"
+								>
+									View on Explorer
+									<ExternalLink className="h-3 w-3" />
+								</a>
+							</div>
+						</div>
+					)}
+
+					<div className="bg-white rounded-xl shadow p-6 border border-gray-200">
+						<h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+							<Shield className="h-5 w-5 text-blue-500" />
+							WETH Liquidity Overview
+						</h2>
+						<div className="grid md:grid-cols-3 gap-6">
+							<div>
+								<p className="text-sm text-gray-500">Total Committed</p>
+								<p className="text-2xl font-bold text-gray-900">{poolStats.committed} WETH</p>
                 </div>
-
-                {/* Simple Process Diagram */}
-                <div className="mb-16">
-                  <div className="grid md:grid-cols-3 gap-8 text-center">
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.8, delay: 0.1 }}
-                      className="bg-blue-50 rounded-lg p-8"
-                    >
-                      <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Wallet className="h-8 w-8 text-white" />
-                      </div>
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">1. Keep Your ETH</h3>
-                      <p className="text-gray-600">
-                        Your ETH stays in your wallet. You approve FlashBank to temporarily use it for flash loans.
-                      </p>
-                    </motion.div>
-
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.8, delay: 0.2 }}
-                      className="bg-green-50 rounded-lg p-8"
-                    >
-                      <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Target className="h-8 w-8 text-white" />
-                      </div>
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">2. Smart Selection</h3>
-                      <p className="text-gray-600">
-                        When a flash loan needs ETH, FlashBank pulls from wallets with amounts closest to the loan size.
-                      </p>
-                    </motion.div>
-
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.8, delay: 0.3 }}
-                      className="bg-purple-50 rounded-lg p-8"
-                    >
-                      <div className="w-16 h-16 bg-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Coins className="h-8 w-8 text-white" />
-                      </div>
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">3. Earn & Return</h3>
-                      <p className="text-gray-600">
-                        Only ETH that gets lent receives profits. Your original ETH is returned immediately after the flash loan.
-                      </p>
-                    </motion.div>
-                  </div>
-                </div>
-
-                {/* Benefits for Both Sides */}
-                <div className="grid md:grid-cols-2 gap-12">
-                  {/* For Lenders */}
                   <div>
-                    <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                      <Users className="h-6 w-6 text-blue-600 mr-3" />
-                      For ETH Holders (Lenders)
-                    </h3>
-                    <div className="space-y-4">
-                      {[
-                        {
-                          icon: Shield,
-                          title: "Zero Permanent Risk",
-                          desc: "Your ETH only leaves wallet during flash loan execution - typically microseconds"
-                        },
-                        {
-                          icon: Clock,
-                          title: "Capital Efficiency",
-                          desc: "Your ETH can earn yield elsewhere while still participating in flash loans"
-                        },
-                        {
-                          icon: Target,
-                          title: "Fair Participation",
-                          desc: "Only ETH that gets lent receives profits - no free-riding from inactive participants"
-                        },
-                        {
-                          icon: Lock,
-                          title: "Full Control",
-                          desc: "Pause, resume, or adjust your participation anytime with simple approvals"
-                        }
-                      ].map((benefit, index) => (
-                        <div key={index} className="flex items-start space-x-4">
-                          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <benefit.icon className="h-5 w-5 text-blue-600" />
+								<p className="text-sm text-gray-500">Active Providers</p>
+								<p className="text-2xl font-bold text-gray-900">{poolStats.providers}</p>
                           </div>
                           <div>
-                            <h4 className="font-semibold text-gray-900 mb-1">{benefit.title}</h4>
-                            <p className="text-gray-600 text-sm">{benefit.desc}</p>
+								<p className="text-sm text-gray-500">Fee</p>
+								<p className="text-2xl font-bold text-gray-900">{poolStats.feeBps} bps</p>
                           </div>
                         </div>
-                      ))}
-                    </div>
+					</div>
+
+					<div className="bg-white rounded-xl shadow p-6 border border-gray-200">
+						<div className="flex flex-wrap gap-3 mb-6">
+							{networkConfig.tokens.map((token) => (
+								<button
+									key={token.key}
+									onClick={() => setSelectedTokenKey(token.key)}
+									className={`px-4 py-2 rounded-lg text-sm font-medium ${token.key === selectedTokenKey ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'}`}
+								>
+									{token.symbol}
+								</button>
+							))}
                   </div>
 
-                  {/* For Borrowers */}
-                  <div>
-                    <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                      <Zap className="h-6 w-6 text-green-600 mr-3" />
-                      For MEV Traders (Borrowers)
-                    </h3>
+						<div className="grid md:grid-cols-2 gap-6">
                     <div className="space-y-4">
-                      {[
-                        {
-                          icon: DollarSign,
-                          title: "Lower Borrowing Costs",
-                          desc: "Competitive fees compared to traditional protocols"
-                        },
-                        {
-                          icon: TrendingUp,
-                          title: "Higher Profits",
-                          desc: "Lower borrowing costs mean higher net returns on arbitrage opportunities"
-                        },
-                        {
-                          icon: Coins,
-                          title: "No Capital Required",
-                          desc: "Access flash loans without upfront capital - use committed liquidity instead"
-                        },
-                        {
-                          icon: CheckCircle,
-                          title: "Immutable & Trustless",
-                          desc: "Contract cannot be changed or rug-pulled, providing maximum security"
-                        }
-                      ].map((benefit, index) => (
-                        <div key={index} className="flex items-start space-x-4">
-                          <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <benefit.icon className="h-5 w-5 text-green-600" />
+								<h3 className="text-base font-semibold text-gray-900">Wallet Balances</h3>
+								<div className="bg-gray-50 rounded-lg p-4">
+									<p className="text-sm text-gray-500">ETH: {ethBalance}</p>
+									<p className="text-sm text-gray-500">WETH: {wethBalance}</p>
+									<p className="text-sm text-gray-500">
+										Allowance: {allowance === 'Unlimited' ? 'Unlimited' : `${allowance} WETH`}
+									</p>
                           </div>
-                          <div>
-                            <h4 className="font-semibold text-gray-900 mb-1">{benefit.title}</h4>
-                            <p className="text-gray-600 text-sm">{benefit.desc}</p>
+								<div className="flex gap-4">
+									<div className="flex-1">
+										<label className="text-sm text-gray-600">Wrap Amount (ETH)</label>
+										<input value={wrapAmount} onChange={(e) => setWrapAmount(e.target.value)} className="w-full border rounded-lg px-3 py-2 mt-1" />
                           </div>
+									<button onClick={handleWrap} className="self-end bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+										<Repeat className="h-4 w-4" /> Wrap
+									</button>
                         </div>
-                      ))}
+								<div className="flex gap-4">
+									<div className="flex-1">
+										<label className="text-sm text-gray-600">Unwrap Amount (WETH)</label>
+										<input value={unwrapAmount} onChange={(e) => setUnwrapAmount(e.target.value)} className="w-full border rounded-lg px-3 py-2 mt-1" />
                     </div>
+									<button onClick={handleUnwrap} className="self-end bg-gray-800 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+										<Repeat className="h-4 w-4" /> Unwrap
+									</button>
                   </div>
                 </div>
-              </div>
-            </section>
 
-            {/* Network Stats */}
-            <section className="py-20 bg-gray-50">
-              <div className="container mx-auto px-6">
-                <h2 className="text-3xl font-bold text-gray-900 mb-12 text-center">Network Statistics</h2>
-                <div className="grid md:grid-cols-4 gap-8">
-                  <div className="text-center">
-                    <div className="text-4xl font-bold text-blue-600 mb-2">0 ETH</div>
-                    <div className="text-gray-600">Total Committed Liquidity</div>
+							<div className="space-y-4">
+								<h3 className="text-base font-semibold text-gray-900">Provide Liquidity</h3>
+								{allowanceWei === 0n && (
+									<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+										<p className="text-sm text-yellow-800">⚠️ Router not approved yet. The button below will approve and then set your commitment.</p>
+									</div>
+								)}
+								{allowanceWei > 0n && (
+									<div className="bg-gray-50 rounded-lg p-4 space-y-2">
+									<p className="text-sm text-gray-500">
+										Current Limit:{' '}
+										{providerLimit === 'Unlimited'
+											? 'Unlimited'
+											: providerLimit === 'Not set'
+												? 'Not set (set a limit to start lending)'
+												: `${providerLimit} WETH`}
+									</p>
+									<p className="text-sm text-gray-500">
+										Status:{' '}
+										{providerRegistered
+											? providerPaused
+												? '⏸️ Paused'
+												: '✓ Active'
+											: 'No commitment yet'}
+									</p>
+										<p className="text-sm text-gray-500">Expiry: {providerExpiry}</p>
+									</div>
+								)}
+								<div className="flex items-center gap-2 mb-2">
+									<input 
+										type="checkbox" 
+										id="unlimited-checkbox"
+										checked={isUnlimitedCommitment}
+										onChange={(e) => {
+											setIsUnlimitedCommitment(e.target.checked);
+											setLimitDirty(true);
+											if (e.target.checked) setLimitInput('');
+										}}
+										className="w-4 h-4 text-blue-600 rounded"
+									/>
+									<label htmlFor="unlimited-checkbox" className="text-sm text-gray-700 cursor-pointer">
+										Unlimited commitment
+									</label>
+								</div>
+								<label className="text-sm text-gray-600">Commitment Limit (WETH)</label>
+								<input 
+									value={limitInput} 
+									onChange={(e) => {
+										setLimitInput(e.target.value);
+										setLimitDirty(true);
+										setIsUnlimitedCommitment(false);
+									}} 
+									placeholder={isUnlimitedCommitment ? "Unlimited" : "e.g. 10.0"}
+									disabled={isUnlimitedCommitment}
+									className="w-full border rounded-lg px-3 py-2 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" 
+								/>
+								{allowanceWei === 0n || limitDirty || !providerRegistered ? (
+									<button onClick={handleApproveAndCommit} className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold">
+										{allowanceWei === 0n ? 'Approve & Set Commitment' : providerRegistered ? 'Update Commitment' : 'Set Commitment'}
+									</button>
+								) : (
+									<button onClick={handlePauseResume} className={`w-full py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${providerPaused ? 'bg-green-600 text-white' : 'bg-yellow-500 text-white'}`}>
+										{providerPaused ? (
+											<><PlayCircle className="h-5 w-5" /> Resume</>
+										) : (
+											<><PauseCircle className="h-5 w-5" /> Pause</>
+										)}
+									</button>
+								)}
                   </div>
-                  <div className="text-center">
-                    <div className="text-4xl font-bold text-green-600 mb-2">0 ETH</div>
-                    <div className="text-gray-600">Total Profits Generated</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-4xl font-bold text-purple-600 mb-2">0</div>
-                    <div className="text-gray-600">Active Participants</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-4xl font-bold text-orange-600 mb-2">0.02%</div>
-                    <div className="text-gray-600">Flash Loan Fee</div>
                   </div>
                 </div>
-              </div>
-            </section>
 
-            {/* Instructions & Statistics */}
-            <section id="instructions" className="py-20 bg-white">
-              <div className="container mx-auto px-6">
-                <div className="text-center mb-16">
-                  <h2 className="text-3xl font-bold text-gray-900 mb-4">📚 Instructions & Statistics</h2>
-                  <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-                    Complete guide to using FlashBank and real-time statistics for each supported network
-                  </p>
-                </div>
+					{/* How It Works */}
+					<div className="bg-white rounded-xl shadow p-6 border border-gray-200">
+						<h3 className="text-lg font-semibold text-gray-900 mb-4">💡 How FlashBank Works</h3>
+						<div className="grid md:grid-cols-2 gap-6">
+							<div>
+								<h4 className="font-semibold text-gray-900 mb-2">For Lenders (You earn fees)</h4>
+								<ol className="space-y-2 text-sm text-gray-700">
+									<li className="flex gap-2">
+										<span className="font-semibold text-blue-600">1.</span>
+										<span>Wrap some ETH to WETH (or use existing WETH)</span>
+									</li>
+									<li className="flex gap-2">
+										<span className="font-semibold text-blue-600">2.</span>
+										<span>Approve the FlashBankRouter to access your WETH</span>
+									</li>
+									<li className="flex gap-2">
+										<span className="font-semibold text-blue-600">3.</span>
+										<span>Set a commitment limit (or unlimited) - <strong>WETH stays in your wallet!</strong></span>
+									</li>
+									<li className="flex gap-2">
+										<span className="font-semibold text-blue-600">4.</span>
+										<span>Earn fees every time borrowers use your liquidity</span>
+									</li>
+									<li className="flex gap-2">
+										<span className="font-semibold text-blue-600">5.</span>
+										<span>Pause/unpause or change limits anytime - instant effect</span>
+									</li>
+								</ol>
+							</div>
+							<div>
+								<h4 className="font-semibold text-gray-900 mb-2">For Borrowers (MEV/Arb bots)</h4>
+								<ol className="space-y-2 text-sm text-gray-700">
+									<li className="flex gap-2">
+										<span className="font-semibold text-purple-600">1.</span>
+										<span>Implement the <code className="bg-gray-100 px-1 rounded text-xs">IFlashLoanReceiver</code> interface</span>
+									</li>
+									<li className="flex gap-2">
+										<span className="font-semibold text-purple-600">2.</span>
+										<span>Call <code className="bg-gray-100 px-1 rounded text-xs">flashLoan(token, amount, toNative, data)</code></span>
+									</li>
+									<li className="flex gap-2">
+										<span className="font-semibold text-purple-600">3.</span>
+										<span>Router pulls WETH from providers (all in one tx)</span>
+									</li>
+									<li className="flex gap-2">
+										<span className="font-semibold text-purple-600">4.</span>
+										<span>Your contract receives WETH or native ETH</span>
+									</li>
+									<li className="flex gap-2">
+										<span className="font-semibold text-purple-600">5.</span>
+										<span>Execute your arbitrage/MEV logic</span>
+									</li>
+									<li className="flex gap-2">
+										<span className="font-semibold text-purple-600">6.</span>
+										<span>Repay principal + fee or entire tx reverts</span>
+									</li>
+								</ol>
+							</div>
+						</div>
+						<div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+							<p className="text-sm text-blue-900">
+								<strong>🔐 Key Difference:</strong> Traditional flash loan protocols require you to <em>deposit</em> your funds into their contract. 
+								FlashBank lets you <strong>keep WETH in your own wallet</strong> and just approve the router. You maintain full custody until the moment a loan is executed.
+							</p>
+						</div>
+					</div>
 
-                <div className="grid md:grid-cols-2 gap-12 mb-16">
-                  {/* Borrower Instructions */}
-                  <div>
-                    <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                      <BookOpen className="h-6 w-6 text-blue-600 mr-3" />
-                        How to Borrow with FlashBank (for MEV/Arb bots)
+					<div className="bg-white rounded-xl shadow p-6 border border-gray-200">
+						<h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+							<ArrowRightCircle className="h-5 w-5 text-purple-500" />
+							Demo Flash Loan
                     </h3>
-                    <div className="space-y-6">
-                      <div className="bg-blue-50 rounded-lg p-6">
-                        <h4 className="font-semibold text-blue-900 mb-3">1) Deploy a borrower contract</h4>
-                        <p className="text-blue-700 text-sm">
-                          Implement <code>executeFlashLoan(uint256 amount, uint256 fee, bytes data)</code> and return <code>true</code> on success.
-                        </p>
-                        <details className="mt-3">
-                          <summary className="cursor-pointer text-sm text-blue-700 underline">Show minimal interfaces</summary>
-                          <pre className="text-xs bg-white border border-blue-100 rounded p-3 mt-3 overflow-x-auto"><code>{`interface IL2FlashLoan { function executeFlashLoan(uint256 amount, uint256 fee, bytes calldata data) external returns (bool); }
-interface IFlashBank { function flashLoan(uint256 amount, bytes calldata data) external; }`}</code></pre>
-                          <div className="text-xs text-blue-700 mt-2"><a className="underline" href="/guides/borrow">Read the full Borrower Guide →</a></div>
-                        </details>
-                      </div>
-                      <div className="bg-green-50 rounded-lg p-6">
-                        <h4 className="font-semibold text-green-900 mb-3">2) Start a loan</h4>
-                        <p className="text-green-700 text-sm">From your EOA/script, call your borrower's entrypoint that internally calls <code>flashLoan</code>.</p>
-                        <details className="mt-3">
-                          <summary className="cursor-pointer text-sm text-green-700 underline">Show ethers v6 script snippet</summary>
-                          <pre className="text-xs bg-white border border-green-100 rounded p-3 mt-3 overflow-x-auto"><code>{`await borrower.start(ethers.parseEther("10"), "0x");`}</code></pre>
-                        </details>
-                      </div>
-                      <div className="bg-purple-50 rounded-lg p-6">
-                        <h4 className="font-semibold text-purple-900 mb-3">3) Repay inside callback</h4>
-                        <ul className="list-disc pl-5 text-purple-700 text-sm space-y-1">
-                          <li>Minimum: 0.01 ETH; Maximum: 10,000 ETH (and cannot exceed available liquidity)</li>
-                          <li>Fee: 0.02% of amount (<code>fee = (amount * 2) / 10000</code>)</li>
-                          <li>Repay <strong>amount + fee</strong> to FlashBank before returning from <code>executeFlashLoan</code></li>
-                        </ul>
-                      </div>
-                      <div className="bg-orange-50 rounded-lg p-6">
-                        <h4 className="font-semibold text-orange-900 mb-3">4) Strategy tips</h4>
-                        <ul className="list-disc pl-5 text-orange-700 text-sm space-y-1">
-                          <li>Encode DEX routes/pools into <code>data</code> for use in your strategy.</li>
-                          <li>Return <code>false</code> (or revert) if the strategy fails; funds auto-return to providers.</li>
-                          <li>Optimise gas; your EOA funds the transaction.</li>
-                        </ul>
-                      </div>
-                      {/* Lender Guide - More Info */}
-                      <details className="bg-gray-50 rounded-lg p-6">
-                        <summary className="cursor-pointer font-semibold text-gray-900">More: Lender Guide (Provide Liquidity)</summary>
-                        <div className="mt-4 space-y-4 text-sm text-gray-700">
-                          <p><strong>Approve Access</strong>: Allow FlashBank to temporarily use your ETH during flash loans. Your ETH remains in your wallet.</p>
-                          <p><strong>Set/Change Limit</strong>: Optionally cap the maximum amount FlashBank can pull from you. Use 0 to pause; choose Unlimited for hands‑off participation.</p>
-                          <p><strong>Pause/Resume</strong>: Temporarily stop and later resume participation without losing your previous preference.</p>
-                          <p><strong>Claim Profits</strong>: Withdraw accumulated profits anytime.</p>
-                          <div><a className="underline text-blue-700" href="/guides/lend">Read the full Lender Guide →</a></div>
-                        </div>
-                      </details>
-                    </div>
-                  </div>
-
-                  {/* Network Statistics */}
+						<div className="grid md:grid-cols-2 gap-4 mb-4">
+							<div className="bg-green-50 border border-green-200 rounded-lg p-4">
+								<h4 className="font-semibold text-green-900 mb-2">✓ Success Demo</h4>
+								<p className="text-sm text-green-800">
+									Borrows WETH from the pool → unwraps to ETH → passes through counter (proving you used others' funds) → proves funds on-chain → repays router. Transaction succeeds.
+								</p>
+							</div>
+							<div className="bg-red-50 border border-red-200 rounded-lg p-4">
+								<h4 className="font-semibold text-red-900 mb-2">✗ Fail Demo</h4>
+								<p className="text-sm text-red-800">
+									Borrows WETH → unwraps → passes through counter → attempts to keep funds by sending to proof sink. Router detects missing repayment and <strong>reverts the entire transaction</strong>. Funds are safe.
+								</p>
+							</div>
+						</div>
+						{networkConfig.demoCounter && (
+							<div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
+								<div className="flex items-center justify-between">
+									<div>
+										<p className="text-sm font-semibold text-purple-900">Demo Counter</p>
+										<p className="text-xs text-purple-700">Total ETH that has passed through the counter</p>
+									</div>
+									<div className="text-right">
+										<p className="text-2xl font-bold text-purple-900">{demoCounterTotal}</p>
+										<p className="text-xs text-purple-700">ETH</p>
+									</div>
+								</div>
+							</div>
+						)}
+						<div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+							<p className="text-sm font-semibold text-blue-900 mb-2">Demo Requirements:</p>
+							<div className="space-y-1 text-sm text-blue-800">
+								<div className="flex items-center gap-2">
+									{Number(poolStats.committed) >= Number(demoAmount) ? '✓' : '✗'} 
+									<span>Pool has ≥ {demoAmount} WETH committed (current: {formatEth(poolStats.committed, 4)} WETH)</span>
+								</div>
+								<div className="flex items-center gap-2">
+									{Number(ethBalance) >= Number(quoteFee) ? '✓' : '✗'} 
+									<span>You have ≥ {quoteFee} ETH for the fee</span>
+								</div>
+							</div>
+							<p className="text-xs text-blue-700 mt-2 italic">Note: The demo borrows from the pool, not your personal commitment</p>
+						</div>
+						<div className="grid md:grid-cols-2 gap-4">
                   <div>
-                    <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                      <TrendingUp className="h-6 w-6 text-green-600 mr-3" />
-                      Network Statistics
-                    </h3>
-                    <div className="space-y-4">
-                      {Object.entries(CHAIN_CONFIGS).map(([chainIdStr, config]) => {
-                        const statsChainId = Number(chainIdStr);
-                        const isCurrentChain = statsChainId === chainId;
-                        return (
-                          <div key={chainIdStr} className={`border rounded-lg p-4 ${
-                            isCurrentChain ? `border-${config.color}-200 bg-${config.color}-50` : 'border-gray-200 bg-gray-50'
-                          }`}>
-                            <div className="flex items-center justify-between mb-3">
-                              <h4 className={`font-semibold flex items-center ${
-                                isCurrentChain ? `${COLOR_CLASSES[config.color].text800}` : 'text-gray-700'
-                              }`}>
-                                {config.icon} {config.name}
-                              </h4>
-                              <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                isCurrentChain
-                                  ? `${COLOR_CLASSES[config.color].bg100} ${COLOR_CLASSES[config.color].text800}`
-                                  : 'bg-gray-100 text-gray-600'
-                              }`}>
-                                {isCurrentChain ? 'Current' : 'Switch'}
-                              </span>
+								<label className="text-sm text-gray-600">Amount (ETH)</label>
+								<input value={demoAmount} onChange={(e) => setDemoAmount(e.target.value)} className="w-full border rounded-lg px-3 py-2 mt-1" />
+								<p className="text-xs text-gray-500 mt-2">Estimated Fee: {quoteFee} ETH</p>
                             </div>
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                              <div>
-                                <span className="text-gray-600">Total Committed:</span>
-                                <div className={`font-semibold ${
-                                  isCurrentChain ? `${COLOR_CLASSES[config.color].text700}` : 'text-gray-700'
-                                }`}>
-                                  {statsChainId === chainId ? (approxCommitted ? `≈ ${approxCommitted}` : poolStats.totalCommitted) : '0.00'} ETH
-                                </div>
+							<div className="flex items-end gap-2">
+								<button 
+									onClick={() => handleRunDemo(false)} 
+									disabled={isRunningDemo || Number(poolStats.committed) < Number(demoAmount) || Number(ethBalance) < Number(quoteFee)} 
+									className="flex-1 bg-green-600 text-white py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+									title={Number(poolStats.committed) < Number(demoAmount) || Number(ethBalance) < Number(quoteFee) ? 'Check requirements above' : 'Borrow, prove funds, and repay successfully'}
+								>
+									{isRunningDemo && !demoFailMode ? 'Running...' : 'Run Demo (Success)'}
+								</button>
+								<button 
+									onClick={() => handleRunDemo(true)} 
+									disabled={isRunningDemo || Number(poolStats.committed) < Number(demoAmount) || Number(ethBalance) < Number(quoteFee)} 
+									className="flex-1 bg-red-600 text-white py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+									title={Number(poolStats.committed) < Number(demoAmount) || Number(ethBalance) < Number(quoteFee) ? 'Check requirements above' : 'Attempt to steal funds - transaction will revert'}
+								>
+									{isRunningDemo && demoFailMode ? 'Running...' : 'Run Demo (Fail)'}
+								</button>
+							</div>
                               </div>
-                              <div>
-                                <span className="text-gray-600">Active Providers:</span>
-                                <div className={`font-semibold ${
-                                  isCurrentChain ? `${COLOR_CLASSES[config.color].text700}` : 'text-gray-700'
-                                }`}>
-                                  {statsChainId === chainId ? poolStats.numProviders : '0'}
-                                </div>
-                              </div>
-                              <div>
-                                <span className="text-gray-600">Total Profits:</span>
-                                <div className={`font-semibold ${
-                                  isCurrentChain ? `${COLOR_CLASSES[config.color].text700}` : 'text-gray-700'
-                                }`}>
-                                  {statsChainId === chainId ? poolStats.totalProfits : '0.00'} ETH
-                                </div>
-                              </div>
-                              <div>
-                                <span className="text-gray-600">Flash Loan Fee:</span>
-                                <div className={`font-semibold ${
-                                  isCurrentChain ? `${COLOR_CLASSES[config.color].text700}` : 'text-gray-700'
-                                }`}>
-                                  0.02%
-                                </div>
-                              </div>
-                            </div>
-                            <div className="mt-3 pt-3 border-t border-gray-200">
-                              <a
-                                href={config.explorerUrl + '/address/' + config.flashbankAddress}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className={`text-xs hover:underline ${
-                                  isCurrentChain ? `${COLOR_CLASSES[config.color].text600}` : 'text-gray-500'
-                                }`}
-                              >
-                                View Contract →
-                              </a>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Key Benefits Summary */}
-                <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-8">
-                  <h3 className="text-xl font-bold text-gray-900 mb-6 text-center">Why Choose FlashBank?</h3>
-                  <div className="grid md:grid-cols-3 gap-6 text-center">
-                    <div>
-                      <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                        <Shield className="h-6 w-6 text-white" />
-                      </div>
-                      <h4 className="font-semibold text-blue-900 mb-2">Zero Permanent Risk</h4>
-                      <p className="text-blue-700 text-sm">ETH only leaves wallet during flash loan execution</p>
-                    </div>
-                    <div>
-                      <div className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                        <TrendingUp className="h-6 w-6 text-white" />
-                      </div>
-                      <h4 className="font-semibold text-green-900 mb-2">Competitive Returns</h4>
-                      <p className="text-green-700 text-sm">Earn from flash loan fees with capital efficiency</p>
-                    </div>
-                    <div>
-                      <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                        <Lock className="h-6 w-6 text-white" />
-                      </div>
-                      <h4 className="font-semibold text-purple-900 mb-2">Full Control</h4>
-                      <p className="text-purple-700 text-sm">Pause, resume, or withdraw anytime</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            {/* Wallet Connection Help */}
-            <section className="py-16 bg-gray-50">
-              <div className="container mx-auto px-6 text-center">
-                <h2 className="text-2xl font-bold text-gray-900 mb-8">Wallet Connection Help</h2>
-                <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-sm p-6">
-                  <p className="text-gray-600 mb-6">
-                    ConnectKit automatically detects and supports modern wallets:
-                  </p>
-                  <div className="grid md:grid-cols-2 gap-4 text-sm">
-                    <div className="text-center p-4 bg-indigo-50 rounded-lg border-2 border-indigo-200">
-                      <strong className="text-indigo-700">🎯 Modern Wallets</strong>
-                      <p className="text-indigo-600 mt-2">
-                        <strong>Keplr, Vultisig, MetaMask</strong>, and more
-                      </p>
-                      <p className="text-xs text-indigo-500 mt-1">Auto-detected by ConnectKit</p>
-                    </div>
-                    <div className="text-center p-4 bg-blue-50 rounded-lg">
-                      <strong className="text-blue-700">💼 Coinbase Wallet</strong>
-                      <p className="text-blue-600 mt-2">Mobile app or browser extension</p>
-                    </div>
-                    <div className="text-center p-4 bg-green-50 rounded-lg">
-                      <strong className="text-green-700">📱 Mobile Wallets</strong>
-                      <p className="text-green-600 mt-2">Trust, Rainbow, Ledger, and more</p>
-                      <p className="text-xs text-green-500 mt-1">Via WalletConnect (optional setup)</p>
-                    </div>
-                    <div className="text-center p-4 bg-purple-50 rounded-lg">
-                      <strong className="text-purple-700">🔧 Seamless Experience</strong>
-                      <p className="text-purple-600 mt-2">Modern wallet connection without manual detection</p>
-                    </div>
-                </div>
-              </div>
-            </div>
-          </section>
-          </>
-        )}
-
-        {/* Footer */}
-        <footer className="bg-gray-900 text-white py-16">
-          <div className="container mx-auto px-6 text-center">
-          <div className="mb-8">
-              <div className="flex items-center justify-center space-x-3 mb-4">
-                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                  <Zap className="h-5 w-5 text-white" />
-                </div>
-                <span className="text-2xl font-bold">FlashBank.net</span>
-              </div>
-              <p className="text-gray-400">Revolutionary trustless flash loan network</p>
+						{demoTxHash && (
+							<>
+							<div className="mt-4 space-y-4">
+								<div className="bg-gray-50 rounded-lg p-4">
+									<p className="text-sm text-gray-600">
+										Tx:{' '}
+										<a href={`${networkConfig.explorer}/tx/${demoTxHash}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+											{demoTxHash.slice(0, 10)}...{demoTxHash.slice(-8)}
+										</a>
+									</p>
+									{demoResult && (
+										<p className="text-sm text-gray-600 mt-2">
+											Amount {demoResult.amount} ETH · Fee {demoResult.fee} ETH
+										</p>
+									)}
+								</div>
+								<div className="bg-white border-2 border-gray-200 rounded-lg p-4">
+									<p className="text-sm font-semibold text-gray-900 mb-3">Transaction Flow:</p>
+									<div className="flex flex-col gap-2 text-sm">
+										<div className="flex items-center gap-2">
+											<span className="text-2xl">💰</span>
+											<a href={`${networkConfig.explorer}/address/${networkConfig.router}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline flex-1">
+												Pool providers' WETH
+											</a>
+											<span className="text-gray-400">→</span>
+										</div>
+										<div className="flex items-center gap-2">
+											<span className="text-2xl">📦</span>
+											<a href={`${networkConfig.explorer}/address/${networkConfig.router}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline flex-1">
+												FlashBank Router (unwrap)
+											</a>
+											<span className="text-gray-400">→</span>
+										</div>
+										<div className="flex items-center gap-2">
+											<span className="text-2xl">🤖</span>
+											<a href={`${networkConfig.explorer}/address/${networkConfig.demoBorrower}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline flex-1">
+												Demo Borrower (receives ETH)
+											</a>
+											<span className="text-gray-400">→</span>
+										</div>
+										<div className="flex items-center gap-2">
+											<span className="text-2xl">🔢</span>
+											<a href={`${networkConfig.explorer}/address/${networkConfig.demoCounter}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline flex-1">
+												Counter (proves you used {demoResult?.amount} ETH)
+											</a>
+											<span className="text-gray-400">→</span>
+										</div>
+										{demoOutcome === 'success' && (
+											<>
+												<div className="flex items-center gap-2">
+													<span className="text-2xl">✅</span>
+													<a href={`${networkConfig.explorer}/address/${networkConfig.proofSink}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline flex-1">
+														Proof (refunds ETH)
+													</a>
+													<span className="text-gray-400">→</span>
+												</div>
+												<div className="flex items-center gap-2">
+													<span className="text-2xl">💸</span>
+													<span className="text-green-600 font-semibold flex-1">Repaid to Router + Fee</span>
+													<span className="text-green-600">✓</span>
+												</div>
+											</>
+										)}
+										{demoOutcome === 'blocked' && (
+											<>
+												<div className="flex items-center gap-2">
+													<span className="text-2xl">🚫</span>
+													<a href={`${networkConfig.explorer}/address/${networkConfig.proofSink}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline flex-1">
+														Proof (keeps ETH - theft attempt)
+													</a>
+													<span className="text-red-600">✗</span>
+												</div>
+												<div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded p-2">
+													<span className="text-2xl">⛔</span>
+													<span className="text-red-600 font-semibold flex-1">Router detected missing repayment → REVERT</span>
+												</div>
+												<p className="text-xs text-red-700 italic mt-2">
+													All state changes rolled back. Providers' WETH never left their wallets.
+												</p>
+											</>
+										)}
+										{demoOutcome === 'none' && (
+											<p className="text-xs text-gray-500 italic">Run a demo to visualise the full flow.</p>
+										)}
+									</div>
+								</div>
+							</div>
+							{demoError && (
+								<p className="text-sm text-red-600 mt-2">{demoError}</p>
+							)}
+							</>
+						)}
           </div>
           
-          <div className="flex justify-center space-x-8 mb-8">
-              <a href="#instructions" className="text-gray-400 hover:text-white transition-colors">Instructions</a>
-              <a href="https://github.com/flashbank-net" className="text-gray-400 hover:text-white transition-colors">GitHub</a>
-              <a href="https://docs.flashbank.net" className="text-gray-400 hover:text-white transition-colors">Docs</a>
-              <a href="https://twitter.com/FlashBankNet" className="text-gray-400 hover:text-white transition-colors">Twitter</a>
-              <a href="https://discord.gg/flashbank" className="text-gray-400 hover:text-white transition-colors">Discord</a>
+					<div className="bg-white rounded-xl shadow p-6 border border-gray-200">
+						<h3 className="text-lg font-semibold text-gray-900 mb-4">Guide</h3>
+						<ol className="list-decimal list-inside space-y-2 text-gray-700">
+							<li>Wrap the ETH amount you wish to make available (WETH stays in your wallet).</li>
+							<li>Approve the FlashBank Router once.</li>
+							<li>Set your commitment limit and optional expiry. Pause/resume at any time.</li>
+							<li>Earn 0.02% (configurable) each time your WETH is pulled into a flash loan.</li>
+							<li>Use the demo to verify behaviour on Sepolia before moving to production chains.</li>
+						</ol>
           </div>
-          
-            <div className="border-t border-gray-800 pt-8">
-              <p className="text-gray-400">&copy; 2025 FlashBank.net. Built for the DeFi community.</p>
-              <p className="text-sm mt-2 text-gray-500">
-              <AlertTriangle className="h-4 w-4 inline mr-1" />
-              Smart contracts involve risk. Do your own research.
-            </p>
-            </div>
-          </div>
-        </footer>
+				</main>
+
+				{/* Footer */}
+				<footer className="bg-white border-t border-gray-200 py-8 mt-12">
+					<div className="container mx-auto px-6">
+						<div className="grid md:grid-cols-3 gap-8">
+							<div>
+								<h4 className="font-semibold text-gray-900 mb-3">📚 Documentation</h4>
+								<ul className="space-y-2 text-sm">
+									<li>
+										<a href="/guides/lend" className="text-blue-600 hover:text-blue-800">Lender Guide</a>
+									</li>
+									<li>
+										<a href="/guides/borrow" className="text-blue-600 hover:text-blue-800">Borrower Guide</a>
+									</li>
+									<li>
+										<a href="/security" className="text-blue-600 hover:text-blue-800">Security Audit</a>
+									</li>
+								</ul>
+							</div>
+							<div>
+								<h4 className="font-semibold text-gray-900 mb-3">🔗 Smart Contracts</h4>
+								<ul className="space-y-2 text-sm">
+									{networkConfig.router && (
+										<li>
+											<a 
+												href={`${networkConfig.explorer}/address/${networkConfig.router}#code`}
+												target="_blank"
+												rel="noopener noreferrer"
+												className="text-blue-600 hover:text-blue-800 inline-flex items-center gap-1"
+											>
+												FlashBankRouter
+												<ExternalLink className="h-3 w-3" />
+											</a>
+										</li>
+									)}
+									{selectedToken && (
+										<li>
+											<a 
+												href={`${networkConfig.explorer}/address/${selectedToken.address}#code`}
+												target="_blank"
+												rel="noopener noreferrer"
+												className="text-blue-600 hover:text-blue-800 inline-flex items-center gap-1"
+											>
+												WETH Token
+												<ExternalLink className="h-3 w-3" />
+											</a>
+										</li>
+									)}
+									<li>
+										<a 
+											href="https://github.com/your-repo/flashbank-net"
+											target="_blank"
+											rel="noopener noreferrer"
+											className="text-blue-600 hover:text-blue-800 inline-flex items-center gap-1"
+										>
+											View on GitHub
+											<ExternalLink className="h-3 w-3" />
+										</a>
+									</li>
+								</ul>
+							</div>
+							<div>
+								<h4 className="font-semibold text-gray-900 mb-3">ℹ️ About</h4>
+								<p className="text-sm text-gray-600 mb-3">
+									FlashBank is the first flash loan protocol where liquidity providers maintain full custody of their funds until the moment a loan executes.
+								</p>
+								<p className="text-xs text-gray-500">
+									⚠️ Soft launch on Sepolia. Use at your own risk.
+								</p>
+							</div>
+						</div>
+						<div className="mt-8 pt-6 border-t border-gray-200 text-center text-sm text-gray-500">
+							<p>Built with ❤️ for the Ethereum community · No deposits, no custody, no nonsense</p>
+						</div>
+					</div>
+				</footer>
       </div>
     </>
   );
 }
+

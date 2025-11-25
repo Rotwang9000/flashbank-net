@@ -1,15 +1,19 @@
+
 # 🏦 FlashBank.net - Revolutionary Just-in-Time Flash Loan Network
 
 **The world's first IMMUTABLE flash loan network where your ETH never leaves your wallet**
 
-## 🚀 Deployment Status (October 17, 2025)
+## 🚀 Deployment Status (November 24, 2025)
 
 | Network | Status | Contract Address | Verified |
 |---------|--------|------------------|----------|
+| **Sepolia** | ✅ Live | Router + Demo contracts | ✅ Yes (v2 API) |
 | **Arbitrum** | ✅ Live | `0x5c0156da501BC97DD35017Fb20624B7f1Ce7E095` | ✅ Yes |
 | **Base** | ✅ Live | `0xBDcC71d5F73962d017756A04919FBba9d30F0795` | ⚠️ Manual needed |
 | **Ethereum** | ✅ Live | `0xBDcC71d5F73962d017756A04919FBba9d30F0795` | ⏳ Pending |
 | **Website** | ✅ Live | [flashbank.net](https://flashbank.net) | ✅ Yes |
+
+> **Note**: As of November 2025, all Sepolia contracts are now verified using Etherscan v2 API with `@nomicfoundation/hardhat-verify@^2.1.3`.
 
 📋 **Detailed Status**: See [STATUS_SUMMARY.md](STATUS_SUMMARY.md) and [DEPLOYMENT_STATUS.md](DEPLOYMENT_STATUS.md)
 
@@ -18,6 +22,75 @@
 💡 **How It Works**: [Flash Loan Concept Guide](FLASH_LOAN_CONCEPT.md)  
 🔧 **Correct Design**: [Revolutionary Architecture](CORRECT_ARCHITECTURE.md) ⚠️ **READ THIS FIRST**  
 🏊 **Current Pool**: [Pool Mechanics](POOL_MECHANICS.md) *(needs fixing)*
+
+---
+
+## 🔄 November 2025 Router Upgrade (WETH-First)
+
+> ✅ **Major update:** Liquidity now flows through the new `FlashBankRouter` contract.  
+> 🔐 **No deposits:** Providers keep WETH in their wallets and simply approve the router.  
+> 🪙 **Token-ready:** The router tracks commitments per ERC-20, starting with WETH.
+
+| Chain | Router Address | WETH Token | Demo Borrower |
+|-------|----------------|------------|---------------|
+| **Sepolia (soft launch)** | `NEXT_PUBLIC_SEPOLIA_ROUTER_ADDRESS` | `0xdd13E55209Fd76AfE204dBda4007C227904f0a81` | `NEXT_PUBLIC_SEPOLIA_DEMO_BORROWER_ADDRESS` |
+| **Base** | _deploy via `scripts/deploy-router.js`_ | `0x4200000000000000000000000000000000000006` | _TBD_ |
+| **Arbitrum** | _deploy via `scripts/deploy-router.js`_ | `0x82aF49447D8a07e3bd95BD0d56f35241523fBab1` | _TBD_ |
+| **Ethereum** | _deploy via `scripts/deploy-router.js`_ | `0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2` | _TBD_ |
+
+### Why the Router Matters
+
+- **WETH stays in your wallet.** You simply approve the router and set a limit.
+- **Permit-ready.** ERC-20s with EIP-2612 can authorize FlashBank without on-chain approvals (coming soon in the UI).
+- **Token registry.** Adding a new asset is a single `setTokenConfig` call—no redeployments.
+- **ETH bridge.** Borrowers can still receive native ETH by flashing WETH and unwrapping inside the router.
+
+### Provider Flow (WETH Example)
+
+1. Wrap ETH → receive WETH in the same wallet you already use.
+2. Approve `FlashBankRouter` once (or sign a permit).
+3. Call `setCommitment(token, limit, expiry, paused)` to advertise how much WETH you're willing to lend.
+4. Pause/resume at any time. No withdrawals—just drop the limit to zero.
+5. Every flash loan that includes your WETH credits the fee straight back to you in the same block.
+
+### Router Configuration & Limits
+
+The router owner can configure per-token settings via `setTokenConfig`:
+
+- **Fee Range**: 0.01% - 1% (1-100 basis points)
+  - Enforced minimum prevents race-to-zero fee competition
+  - Enforced maximum protects borrowers from excessive fees
+  
+- **Max Borrow Percentage**: 1% - 100% of pool (100-10000 basis points)
+  - Prevents single borrower from monopolising entire pool
+  - Default: 50% (5000 bps) - allows multiple concurrent loans
+  - Example: With 100 WETH committed, max single loan = 50 WETH
+  
+- **Max Flash Loan**: Optional absolute cap per transaction (in wei)
+  - Set to 0 for unlimited (subject to pool size and max borrow %)
+  
+These limits ensure fair access and sustainable fee economics whilst maintaining protocol flexibility.
+
+### New Environment Variables
+
+```
+NEXT_PUBLIC_SEPOLIA_ROUTER_ADDRESS=0x...
+NEXT_PUBLIC_SEPOLIA_WETH_ADDRESS=0xdd13E55209Fd76AfE204dBda4007C227904f0a81
+NEXT_PUBLIC_SEPOLIA_DEMO_BORROWER_ADDRESS=0x...
+NEXT_PUBLIC_SEPOLIA_PROOF_SINK_ADDRESS=0x...
+NEXT_PUBLIC_BASE_ROUTER_ADDRESS=0x...
+NEXT_PUBLIC_BASE_WETH_ADDRESS=0x4200000000000000000000000000000000000006
+NEXT_PUBLIC_ARBITRUM_ROUTER_ADDRESS=0x...
+NEXT_PUBLIC_ETHEREUM_ROUTER_ADDRESS=0x...
+```
+
+Set the `_ROUTER_ADDRESS` values after running:
+
+```
+npx hardhat run scripts/deploy-router.js --network <network>
+```
+
+> ℹ️ The legacy `FlashBankRevolutionary` addresses (deposits) remain deployed but the primary UX now goes through the router/WETH workflow. Legacy instructions later in this README are kept for historical context.
 
 ---
 
@@ -125,33 +198,51 @@ For participants with 10 ETH committed:
 
 ## 🔧 Quick Start
 
-### **For Depositors**
+### **For WETH Liquidity Providers**
 ```javascript
-// 1. Connect to FlashBank
-const flashBank = new ethers.Contract(
-  "0x5c0156da501BC97DD35017Fb20624B7f1Ce7E095", 
-  FlashBankABI, 
+const router = new ethers.Contract(
+  process.env.NEXT_PUBLIC_SEPOLIA_ROUTER_ADDRESS,
+  FlashBankRouterABI,
+  signer
+);
+const weth = new ethers.Contract(
+  process.env.NEXT_PUBLIC_SEPOLIA_WETH_ADDRESS,
+  WETH9_ABI,
   signer
 );
 
-// 2. Deposit ETH to earn fees
-await flashBank.deposit({ value: ethers.parseEther("10") });
+// 1. Wrap some ETH so you have WETH on hand
+await weth.deposit({ value: ethers.parseEther("5") });
 
-// 3. Check your balance
-const [deposits, profits] = await flashBank.getUserBalance(address);
-console.log(`Deposits: ${ethers.formatEther(deposits)} ETH`);
-console.log(`Profits: ${ethers.formatEther(profits)} ETH`);
+// 2. Approve (or permit) the router once
+await weth.approve(router.getAddress(), ethers.MaxUint256);
 
-// 4. Withdraw profits
-await flashBank.withdrawProfit();
+// 3. Advertise your commitment (limit + optional expiry)
+await router.setCommitment(
+  weth.getAddress(),
+  ethers.parseEther("3"), // lend up to 3 WETH
+  0,                      // no expiry
+  false                   // active
+);
+
+// 4. Pause/resume instantly
+await router.setCommitment(weth.getAddress(), ethers.parseEther("3"), 0, true);
 ```
 
 ### **For MEV Bots**
 ```javascript
-// Execute flash loan with 44% savings vs Aave
-await flashBank.flashLoan(
-  ethers.parseEther("100"), // 100 ETH
-  strategyData              // Your MEV strategy
+const router = new ethers.Contract(
+  process.env.NEXT_PUBLIC_SEPOLIA_ROUTER_ADDRESS,
+  FlashBankRouterABI,
+  signer
+);
+
+// Borrow 100 WETH (unwrap to native ETH inside the router)
+await router.flashLoan(
+  process.env.NEXT_PUBLIC_SEPOLIA_WETH_ADDRESS,
+  ethers.parseEther("100"),
+  true,               // receive native ETH
+  strategyCalldata    // forwarded to IL2FlashLoan.executeFlashLoan
 );
 ```
 
@@ -351,3 +442,11 @@ NEXT_PUBLIC_SEPOLIA_DEMO_BORROWER_ADDRESS=0xYourDeployedDemo
 - On the website (Sepolia default), use "One‑click Demo" to run a small flash loan.
   - You approve the tx, pay gas + exact fee (auto‑calculated), and get proof via events.
   - The UI decodes `FlashLoanExecuted` and demo events from the tx receipt.
+- **Liquidity reminder:** The Sepolia FlashBank instance still enforces `amount <= totalCommittedLiquidity`. Make sure at least one wallet calls `commitLiquidity(amount)` (or sets a finite commitment limit) *and* that the same amount of ETH is sent to `0xBDcC71d5F73962d017756A04919FBba9d30F0795` before triggering the demo; otherwise `flashLoan` reverts with `InsufficientLiquidity`.
+  ```bash
+  # Example (Sepolia)
+  npx hardhat console --network sepolia
+  > const fb = await ethers.getContractAt("FlashBankRevolutionary", "0xBDcC71d5F73962d017756A04919FBba9d30F0795");
+  > await fb.commitLiquidity(ethers.parseEther("0.1"));
+  > await signer.sendTransaction({ to: fb.target, value: ethers.parseEther("0.1") });
+  ```

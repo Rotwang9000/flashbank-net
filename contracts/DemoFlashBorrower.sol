@@ -3,9 +3,9 @@ pragma solidity ^0.8.24;
 
 import { IL2FlashLoan } from "./IL2FlashLoan.sol";
 
-interface IFlashBankMinimal {
-	function calculateFlashLoanFee(uint256 amount) external view returns (uint256);
-	function flashLoan(uint256 amount, bytes calldata data) external;
+interface IFlashBankRouter {
+	function flashLoan(address token, uint256 amount, bool toNative, bytes calldata data) external;
+	function quoteFee(address token, uint256 amount) external view returns (uint256);
 }
 
 interface IProofOfFunds {
@@ -13,41 +13,46 @@ interface IProofOfFunds {
 	function proveNoRefund(bytes calldata data) external payable returns (bool);
 }
 
+interface IDemoCounter {
+	function count() external payable returns (bool);
+	function getStats() external view returns (uint256 total, uint256 txCount);
+}
+
 /**
  * @title DemoFlashBorrower
- * @notice Minimal borrower used to demonstrate a FlashBank flash loan end-to-end.
- *         Users call runDemo(amount) sending the exact fee as msg.value. The contract
- *         requests a flash loan from FlashBank, receives the funds, and immediately
- *         repays principal + fee. It emits events for clear proof in the tx receipt.
+ * @notice Demonstrates WETH-backed FlashBank loans routed through the FlashBankRouter.
+ *         Users authorize this contract to borrow ETH (unwrapped from WETH) and send the fee upfront.
  */
 contract DemoFlashBorrower is IL2FlashLoan {
-	address public immutable flashBank;
+	address public immutable router;
+	address public immutable liquidityToken;
 	address public immutable proofSink;
+	address public immutable demoCounter;
 
 	event DemoStart(address indexed user, uint256 amount, uint256 expectedFee);
 	event DemoReceived(uint256 amount, uint256 fee, uint256 balanceBefore);
+	event DemoCounted(uint256 amount, uint256 newTotal);
 	event DemoRepaid(uint256 totalRepaid);
 
-	constructor(address flashBankAddress, address proofSinkAddress) {
-		require(flashBankAddress != address(0), "flashBank required");
+	constructor(address routerAddress, address tokenAddress, address proofSinkAddress, address demoCounterAddress) {
+		require(routerAddress != address(0), "router required");
+		require(tokenAddress != address(0), "token required");
 		require(proofSinkAddress != address(0), "proofSink required");
-		flashBank = flashBankAddress;
+		require(demoCounterAddress != address(0), "demoCounter required");
+		router = routerAddress;
+		liquidityToken = tokenAddress;
 		proofSink = proofSinkAddress;
+		demoCounter = demoCounterAddress;
 	}
 
-	/**
-	 * @notice Initiate a demo flash loan (success path). Send msg.value equal to the required fee.
-	 */
 	function runDemo(uint256 amount) external payable returns (bool) {
 		require(amount > 0, "amount");
-		uint256 fee = IFlashBankMinimal(flashBank).calculateFlashLoanFee(amount);
+		uint256 fee = IFlashBankRouter(router).quoteFee(liquidityToken, amount);
 		require(msg.value >= fee, "fee needed");
 		emit DemoStart(msg.sender, amount, fee);
 
-		// Request the flash loan. FlashBank will callback executeFlashLoan on this contract.
-		IFlashBankMinimal(flashBank).flashLoan(amount, abi.encode(false, msg.sender));
+		IFlashBankRouter(router).flashLoan(liquidityToken, amount, true, abi.encode(false, msg.sender));
 
-		// Refund any leftover ether (e.g. if user overpaid fee)
 		uint256 leftover = address(this).balance;
 		if (leftover > 0) {
 			(bool ok, ) = payable(msg.sender).call{ value: leftover }("");
@@ -56,20 +61,14 @@ contract DemoFlashBorrower is IL2FlashLoan {
 		return true;
 	}
 
-	/**
-	 * @notice Initiate a demo flash loan (fail path). Sends the borrowed ETH to proof sink without refund,
-	 *         proving theft attempts cause the flash loan to fail. Any leftover (e.g. fee) is refunded at the end.
-	 */
 	function runDemoFail(uint256 amount) external payable returns (bool) {
 		require(amount > 0, "amount");
-		uint256 fee = IFlashBankMinimal(flashBank).calculateFlashLoanFee(amount);
-		// Still require fee to ensure the demo mirrors real conditions
+		uint256 fee = IFlashBankRouter(router).quoteFee(liquidityToken, amount);
 		require(msg.value >= fee, "fee needed");
 		emit DemoStart(msg.sender, amount, fee);
 
-		IFlashBankMinimal(flashBank).flashLoan(amount, abi.encode(true, msg.sender));
+		IFlashBankRouter(router).flashLoan(liquidityToken, amount, true, abi.encode(true, msg.sender));
 
-		// Refund any leftover ether (e.g. fee), since repayment won't occur in fail mode
 		uint256 leftover = address(this).balance;
 		if (leftover > 0) {
 			(bool ok, ) = payable(msg.sender).call{ value: leftover }("");
@@ -78,36 +77,38 @@ contract DemoFlashBorrower is IL2FlashLoan {
 		return true;
 	}
 
-	/**
-	 * @inheritdoc IL2FlashLoan
-	 */
 	function executeFlashLoan(
 		uint256 amount,
 		uint256 fee,
 		bytes calldata data
 	) external payable override returns (bool success) {
-		// Only accept callback from our FlashBank
-		require(msg.sender == flashBank, "only FlashBank");
+		require(msg.sender == router, "only router");
 
 		uint256 beforeBal = address(this).balance;
 		emit DemoReceived(amount, fee, beforeBal);
 
-		(bool failMode, address originalUser) = abi.decode(data, (bool, address));
+		(bool failMode, ) = abi.decode(data, (bool, address));
+
+		// First, pass the funds through the counter to prove we have them
+		bool counted = IDemoCounter(demoCounter).count{ value: amount }();
+		require(counted, "counter failed");
+		(uint256 newTotal, ) = IDemoCounter(demoCounter).getStats();
+		emit DemoCounted(amount, newTotal);
 
 		if (failMode) {
-			// Send borrowed ETH to proof sink w/o refund; demonstrate failure to repay
+			// Attempt to steal: send ETH to proof sink (which keeps it) and DON'T repay router
 			bool ok2 = IProofOfFunds(proofSink).proveNoRefund{ value: amount }("");
 			require(ok2, "proof keep failed");
-			// Do NOT repay; return true to let pool handle failure via balance check
+			// Don't repay - just return true and let the router's balance check catch the theft
 			return true;
 		} else {
-			// External proof that funds were received, then refund immediately
+			// Success path: prove we have the funds, then repay
 			bool ok = IProofOfFunds(proofSink).prove{ value: amount }("");
 			require(ok, "proof failed");
 
-			// Repay principal + fee back to FlashBank
-			(uint256 total) = (amount + fee);
-			(bool repaid, ) = payable(flashBank).call{ value: total }("");
+			uint256 total = amount + fee;
+			require(address(this).balance >= total, "insufficient balance");
+			(bool repaid, ) = payable(router).call{ value: total }("");
 			require(repaid, "repay failed");
 			emit DemoRepaid(total);
 			return true;
@@ -116,5 +117,3 @@ contract DemoFlashBorrower is IL2FlashLoan {
 
 	receive() external payable {}
 }
-
-

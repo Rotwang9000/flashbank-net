@@ -75,6 +75,23 @@ await borrower.start(ethers.parseEther("10"), "0x"); // Request 10 ETH`}</code><
               </ul>
             </section>
 
+            <section className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-blue-900 mb-3">⛽ Gas Cost Analysis</h2>
+              <p className="text-blue-800 text-sm mb-3">
+                Want to understand the gas costs of multi-provider flash loans? We've published a detailed study based on real Sepolia transactions.
+              </p>
+              <a 
+                href="/gas-study" 
+                className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+              >
+                📊 Read Gas Cost Study
+                <span className="text-xs">→</span>
+              </a>
+              <p className="text-blue-700 text-xs mt-3">
+                Learn when to use WETH-only mode, how provider count affects gas, and when FlashBank is more economical than Aave.
+              </p>
+            </section>
+
             <div className="text-sm">
               <a href="/#instructions" className="text-blue-700 underline">← Back to Instructions</a>
             </div>

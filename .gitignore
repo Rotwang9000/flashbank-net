@@ -100,3 +100,5 @@ secrets/
 # Local development
 local/
 package-lock.json
+website/.env.local.bak
+package-lock.json

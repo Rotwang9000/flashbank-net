@@ -1,6 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
-import { Shield, CheckCircle, AlertTriangle, Lock, Users, DollarSign, Zap, FileText } from 'lucide-react';
+import { Shield, CheckCircle, AlertTriangle, Lock, Users, DollarSign, Zap, FileText, ExternalLink } from 'lucide-react';
 
 export default function Security() {
 	return (
@@ -86,6 +86,20 @@ export default function Security() {
 								<h3 className="font-semibold text-gray-900 mb-2">Fee Limits Enforced</h3>
 								<p className="text-gray-600 text-sm">
 									Fees hardcoded between 0.01% - 1%. Owner fee capped at 100% of the fee. No excessive fees possible.
+								</p>
+							</div>
+
+							<div className="border-l-4 border-green-500 pl-4">
+								<h3 className="font-semibold text-gray-900 mb-2">Ownership & Rescue Hardening</h3>
+								<p className="text-gray-600 text-sm">
+									<code className="bg-gray-200 px-1 rounded text-xs">transferOwnership</code> and <code className="bg-gray-200 px-1 rounded text-xs">renounceOwnership</code> are disabled. Ownership transfers and ERC-20/ETH rescue flows now follow the same dual-signature path as fee changes.
+								</p>
+							</div>
+
+							<div className="border-l-4 border-green-500 pl-4">
+								<h3 className="font-semibold text-gray-900 mb-2">Flexible Token Wrapper</h3>
+								<p className="text-gray-600 text-sm">
+									The <code className="bg-gray-200 px-1 rounded text-xs">wrapper</code> address is only used when loans must be paid in native ETH (e.g. WETH unwrap for <code>toNative</code> demos). Future tokens (LINK, wstETH, etc.) can set <code>wrapper = 0</code> to be loaned as themselves.
 								</p>
 							</div>
 
@@ -199,18 +213,70 @@ export default function Security() {
 							<div>
 								<h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
 									<CheckCircle className="w-5 h-5 text-green-600" />
-									Deployer Separate from Admin
+									Dual-Signature Control (2-of-2 Multi-Sig)
 								</h3>
 								<div className="bg-green-50 p-4 rounded-lg text-sm text-gray-700">
-									<p className="mb-2"><strong>Security Design:</strong> Ownership transferred to secure multisig/vault after deployment.</p>
-									<p className="mb-2"><strong>Why:</strong></p>
+									<p className="mb-2"><strong>Security Design:</strong> Critical operations require TWO independent signatures.</p>
+									<p className="mb-2"><strong>How It Works:</strong></p>
 									<ul className="list-disc list-inside space-y-1 ml-4">
-										<li>Deployer key sits in deployment code (less secure)</li>
-										<li>Admin key in Vultisig vault/multisig (more secure)</li>
-										<li>After transfer, deployer cannot modify settings</li>
-										<li>Admin controls fees, profits, and configuration</li>
+										<li><strong>Step 1:</strong> Owner (deployer) proposes change</li>
+										<li><strong>Step 2:</strong> Admin (Vultisig vault) approves and executes</li>
+										<li>Both must agree for config changes or profit withdrawals</li>
+										<li>Single compromised key cannot modify the protocol</li>
 									</ul>
-									<p className="mt-2"><strong>Implementation:</strong> Uses OpenZeppelin's <code className="bg-gray-200 px-1 rounded">transferOwnership()</code> function.</p>
+									<p className="mt-2"><strong>Protected Operations:</strong></p>
+									<ul className="list-disc list-inside space-y-1 ml-4">
+										<li>Fee configuration changes</li>
+										<li>Pool limit adjustments</li>
+										<li>Owner profit withdrawals</li>
+										<li>Token enable/disable</li>
+										<li>Ownership transfer (propose + execute)</li>
+										<li>ERC-20 / ETH rescue transactions</li>
+									</ul>
+									<p className="mt-2"><strong>Admin Address:</strong> <code className="bg-gray-200 px-1 rounded text-xs">0xC021...319e7</code> (Vultisig vault)</p>
+									<p className="text-xs text-gray-600">
+										Testnets can override via <code className="bg-gray-200 px-1 rounded text-xs">TESTNET_ADMIN_ADDRESS</code>. Current Sepolia admin is <code className="bg-gray-200 px-1 rounded text-xs">0x3CD6...c191</code> for compatibility with wallets that do not support Sepolia.
+									</p>
+								</div>
+							</div>
+
+							<div>
+								<h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+									<ExternalLink className="w-5 h-5 text-blue-600" />
+									How to Approve Changes (via Etherscan)
+								</h3>
+								<div className="bg-blue-50 p-4 rounded-lg text-sm text-gray-700 space-y-3">
+									<p>Vultisig uses TSS, so there is no single private key to paste into a CLI. Everything can be performed directly from the <strong>Write Contract</strong> tab on Etherscan:</p>
+									<div>
+										<p className="font-semibold text-gray-900 mb-1">1. Owner (deployer device) proposes</p>
+										<ul className="list-decimal list-inside ml-4 space-y-1">
+											<li>Open router contract on Etherscan → <em>Contract</em> → <em>Write Contract</em></li>
+											<li>Connect deployer wallet</li>
+											<li>Call <code className="bg-gray-200 px-1 rounded text-xs">proposeTokenConfig</code> or <code className="bg-gray-200 px-1 rounded text-xs">proposeProfitWithdrawal</code></li>
+											<li>Copy the emitted <code className="bg-gray-200 px-1 rounded text-xs">ChangeProposed</code> hash (optional)</li>
+										</ul>
+									</div>
+									<div>
+										<p className="font-semibold text-gray-900 mb-1">2. Admin (Vultisig vault) executes</p>
+										<ul className="list-decimal list-inside ml-4 space-y-1">
+											<li>Open the same contract on Etherscan from the Vultisig wallet</li>
+											<li>Call <code className="bg-gray-200 px-1 rounded text-xs">executeTokenConfig</code> or <code className="bg-gray-200 px-1 rounded text-xs">executeProfitWithdrawal</code> with identical parameters</li>
+											<li>Vultisig automatically co-signs the transaction across devices</li>
+											<li>Transaction emits <code className="bg-gray-200 px-1 rounded text-xs">ChangeExecuted</code> for audit trail</li>
+										</ul>
+									</div>
+									<p className="text-xs text-gray-600">
+										Need a refresher? See the{" "}
+										<a
+											href="https://github.com/flashbank-net/flashbank/blob/master/DUAL_CONTROL.md"
+											target="_blank"
+											rel="noopener noreferrer"
+											className="text-blue-600 underline"
+										>
+											dual-control runbook
+										</a>{" "}
+										for screenshots and detailed instructions.
+									</p>
 								</div>
 							</div>
 
@@ -492,6 +558,16 @@ if (amount > maxBorrow)
 									<span className="px-3 py-1 bg-green-100 text-green-800 rounded text-sm font-medium">
 										62+ automated tests
 									</span>
+								</div>
+							</div>
+
+							<div>
+								<div className="text-sm text-gray-600 mb-1">Current Sepolia Deployment</div>
+								<div className="text-sm bg-gray-50 p-3 rounded space-y-1 break-words font-mono">
+									<div>Router: 0x9a4FbC70b30f32006A3fe834173D16b7A0e4E7D4</div>
+									<div>Admin: 0x3CD6BbF16599Af7FDe6F4b7C8b6FD6Bea4EDc191</div>
+									<div>Owner: 0x4F0B3C7fdf5D7C3C7179E1E180b28D23a16fd036</div>
+									<div>Demo Borrower: 0xFD0a29b84533d9CEF69e63311bb766236f09a454</div>
 								</div>
 							</div>
 						</div>

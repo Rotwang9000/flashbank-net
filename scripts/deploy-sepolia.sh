@@ -77,7 +77,11 @@ upsert_env "NEXT_PUBLIC_${NETWORK_ENV_PREFIX}_DEMO_COUNTER_ADDRESS" "$DEMO_COUNT
 
 if [ -n "${ETHERSCAN_API_KEY:-}" ]; then
 	echo ">>> Verifying contracts on Etherscan"
-	npx hardhat verify --network "$NETWORK" "$ROUTER_ADDRESS" || echo "Router verification failed (possibly already verified)"
+	ADMIN_ARG="$ADMIN_ADDRESS"
+	if [ "$NETWORK" != "mainnet" ] && [ "$NETWORK" != "ethereum" ] && [ -n "${TESTNET_ADMIN_ADDRESS:-}" ]; then
+		ADMIN_ARG="$TESTNET_ADMIN_ADDRESS"
+	fi
+	npx hardhat verify --network "$NETWORK" "$ROUTER_ADDRESS" "$ADMIN_ARG" || echo "Router verification failed (possibly already verified)"
 	npx hardhat verify --network "$NETWORK" "$PROOF_SINK_ADDRESS" || echo "ProofOfFunds verification failed"
 	npx hardhat verify --network "$NETWORK" "$DEMO_COUNTER_ADDRESS" || echo "DemoCounter verification failed"
 npx hardhat verify --network "$NETWORK" "$DEMO_ADDRESS" "$ROUTER_ADDRESS" "$WETH_ADDRESS" "$PROOF_SINK_ADDRESS" "$DEMO_COUNTER_ADDRESS" || echo "DemoFlashBorrower verification failed"

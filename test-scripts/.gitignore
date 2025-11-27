@@ -1,0 +1,6 @@
+# Test artifacts
+*.log
+test-results/
+coverage/
+.nyc_output/
+

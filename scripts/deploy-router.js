@@ -19,12 +19,32 @@ async function main() {
 	console.log("Deploying FlashBankRouter with account:", deployer.address);
 	console.log("Network:", network.chainId);
 
+	const isTestnet = ["11155111", "84532", "84531", "421614"].includes(String(network.chainId));
+	const fallbackAdmin = process.env.ADMIN_ADDRESS;
+	const testnetAdmin = process.env.TESTNET_ADMIN_ADDRESS;
+	const adminAddress = isTestnet && ethers.isAddress(testnetAdmin)
+		? testnetAdmin
+		: fallbackAdmin;
+
+	if (!adminAddress || !ethers.isAddress(adminAddress)) {
+		console.error("Error: Missing admin address. Set ADMIN_ADDRESS (and TESTNET_ADMIN_ADDRESS for testnets) in .env");
+		process.exit(1);
+	}
+
+	console.log("Admin address (dual-control):", adminAddress);
+	console.log("Deployer:", deployer.address);
+	console.log("Both signatures required for config changes and profit withdrawals");
+
 	const Router = await ethers.getContractFactory("FlashBankRouter");
-	const router = await Router.deploy();
+	const router = await Router.deploy(adminAddress);
 	await router.waitForDeployment();
 
 	const routerAddress = await router.getAddress();
 	console.log("FlashBankRouter deployed to:", routerAddress);
+	
+	// Verify admin was set correctly
+	const setAdmin = await router.admin();
+	console.log("Verified admin:", setAdmin);
 
 	const weth = process.env.FLASHBANK_LIQUIDITY_TOKEN || WETH_ADDRESSES[String(network.chainId)];
 	if (!weth) {

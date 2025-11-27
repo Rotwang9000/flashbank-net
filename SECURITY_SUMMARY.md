@@ -27,6 +27,7 @@
 - Fees capped at 1% maximum
 - Owner fee capped at 100% of fee (max 1% of loan)
 - No emergency withdrawal of provider funds
+- ERC-20 / ETH rescue routines require the same dual-signature workflow (owner proposes, admin executes)
 
 #### 4. **Attack Resistance** ✅
 - ✅ Reentrancy protection (`nonReentrant`)
@@ -117,17 +118,27 @@
 5. ✅ **Transfer ownership to multisig/vault after deployment**
 
 #### Deployment Security:
-The contract uses OpenZeppelin's `Ownable`, which supports ownership transfer. After deployment, transfer ownership from the deployer key to a secure multisig/vault:
+- `transferOwnership()` and `renounceOwnership()` are disabled; ownership changes must use the dual-signature `proposeOwnershipTransfer` → `executeOwnershipTransfer` flow (script: `scripts/transfer-ownership.js`).
+- This forces both deployer and admin to approve any new owner, preventing unilateral rug pulls.
+- Owners can still rotate the admin via `setAdmin` (single sig) for recovery, but production deploys should immediately move ownership to a multisig.
 
 ```bash
-NEW_OWNER=0xYourMultisigAddress npx hardhat run scripts/transfer-ownership.js --network mainnet
+# Step 1: Owner proposes
+ACTION=propose NEW_OWNER=0xYourMultisig npx hardhat run scripts/transfer-ownership.js --network mainnet
+# Step 2: Admin executes
+ACTION=execute NEW_OWNER=0xYourMultisig PRIVATE_KEY=$ADMIN_KEY npx hardhat run scripts/transfer-ownership.js --network mainnet
 ```
 
 **Why Separate Deployer and Admin:**
 - Deployer key sits in deployment code (less secure)
 - Admin key in Vultisig vault/multisig (more secure)
-- After transfer, deployer cannot modify settings
-- Admin controls fees, profits, and config
+- After ownership transfer, deployer cannot modify settings
+- Admin controls fees, profits, and config (but STILL cannot act without deployer proposals)
+
+#### Dual-Control Execution:
+- All sensitive changes (token config, profit withdrawals, ownership transfer, rescue operations) require **two transactions**: `propose…` (owner) then `execute…` (admin)
+- Vultisig users can perform both steps directly from Etherscan’s **Write Contract** tab—no CLI private key needed
+- Helper docs + scripts live in `DUAL_CONTROL.md`, `scripts/dual-control-config.js`, `scripts/dual-control-withdraw.js`, and `scripts/transfer-ownership.js`
 
 #### Should Do:
 1. Consider adding timelock for fee changes (48hr delay)
@@ -155,11 +166,13 @@ NEW_OWNER=0xYourMultisigAddress npx hardhat run scripts/transfer-ownership.js --
 - [ ] Update documentation
 - [ ] Announce to community
 
-### Contract Addresses (Sepolia Testnet)
+### Contract Addresses (Sepolia Testnet - current build)
 
-- **FlashBankRouter**: `0x304af9B20Ba775ABAF7B105bEEcdE5305609548a`
+- **FlashBankRouter**: `0x9a4FbC70b30f32006A3fe834173D16b7A0e4E7D4`
 - **WETH**: `0xdd13E55209Fd76AfE204dBda4007C227904f0a81`
-- **Owner**: `0x3CD6BbF16599Af7FDe6F4b7C8b6FD6Bea4EDc191`
+- **Owner**: `0x4F0B3C7fdf5D7C3C7179E1E180b28D23a16fd036`
+- **Admin (dual control)**: `0x3CD6BbF16599Af7FDe6F4b7C8b6FD6Bea4EDc191`
+- **Demo Borrower**: `0xFD0a29b84533d9CEF69e63311bb766236f09a454`
 
 ### Test Results
 
@@ -191,8 +204,8 @@ The FlashBankRouter contract has passed comprehensive security testing and demon
 
 ---
 
-**Audit Date**: 2025-11-25  
+**Audit Date**: 2025-11-26  
 **Auditor**: Comprehensive AI Security Analysis  
-**Contract Version**: FlashBankRouter v2.0 (WETH-based with owner profits)  
+**Contract Version**: FlashBankRouter v2.1.1 (Dual control + ownership/rescue hardening)  
 **Status**: ✅ Production Ready (with recommended updates)
 

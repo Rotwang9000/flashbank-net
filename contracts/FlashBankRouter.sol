@@ -58,7 +58,10 @@ contract FlashBankRouter is Ownable, ReentrancyGuard {
 	mapping(address => uint256) public totalCommitted;
 	mapping(address => bool) private configuredTokens;
 	mapping(address => uint256) public ownerProfits; // Accumulated owner fees per token
-
+	
+	address public admin; // Secondary admin for dual-signature control
+	mapping(bytes32 => bool) public pendingChanges; // Hash of proposed change => approved by deployer
+	
 	error TokenNotConfigured();
 	error TokenNotEnabled();
 	error InvalidToken();
@@ -71,6 +74,8 @@ contract FlashBankRouter is Ownable, ReentrancyGuard {
 	error FlashLoanFailed();
 	error CommitmentLocked();
 	error ExceedsMaxBorrowLimit();
+	error NotAdmin();
+	error ChangeNotProposed();
 
 	event TokenConfigUpdated(
 		address indexed token,
@@ -97,17 +102,140 @@ contract FlashBankRouter is Ownable, ReentrancyGuard {
 		uint256 fee,
 		bool toNative
 	);
+	
+	event AdminUpdated(address indexed oldAdmin, address indexed newAdmin);
+	event ChangeProposed(bytes32 indexed changeHash, address indexed proposer);
+	event ChangeExecuted(bytes32 indexed changeHash, address indexed executor);
+
+	constructor(address _admin) {
+		admin = _admin;
+		emit AdminUpdated(address(0), _admin);
+	}
+
+	modifier onlyOwnerOrAdmin() {
+		require(msg.sender == owner() || msg.sender == admin, "Not owner or admin");
+		_;
+	}
 
 	receive() external payable {}
 
-	function setTokenConfig(
+	/**
+	 * @notice Update admin address (requires owner)
+	 */
+	function setAdmin(address newAdmin) external onlyOwner {
+		require(newAdmin != address(0), "Invalid admin");
+		address oldAdmin = admin;
+		admin = newAdmin;
+		emit AdminUpdated(oldAdmin, newAdmin);
+	}
+
+	/**
+	 * @notice Step 1: Owner proposes a token config change
+	 */
+	function proposeTokenConfig(
 		address token,
 		TokenConfig calldata config
 	) external onlyOwner {
 		if (token == address(0)) revert InvalidToken();
 		if (config.feeBps < MIN_FEE_BPS || config.feeBps > MAX_FEE_BPS) revert InvalidFee();
 		if (config.maxBorrowBps < MIN_MAX_BORROW_BPS || config.maxBorrowBps > MAX_MAX_BORROW_BPS) revert InvalidAmount();
-		if (config.ownerFeeBps > FEE_DENOMINATOR) revert InvalidFee(); // Owner can't take more than 100% of fee
+		if (config.ownerFeeBps > FEE_DENOMINATOR) revert InvalidFee();
+
+		bytes32 changeHash = keccak256(abi.encode(token, config));
+		pendingChanges[changeHash] = true;
+		
+		emit ChangeProposed(changeHash, msg.sender);
+	}
+
+	/**
+	 * @notice Step 2: Admin approves and executes the change
+	 */
+	function executeTokenConfig(
+		address token,
+		TokenConfig calldata config
+	) external {
+		if (msg.sender != admin) revert NotAdmin();
+		
+		bytes32 changeHash = keccak256(abi.encode(token, config));
+		if (!pendingChanges[changeHash]) revert ChangeNotProposed();
+		
+		// Validate again (in case admin tries different values)
+		if (token == address(0)) revert InvalidToken();
+		if (config.feeBps < MIN_FEE_BPS || config.feeBps > MAX_FEE_BPS) revert InvalidFee();
+		if (config.maxBorrowBps < MIN_MAX_BORROW_BPS || config.maxBorrowBps > MAX_MAX_BORROW_BPS) revert InvalidAmount();
+		if (config.ownerFeeBps > FEE_DENOMINATOR) revert InvalidFee();
+
+		tokenConfigs[token] = TokenConfig({
+			enabled: config.enabled,
+			supportsPermit: config.supportsPermit,
+			feeBps: config.feeBps,
+			maxFlashLoan: config.maxFlashLoan,
+			wrapper: config.wrapper,
+			maxBorrowBps: config.maxBorrowBps,
+			ownerFeeBps: config.ownerFeeBps
+		});
+
+		configuredTokens[token] = true;
+		delete pendingChanges[changeHash];
+
+		emit TokenConfigUpdated(
+			token,
+			config.enabled,
+			config.supportsPermit,
+			config.feeBps,
+			config.maxFlashLoan,
+			config.wrapper,
+			config.maxBorrowBps
+		);
+		
+		emit ChangeExecuted(changeHash, msg.sender);
+	}
+
+	/**
+	 * @notice Step 1: Owner proposes ownership transfer (dual control)
+	 */
+	function proposeOwnershipTransfer(address newOwner) external onlyOwner {
+		require(newOwner != address(0), "invalid owner");
+		bytes32 changeHash = keccak256(abi.encode("ownership", newOwner));
+		pendingChanges[changeHash] = true;
+		emit ChangeProposed(changeHash, msg.sender);
+	}
+
+	/**
+	 * @notice Step 2: Admin executes ownership transfer
+	 */
+	function executeOwnershipTransfer(address newOwner) external {
+		if (msg.sender != admin) revert NotAdmin();
+		require(newOwner != address(0), "invalid owner");
+
+		bytes32 changeHash = keccak256(abi.encode("ownership", newOwner));
+		if (!pendingChanges[changeHash]) revert ChangeNotProposed();
+
+		delete pendingChanges[changeHash];
+		_transferOwnership(newOwner);
+		emit ChangeExecuted(changeHash, msg.sender);
+	}
+
+	function transferOwnership(address) public view override onlyOwner {
+		revert("Use proposeOwnershipTransfer");
+	}
+
+	function renounceOwnership() public view override onlyOwner {
+		revert("Ownership cannot be renounced");
+	}
+
+	/**
+	 * @notice Emergency: Set token config with single signature (owner or admin)
+	 * @dev Use for initial setup or emergencies only
+	 */
+	function setTokenConfig(
+		address token,
+		TokenConfig calldata config
+	) external onlyOwnerOrAdmin {
+		if (token == address(0)) revert InvalidToken();
+		if (config.feeBps < MIN_FEE_BPS || config.feeBps > MAX_FEE_BPS) revert InvalidFee();
+		if (config.maxBorrowBps < MIN_MAX_BORROW_BPS || config.maxBorrowBps > MAX_MAX_BORROW_BPS) revert InvalidAmount();
+		if (config.ownerFeeBps > FEE_DENOMINATOR) revert InvalidFee();
 
 		tokenConfigs[token] = TokenConfig({
 			enabled: config.enabled,
@@ -353,18 +481,88 @@ contract FlashBankRouter is Ownable, ReentrancyGuard {
 		_autoDeactivate(token, provider, cfg);
 	}
 
-	function rescueToken(address token, address to, uint256 amount) external onlyOwner {
-		require(to != address(0), "invalid recipient");
-		IERC20(token).safeTransfer(to, amount);
+	function proposeRescueToken(address token, address to, uint256 amount) external onlyOwner {
+		require(token != address(0) && to != address(0), "invalid address");
+		require(amount > 0, "invalid amount");
+
+		bytes32 changeHash = keccak256(abi.encode("rescueToken", token, to, amount));
+		pendingChanges[changeHash] = true;
+		emit ChangeProposed(changeHash, msg.sender);
 	}
 
-	function rescueETH(address payable to, uint256 amount) external onlyOwner {
+	function executeRescueToken(address token, address to, uint256 amount) external {
+		if (msg.sender != admin) revert NotAdmin();
+		require(token != address(0) && to != address(0), "invalid address");
+		require(amount > 0, "invalid amount");
+
+		bytes32 changeHash = keccak256(abi.encode("rescueToken", token, to, amount));
+		if (!pendingChanges[changeHash]) revert ChangeNotProposed();
+
+		delete pendingChanges[changeHash];
+		IERC20(token).safeTransfer(to, amount);
+		emit ChangeExecuted(changeHash, msg.sender);
+	}
+
+	function proposeRescueETH(address payable to, uint256 amount) external onlyOwner {
 		require(to != address(0), "invalid recipient");
+		require(amount > 0, "invalid amount");
+
+		bytes32 changeHash = keccak256(abi.encode("rescueETH", to, amount));
+		pendingChanges[changeHash] = true;
+		emit ChangeProposed(changeHash, msg.sender);
+	}
+
+	function executeRescueETH(address payable to, uint256 amount) external {
+		if (msg.sender != admin) revert NotAdmin();
+		require(to != address(0), "invalid recipient");
+		require(amount > 0, "invalid amount");
+
+		bytes32 changeHash = keccak256(abi.encode("rescueETH", to, amount));
+		if (!pendingChanges[changeHash]) revert ChangeNotProposed();
+
+		delete pendingChanges[changeHash];
 		(bool sent, ) = to.call{value: amount}("");
 		require(sent, "rescue failed");
+		emit ChangeExecuted(changeHash, msg.sender);
 	}
 
-	function withdrawOwnerProfits(address token, address to) external onlyOwner {
+	/**
+	 * @notice Step 1: Owner proposes profit withdrawal
+	 */
+	function proposeProfitWithdrawal(address token, address to, uint256 amount) external onlyOwner {
+		require(to != address(0), "invalid recipient");
+		require(amount > 0 && amount <= ownerProfits[token], "invalid amount");
+		
+		bytes32 changeHash = keccak256(abi.encode("withdraw", token, to, amount));
+		pendingChanges[changeHash] = true;
+		
+		emit ChangeProposed(changeHash, msg.sender);
+	}
+
+	/**
+	 * @notice Step 2: Admin approves and executes profit withdrawal
+	 */
+	function executeProfitWithdrawal(address token, address to, uint256 amount) external {
+		if (msg.sender != admin) revert NotAdmin();
+		
+		bytes32 changeHash = keccak256(abi.encode("withdraw", token, to, amount));
+		if (!pendingChanges[changeHash]) revert ChangeNotProposed();
+		
+		require(to != address(0), "invalid recipient");
+		require(amount > 0 && amount <= ownerProfits[token], "invalid amount");
+		
+		ownerProfits[token] -= amount;
+		delete pendingChanges[changeHash];
+		IERC20(token).safeTransfer(to, amount);
+		
+		emit ChangeExecuted(changeHash, msg.sender);
+	}
+
+	/**
+	 * @notice Emergency: Withdraw profits with single signature (owner or admin)
+	 * @dev Use for emergencies only - normal flow should use propose/execute
+	 */
+	function withdrawOwnerProfits(address token, address to) external onlyOwnerOrAdmin {
 		require(to != address(0), "invalid recipient");
 		uint256 amount = ownerProfits[token];
 		if (amount == 0) revert InvalidAmount();

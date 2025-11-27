@@ -660,6 +660,13 @@ export default function Home() {
 				args: [selectedToken.address, amountWei]
 			});
 
+			// For fail demo, show the flow immediately before attempting transaction
+			if (failModeOverride) {
+				setDemoResult({ amount: demoAmount, fee: ethers.formatEther(feeWei) });
+				setDemoOutcome('blocked');
+				setDemoTxHash('pending'); // Placeholder to show the flow
+			}
+
 			const fn = failModeOverride ? 'runDemoFail' : 'runDemo';
 			const hash = await safeWrite(
 				networkConfig.demoBorrower as `0x${string}`,
@@ -698,7 +705,13 @@ export default function Home() {
 			}
 		} catch (error: any) {
 			const msg = error?.shortMessage || error?.message || 'Demo failed';
-			toast.error(msg);
+			// For fail demo, if wallet rejected, that's expected
+			if (failModeOverride && (msg.includes('rejected') || msg.includes('denied') || msg.includes('cancelled'))) {
+				setDemoError('Your wallet rejected the transaction (expected - it detected the revert). See the flow above for what would have happened.');
+				toast.info('Wallet rejected transaction (expected behaviour)');
+			} else {
+				toast.error(msg);
+			}
 		} finally {
 			setIsRunningDemo(false);
 		}
@@ -1025,12 +1038,15 @@ export default function Home() {
 									Borrows WETH from the pool → unwraps to ETH → passes through counter (proving you used others' funds) → proves funds on-chain → repays router. Transaction succeeds.
 								</p>
 							</div>
-							<div className="bg-red-50 border border-red-200 rounded-lg p-4">
-								<h4 className="font-semibold text-red-900 mb-2">✗ Fail Demo</h4>
-								<p className="text-sm text-red-800">
-									Borrows WETH → unwraps → passes through counter → attempts to keep funds by sending to proof sink. Router detects missing repayment and <strong>reverts the entire transaction</strong>. Funds are safe.
-								</p>
-							</div>
+					<div className="bg-red-50 border border-red-200 rounded-lg p-4">
+						<h4 className="font-semibold text-red-900 mb-2">✗ Fail Demo</h4>
+						<p className="text-sm text-red-800 mb-2">
+							Borrows WETH → unwraps → passes through counter → attempts to keep funds by sending to proof sink. Router detects missing repayment and <strong>reverts the entire transaction</strong>. Funds are safe.
+						</p>
+						<p className="text-xs text-red-700 italic">
+							⚠️ Note: Most wallets will reject this transaction before sending because they simulate it and detect the revert. If your wallet blocks it, that's expected! <a href="https://sepolia.etherscan.io/tx/0xd721f1d04f0c2662542c8c3fddd37ee28020606000ea22e2b356ba22299301dd" target="_blank" rel="noopener noreferrer" className="underline">See example test transaction</a>.
+						</p>
+					</div>
 						</div>
 						{networkConfig.demoCounter && (
 							<div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
@@ -1085,9 +1101,10 @@ export default function Home() {
 								</button>
 							</div>
                               </div>
-						{demoTxHash && (
-							<>
-							<div className="mt-4 space-y-4">
+					{(demoTxHash || demoOutcome === 'blocked') && (
+						<>
+						<div className="mt-4 space-y-4">
+							{demoTxHash && demoTxHash !== 'pending' && (
 								<div className="bg-gray-50 rounded-lg p-4">
 									<p className="text-sm text-gray-600">
 										Tx:{' '}
@@ -1101,6 +1118,20 @@ export default function Home() {
 										</p>
 									)}
 								</div>
+							)}
+							{demoTxHash === 'pending' && demoOutcome === 'blocked' && (
+								<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+									<p className="text-sm text-yellow-800 font-semibold mb-1">⚠️ Wallet Simulation Detected Revert</p>
+									<p className="text-xs text-yellow-700">
+										Most wallets will reject this transaction before sending. If yours does, that's working as intended! The flow below shows what would happen if the transaction were sent.
+									</p>
+									{demoResult && (
+										<p className="text-xs text-yellow-700 mt-2">
+											Attempted: {demoResult.amount} ETH · Fee: {demoResult.fee} ETH
+										</p>
+									)}
+								</div>
+							)}
 								<div className="bg-white border-2 border-gray-200 rounded-lg p-4">
 									<p className="text-sm font-semibold text-gray-900 mb-3">Transaction Flow:</p>
 									<div className="flex flex-col gap-2 text-sm">

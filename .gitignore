@@ -102,3 +102,4 @@ local/
 package-lock.json
 website/.env.local.bak
 package-lock.json
+website/ENV_EXAMPLE.md

@@ -130,8 +130,19 @@ export default function Security() {
 							<div className="flex items-start gap-3">
 								<CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
 								<div>
+									<div className="font-semibold text-gray-900">Reentrancy Attacks</div>
+									<div className="text-gray-600 text-sm">
+										OpenZeppelin's <code className="bg-gray-200 px-1 rounded text-xs">ReentrancyGuard</code> on <code className="bg-gray-200 px-1 rounded text-xs">flashLoan()</code> prevents recursive calls. 
+										Tested scenarios: recursive flash loans, cross-contract reentrancy, provider manipulation during loan. All blocked.
+									</div>
+								</div>
+							</div>
+
+							<div className="flex items-start gap-3">
+								<CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+								<div>
 									<div className="font-semibold text-gray-900">Flash Loan Attacks</div>
-									<div className="text-gray-600 text-sm">Repayment verified before distribution. Failed loans revert entirely.</div>
+									<div className="text-gray-600 text-sm">Repayment verified before distribution. Failed loans revert entirely. Atomic execution ensures all-or-nothing.</div>
 								</div>
 							</div>
 
@@ -139,7 +150,7 @@ export default function Security() {
 								<CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
 								<div>
 									<div className="font-semibold text-gray-900">Price Oracle Manipulation</div>
-									<div className="text-gray-600 text-sm">No price oracles used. Not vulnerable to oracle attacks.</div>
+									<div className="text-gray-600 text-sm">No price oracles used. Not vulnerable to oracle attacks. No external dependencies.</div>
 								</div>
 							</div>
 
@@ -147,7 +158,7 @@ export default function Security() {
 								<CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
 								<div>
 									<div className="font-semibold text-gray-900">Front-Running</div>
-									<div className="text-gray-600 text-sm">Flash loans are atomic. No state changes between transactions.</div>
+									<div className="text-gray-600 text-sm">Flash loans are atomic. No state changes between transactions. MEV-resistant design.</div>
 								</div>
 							</div>
 
@@ -155,7 +166,17 @@ export default function Security() {
 								<CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
 								<div>
 									<div className="font-semibold text-gray-900">Gas Griefing</div>
-									<div className="text-gray-600 text-sm">Borrowers pay for their own gas. No gas forwarding to callbacks.</div>
+									<div className="text-gray-600 text-sm">Borrowers pay for their own gas. No gas forwarding to callbacks. If borrower runs out of gas, transaction reverts safely.</div>
+								</div>
+							</div>
+
+							<div className="flex items-start gap-3">
+								<CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+								<div>
+									<div className="font-semibold text-gray-900">ERC777 Hooks</div>
+									<div className="text-gray-600 text-sm">
+										Even if ERC777 tokens call back via hooks, <code className="bg-gray-200 px-1 rounded text-xs">nonReentrant</code> blocks reentrant calls. SafeERC20 used for all transfers.
+									</div>
 								</div>
 							</div>
 
@@ -163,8 +184,101 @@ export default function Security() {
 								<CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
 								<div>
 									<div className="font-semibold text-gray-900">Continuous Borrowing</div>
-									<div className="text-gray-600 text-sm">Providers can pause anytime to stop new loans. Earn fees while active.</div>
+									<div className="text-gray-600 text-sm">Providers can pause anytime to stop new loans. Earn fees while active. Max borrow limit (50% default) prevents pool drainage.</div>
 								</div>
+							</div>
+
+							<div className="flex items-start gap-3">
+								<CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+								<div>
+									<div className="font-semibold text-gray-900">Integer Overflow/Underflow</div>
+									<div className="text-gray-600 text-sm">
+										Solidity 0.8.24 built-in overflow protection. OpenZeppelin Math.mulDiv for critical calculations. Unlimited commitments handled safely.
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					{/* Reentrancy Protection Deep Dive */}
+					<div className="bg-white rounded-xl shadow-lg p-8 mb-8">
+						<h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+							<Shield className="w-6 h-6 text-blue-600" />
+							Reentrancy Protection Deep Dive
+						</h2>
+						
+						<div className="space-y-6">
+							<div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+								<p className="text-sm text-blue-900 font-semibold mb-2">Question: Can someone flash loan into the pool and immediately flash loan out?</p>
+								<p className="text-sm text-blue-800">
+									<strong>Answer: NO.</strong> OpenZeppelin's <code className="bg-blue-200 px-1 rounded text-xs">ReentrancyGuard</code> prevents all recursive flash loan attempts.
+								</p>
+							</div>
+
+							<div>
+								<h3 className="font-semibold text-gray-900 mb-3">How It Works</h3>
+								<div className="bg-gray-50 p-4 rounded-lg text-sm text-gray-700 space-y-2">
+									<p><strong>1. Lock Acquired:</strong> When <code className="bg-gray-200 px-1 rounded text-xs">flashLoan()</code> is called, a global lock is set</p>
+									<p><strong>2. Funds Transferred:</strong> Router pulls liquidity and sends to borrower</p>
+									<p><strong>3. Callback Executed:</strong> Borrower's <code className="bg-gray-200 px-1 rounded text-xs">executeFlashLoan()</code> runs</p>
+									<p><strong>4. Reentrancy Blocked:</strong> Any attempt to call <code className="bg-gray-200 px-1 rounded text-xs">flashLoan()</code> again reverts with "ReentrancyGuard: reentrant call"</p>
+									<p><strong>5. Repayment Verified:</strong> Router checks balance increased by amount + fee</p>
+									<p><strong>6. Lock Released:</strong> Only after successful completion</p>
+								</div>
+							</div>
+
+							<div>
+								<h3 className="font-semibold text-gray-900 mb-3">Attack Scenarios Tested & Blocked</h3>
+								<div className="space-y-3">
+									<div className="border-l-4 border-red-500 pl-4">
+										<p className="font-semibold text-gray-900 text-sm">Recursive Flash Loan</p>
+										<p className="text-xs text-gray-600">Attacker tries to call <code className="bg-gray-200 px-1 rounded">flashLoan()</code> from within their callback</p>
+										<p className="text-xs text-green-700 font-semibold mt-1">✅ BLOCKED - Reverts immediately</p>
+									</div>
+									<div className="border-l-4 border-red-500 pl-4">
+										<p className="font-semibold text-gray-900 text-sm">Cross-Contract Reentrancy</p>
+										<p className="text-xs text-gray-600">Attacker uses helper contract to call <code className="bg-gray-200 px-1 rounded">flashLoan()</code> during callback</p>
+										<p className="text-xs text-green-700 font-semibold mt-1">✅ BLOCKED - Lock is global, not per-contract</p>
+									</div>
+									<div className="border-l-4 border-yellow-500 pl-4">
+										<p className="font-semibold text-gray-900 text-sm">Provider Manipulation</p>
+										<p className="text-xs text-gray-600">Attacker tries to modify commitments during active loan</p>
+										<p className="text-xs text-green-700 font-semibold mt-1">✅ SAFE - Loan uses snapshot, changes don't affect active loan</p>
+									</div>
+									<div className="border-l-4 border-red-500 pl-4">
+										<p className="font-semibold text-gray-900 text-sm">Read-Only Reentrancy</p>
+										<p className="text-xs text-gray-600">Attacker calls view functions to get manipulated state</p>
+										<p className="text-xs text-green-700 font-semibold mt-1">✅ SAFE - No price oracles or external dependencies</p>
+									</div>
+								</div>
+							</div>
+
+							<div>
+								<h3 className="font-semibold text-gray-900 mb-3">Multiple Layers of Defense</h3>
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+									<div className="bg-green-50 border border-green-200 rounded p-3">
+										<p className="text-xs font-semibold text-green-900">1. ReentrancyGuard</p>
+										<p className="text-xs text-green-800">Primary protection on <code className="bg-green-200 px-1 rounded">flashLoan()</code></p>
+									</div>
+									<div className="bg-green-50 border border-green-200 rounded p-3">
+										<p className="text-xs font-semibold text-green-900">2. Atomic Transactions</p>
+										<p className="text-xs text-green-800">All-or-nothing execution</p>
+									</div>
+									<div className="bg-green-50 border border-green-200 rounded p-3">
+										<p className="text-xs font-semibold text-green-900">3. Balance Verification</p>
+										<p className="text-xs text-green-800">Must receive amount + fee back</p>
+									</div>
+									<div className="bg-green-50 border border-green-200 rounded p-3">
+										<p className="text-xs font-semibold text-green-900">4. Non-Custodial</p>
+										<p className="text-xs text-green-800">Funds stay in provider wallets</p>
+									</div>
+								</div>
+							</div>
+
+							<div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+								<p className="text-xs text-gray-700">
+									<strong>Full Analysis:</strong> See <code className="bg-gray-200 px-1 rounded text-xs">REENTRANCY_ANALYSIS.md</code> in our GitHub repository for detailed attack scenarios, test cases, and code examples.
+								</p>
 							</div>
 						</div>
 					</div>
@@ -372,6 +486,72 @@ export default function Security() {
 								<li>✅ Owner accumulated 0.000000084 WETH in profits (2% of fees)</li>
 								<li>✅ Borrowers only needed fees, not full loan amounts</li>
 							</ul>
+						</div>
+					</div>
+
+					{/* What We DON'T Do (By Design) */}
+					<div className="bg-white rounded-xl shadow-lg p-8 mb-8">
+						<h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+							<Shield className="w-6 h-6 text-blue-600" />
+							What We DON'T Do (Security by Design)
+						</h2>
+						
+						<div className="space-y-4">
+							<div className="border-l-4 border-green-500 pl-4">
+								<h3 className="font-semibold text-gray-900 mb-2">❌ No Custody of Funds</h3>
+								<p className="text-sm text-gray-700">
+									We never hold your WETH. Funds stay in your wallet. We only have approval to pull during active loans (milliseconds), then immediately return them.
+								</p>
+							</div>
+
+							<div className="border-l-4 border-green-500 pl-4">
+								<h3 className="font-semibold text-gray-900 mb-2">❌ No Price Oracles</h3>
+								<p className="text-sm text-gray-700">
+									No external price feeds = no oracle manipulation attacks. We don't need prices because we verify repayment by checking balances directly.
+								</p>
+							</div>
+
+							<div className="border-l-4 border-green-500 pl-4">
+								<h3 className="font-semibold text-gray-900 mb-2">❌ No Upgradeable Proxies</h3>
+								<p className="text-sm text-gray-700">
+									Contract logic is immutable. What you see is what you get. No hidden upgrade mechanisms that could change behaviour later.
+								</p>
+							</div>
+
+							<div className="border-l-4 border-green-500 pl-4">
+								<h3 className="font-semibold text-gray-900 mb-2">❌ No Complex Dependencies</h3>
+								<p className="text-sm text-gray-700">
+									Only battle-tested OpenZeppelin contracts. No experimental libraries. No external protocol dependencies that could fail.
+								</p>
+							</div>
+
+							<div className="border-l-4 border-green-500 pl-4">
+								<h3 className="font-semibold text-gray-900 mb-2">❌ No Governance Tokens (Yet)</h3>
+								<p className="text-sm text-gray-700">
+									No token that could be exploited for governance attacks. Dual-signature control provides security without token complexity.
+								</p>
+							</div>
+
+							<div className="border-l-4 border-green-500 pl-4">
+								<h3 className="font-semibold text-gray-900 mb-2">❌ No Flash Loan Voting</h3>
+								<p className="text-sm text-gray-700">
+									If we add governance, flash loan voting will be blocked. Can't borrow tokens to manipulate votes.
+								</p>
+							</div>
+
+							<div className="border-l-4 border-green-500 pl-4">
+								<h3 className="font-semibold text-gray-900 mb-2">❌ No Automatic Liquidations</h3>
+								<p className="text-sm text-gray-700">
+									We don't manage collateral or debt positions. No liquidation bots. No cascading liquidations. Just pure flash loans.
+								</p>
+							</div>
+
+							<div className="border-l-4 border-green-500 pl-4">
+								<h3 className="font-semibold text-gray-900 mb-2">❌ No Timelock Bypass</h3>
+								<p className="text-sm text-gray-700">
+									Critical changes require TWO signatures (owner + admin). No single key can bypass this. No emergency admin override.
+								</p>
+							</div>
 						</div>
 					</div>
 

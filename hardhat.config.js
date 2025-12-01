@@ -36,7 +36,7 @@ module.exports = {
       url: process.env.ARBITRUM_HTTP_URL || `https://rpc.ankr.com/arbitrum/${process.env.ANKR_API_KEY || ""}`,
       chainId: 42161,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-      gasPrice: 100000000, // 0.1 gwei
+      // Let ethers auto-calculate gas price
     },
     
     arbitrumGoerli: {
@@ -49,7 +49,7 @@ module.exports = {
 		url: process.env.ETHEREUM_HTTP_URL || "http://fin2:8545",
 		chainId: 1,
 		accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-		gasPrice: 20000000000, // 20 gwei for mainnet
+		// Let ethers auto-calculate gas price
 	},
 
 	sepolia: {
@@ -63,7 +63,7 @@ module.exports = {
       url: process.env.BASE_HTTP_URL || "https://mainnet.base.org",
       chainId: 8453,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-      gasPrice: 1000000000, // 1 gwei for Base
+      // Let ethers auto-calculate gas price for Base
     },
   },
   

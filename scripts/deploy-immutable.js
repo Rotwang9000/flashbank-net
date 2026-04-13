@@ -72,9 +72,9 @@ async function main() {
   // ============ DEPLOYMENT SUMMARY ============
   
   console.log("\n🎉 IMMUTABLE Deployment complete!");
-  console.log("=" * 50);
+  console.log("=".repeat(50));
   console.log("📋 DEPLOYMENT SUMMARY:");
-  console.log("=" * 50);
+  console.log("=".repeat(50));
   console.log("🔒 L2FlashPoolImmutable:", poolAddress);
   console.log("🤖 MEVFlashLoanReceiver:", receiverAddress);
   console.log("👤 Owner:", await deployer.getAddress());

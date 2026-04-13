@@ -69,9 +69,9 @@ async function main() {
   // ============ DEPLOYMENT SUMMARY ============
   
   console.log("\n🎉 Deployment complete!");
-  console.log("=" * 50);
+  console.log("=".repeat(50));
   console.log("📋 DEPLOYMENT SUMMARY:");
-  console.log("=" * 50);
+  console.log("=".repeat(50));
   console.log("🏦 L2FlashPool (Proxy):", poolAddress);
   console.log("🤖 MEVFlashLoanReceiver:", receiverAddress);
   console.log("👤 Owner:", await deployer.getAddress());

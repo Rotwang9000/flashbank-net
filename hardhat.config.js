@@ -46,7 +46,7 @@ module.exports = {
     },
 
 	ethereum: {
-		url: process.env.ETHEREUM_HTTP_URL || "http://fin2:8545",
+		url: process.env.ETHEREUM_HTTP_URL || "https://cloudflare-eth.com",
 		chainId: 1,
 		accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
 		// Let ethers auto-calculate gas price

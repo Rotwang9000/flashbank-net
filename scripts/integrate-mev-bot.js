@@ -64,7 +64,7 @@ async function main() {
   // ============ GENERATE INTEGRATION CODE ============
   
   console.log("\n📋 INTEGRATION SUMMARY:");
-  console.log("=" * 50);
+  console.log("=".repeat(50));
   
   const integrationCode = `
 // ============ L2 FLASH LOAN INTEGRATION ============

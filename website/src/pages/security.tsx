@@ -1,6 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
-import { Shield, CheckCircle, AlertTriangle, Lock, Users, DollarSign, Zap, FileText, ExternalLink } from 'lucide-react';
+import { Shield, CheckCircle, AlertTriangle, Lock, Users, Zap, FileText, ExternalLink } from 'lucide-react';
 
 export default function Security() {
 	return (
@@ -22,15 +22,15 @@ export default function Security() {
 							</div>
 						</div>
 						
-						<div className="bg-green-50 border-l-4 border-green-500 p-4 mt-6">
-							<div className="flex items-center gap-2">
-								<CheckCircle className="w-6 h-6 text-green-600" />
-								<p className="text-lg font-semibold text-green-900">✅ PRODUCTION READY</p>
-							</div>
-							<p className="text-green-800 mt-2">
-								All critical security tests passed. Contract audited and verified for mainnet deployment.
-							</p>
+					<div className="bg-blue-50 border-l-4 border-blue-500 p-4 mt-6">
+						<div className="flex items-center gap-2">
+							<CheckCircle className="w-6 h-6 text-blue-600" />
+							<p className="text-lg font-semibold text-blue-900">Live on Mainnet</p>
 						</div>
+						<p className="text-blue-800 mt-2">
+							All critical security tests passed. Self-audited with 62+ automated tests. Source code verified on Etherscan. External audit pending.
+						</p>
+					</div>
 					</div>
 
 					{/* Quick Stats */}
@@ -111,11 +111,11 @@ export default function Security() {
 							</div>
 
 							<div className="border-l-4 border-green-500 pl-4">
-								<h3 className="font-semibold text-gray-900 mb-2">Overflow Protection</h3>
-								<p className="text-gray-600 text-sm">
-									Solidity 0.8.24 built-in overflow protection plus OpenZeppelin SafeMath for critical calculations.
-								</p>
-							</div>
+							<h3 className="font-semibold text-gray-900 mb-2">Overflow Protection</h3>
+							<p className="text-gray-600 text-sm">
+								Solidity 0.8.24 built-in overflow/underflow checks plus OpenZeppelin <code className="bg-gray-200 px-1 rounded text-xs">Math.mulDiv</code> for safe percentage calculations on large values.
+							</p>
+						</div>
 						</div>
 					</div>
 
@@ -787,43 +787,43 @@ if (amount > maxBorrow)
 					</div>
 
 					{/* Final Verdict */}
-					<div className="bg-gradient-to-r from-green-500 to-blue-500 rounded-xl shadow-lg p-8 text-white mb-8">
-						<h2 className="text-3xl font-bold mb-4 flex items-center gap-3">
-							<Shield className="w-10 h-10" />
-							Security Verdict
-						</h2>
-						
-						<div className="text-xl mb-6">
-							<strong>✅ PRODUCTION READY</strong>
-						</div>
-
-						<div className="space-y-2 text-white/90">
-							<p>The FlashBankRouter contract has passed comprehensive security testing and demonstrates:</p>
-							<ul className="list-disc list-inside ml-4 space-y-1">
-								<li>Strong security properties with no critical vulnerabilities</li>
-								<li>Provider fund safety with non-custodial architecture</li>
-								<li>Strict admin privilege limitations</li>
-								<li>Comprehensive attack resistance</li>
-								<li>Proper accounting and overflow protection</li>
-							</ul>
-						</div>
-
-						<div className="mt-6 pt-6 border-t border-white/20">
-							<p className="text-sm text-white/80">
-								Contract verified on Etherscan. All source code is open source and available for independent review.
-							</p>
-						</div>
+				<div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl shadow-lg p-8 text-white mb-8">
+					<h2 className="text-3xl font-bold mb-4 flex items-center gap-3">
+						<Shield className="w-10 h-10" />
+						Security Summary
+					</h2>
+					
+					<div className="text-xl mb-6">
+						<strong>Self-Audited · 62+ Automated Tests · Source Verified</strong>
 					</div>
+
+					<div className="space-y-2 text-white/90">
+						<p>The FlashBankRouter contract has passed comprehensive internal security testing and demonstrates:</p>
+						<ul className="list-disc list-inside ml-4 space-y-1">
+							<li>No critical vulnerabilities found in internal review</li>
+							<li>Provider fund safety with non-custodial architecture</li>
+							<li>Strict admin privilege limitations via dual-control</li>
+							<li>Comprehensive attack resistance (reentrancy, overflow, front-running)</li>
+							<li>Immutable contract — no upgrade proxies</li>
+						</ul>
+					</div>
+
+					<div className="mt-6 pt-6 border-t border-white/20">
+						<p className="text-sm text-white/80">
+							Contract verified on Etherscan. Source code is open for independent review. External audit pending — use at your own risk.
+						</p>
+					</div>
+				</div>
 
 					{/* Links */}
 					<div className="bg-white rounded-xl shadow-lg p-8">
 						<h2 className="text-2xl font-bold text-gray-900 mb-6">Additional Resources</h2>
 						
 						<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-							<Link href="/contracts" className="block p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 transition-colors">
+							<a href="https://etherscan.io/address/0x8b6c52E68185b07D6ebf451E790Fee2E81F9B334#code" target="_blank" rel="noopener noreferrer" className="block p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 transition-colors">
 								<div className="font-semibold text-gray-900 mb-1">Smart Contracts</div>
 								<div className="text-sm text-gray-600">View verified contracts on Etherscan</div>
-							</Link>
+							</a>
 
 							<Link href="/gas-study" className="block p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 transition-colors">
 								<div className="font-semibold text-gray-900 mb-1">Gas Analysis</div>

@@ -20,49 +20,80 @@ export default function BorrowGuide() {
           <div className="space-y-8 max-w-4xl">
             <section className="bg-blue-50 border border-blue-200 rounded-lg p-6">
               <h2 className="text-xl font-semibold text-blue-900 mb-3">Interface</h2>
-              <p className="text-blue-800 text-sm mb-3">Your contract must implement <code>executeFlashLoan(uint256 amount, uint256 fee, bytes data)</code> and return <code>true</code> on success.</p>
-              <pre className="text-xs bg-white border border-blue-100 rounded p-3 overflow-x-auto"><code>{`interface IL2FlashLoan { function executeFlashLoan(uint256 amount, uint256 fee, bytes calldata data) external returns (bool); }
-interface IFlashBank { function flashLoan(uint256 amount, bytes calldata data) external; }`}</code></pre>
+              <p className="text-blue-800 text-sm mb-3">Your contract must implement <code>executeFlashLoan(address token, uint256 amount, uint256 fee, bytes data)</code> and return <code>true</code> on success.</p>
+              <pre className="text-xs bg-white border border-blue-100 rounded p-3 overflow-x-auto"><code>{`interface IFlashLoanReceiver {
+    function executeFlashLoan(
+        address token,
+        uint256 amount,
+        uint256 fee,
+        bytes calldata data
+    ) external returns (bool);
+}
+
+// Call the router to initiate a flash loan:
+// router.flashLoan(token, amount, toNative, data)`}</code></pre>
             </section>
 
             <section className="bg-green-50 border border-green-200 rounded-lg p-6">
               <h2 className="text-xl font-semibold text-green-900 mb-3">Minimal Solidity Example</h2>
-              <pre className="text-xs bg-white border border-green-100 rounded p-3 overflow-x-auto"><code>{`contract MyArbBot is IL2FlashLoan {
-    address payable immutable flashBank;
-    constructor(address payable _flashBank) { flashBank = _flashBank; }
+              <pre className="text-xs bg-white border border-green-100 rounded p-3 overflow-x-auto"><code>{`import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-    function start(uint256 amount, bytes calldata data) external {
-        IFlashBank(flashBank).flashLoan(amount, data);
+contract MyArbBot is IFlashLoanReceiver {
+    address immutable router;
+    address immutable weth;
+
+    constructor(address _router, address _weth) {
+        router = _router;
+        weth = _weth;
     }
 
-    function executeFlashLoan(uint256 amount, uint256 fee, bytes calldata data) external returns (bool) {
-        require(msg.sender == flashBank, "only FlashBank");
-        // TODO: implement your MEV/arb strategy using this contract's balance
-        // ... your logic ...
+    function start(uint256 amount, bytes calldata data) external {
+        // toNative=false → receive WETH; toNative=true → receive ETH
+        IFlashBankRouter(router).flashLoan(weth, amount, false, data);
+    }
 
-        // Repay amount + fee before returning
-        (bool ok, ) = flashBank.call{ value: amount + fee }("");
-        require(ok, "repay failed");
+    function executeFlashLoan(
+        address token,
+        uint256 amount,
+        uint256 fee,
+        bytes calldata data
+    ) external returns (bool) {
+        require(msg.sender == router, "only router");
+
+        // Your MEV/arb strategy here — you hold the borrowed WETH
+        // ...
+
+        // Repay: approve router for amount + fee (WETH mode)
+        IERC20(token).approve(router, amount + fee);
         return true;
     }
 
     receive() external payable {}
+}
+
+interface IFlashBankRouter {
+    function flashLoan(
+        address token,
+        uint256 amount,
+        bool toNative,
+        bytes calldata data
+    ) external;
 }`}</code></pre>
             </section>
 
             <section className="bg-purple-50 border border-purple-200 rounded-lg p-6">
               <h2 className="text-xl font-semibold text-purple-900 mb-3">Script Snippet (ethers v6)</h2>
               <pre className="text-xs bg-white border border-purple-100 rounded p-3 overflow-x-auto"><code>{`const borrower = new ethers.Contract(borrowerAddress, borrowerAbi, wallet);
-await borrower.start(ethers.parseEther("10"), "0x"); // Request 10 ETH`}</code></pre>
+await borrower.start(ethers.parseEther("10"), "0x"); // Request 10 WETH`}</code></pre>
             </section>
 
             <section className="bg-orange-50 border border-orange-200 rounded-lg p-6">
               <h2 className="text-xl font-semibold text-orange-900 mb-3">Rules & Limits</h2>
               <ul className="list-disc pl-5 text-orange-800 text-sm space-y-1">
-                <li>Minimum loan: 0.01 ETH</li>
-                <li>Maximum single loan: 10,000 ETH (subject to available liquidity)</li>
-                <li>Fee: 0.02% of the amount (<code>fee = (amount * 2) / 10000</code>)</li>
-                <li>Repay <strong>amount + fee</strong> within <code>executeFlashLoan</code>, otherwise the transaction reverts</li>
+                <li>Maximum single loan: 1,000 WETH (subject to available liquidity and 50% pool cap)</li>
+                <li>Fee: 0.02% of the amount (2 bps, configurable by dual-control)</li>
+                <li>Repay <strong>amount + fee</strong> within <code>executeFlashLoan</code>, otherwise the entire transaction reverts</li>
+                <li>Set <code>toNative=true</code> to receive native ETH instead of WETH (useful for strategies that need ETH)</li>
               </ul>
             </section>
 
@@ -93,7 +124,7 @@ await borrower.start(ethers.parseEther("10"), "0x"); // Request 10 ETH`}</code><
             </section>
 
             <div className="text-sm">
-              <a href="/#instructions" className="text-blue-700 underline">← Back to Instructions</a>
+              <a href="/#guide" className="text-blue-700 underline">← Back to Dashboard</a>
             </div>
           </div>
         </main>

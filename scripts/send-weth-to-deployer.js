@@ -17,7 +17,7 @@ async function main() {
 	console.log("✅ Sent!");
 	
 	const balance = await weth.balanceOf(to);
-	console.log("Deployer WETH balance:", ethers.formatEther(balance));
+	console.log("Recipient WETH balance:", ethers.formatEther(balance));
 }
 
 main().then(() => process.exit(0)).catch(e => { console.error(e); process.exit(1); });

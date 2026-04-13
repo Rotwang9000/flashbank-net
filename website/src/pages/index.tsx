@@ -206,21 +206,6 @@ const DEMO_COUNTER_ABI = [
 	}
 ] as const;
 
-const FLASHLOAN_EVENT_ABI = [
-	{
-		anonymous: false,
-		inputs: [
-			{ indexed: true, internalType: 'address', name: 'borrower', type: 'address' },
-			{ indexed: false, internalType: 'address', name: 'token', type: 'address' },
-			{ indexed: false, internalType: 'uint256', name: 'amount', type: 'uint256' },
-			{ indexed: false, internalType: 'uint256', name: 'fee', type: 'uint256' },
-			{ indexed: false, internalType: 'bool', name: 'toNative', type: 'bool' }
-		],
-		name: 'FlashLoanExecuted',
-		type: 'event'
-	}
-] as const;
-
 const formatEth = (value?: string | bigint | null, decimals = 4) => {
 	if (!value) return '0';
 	const num = typeof value === 'bigint' ? Number(ethers.formatEther(value)) : Number(value);
@@ -269,7 +254,7 @@ export default function Home() {
 	const [demoError, setDemoError] = useState<string | null>(null);
 	const [demoCounterTotal, setDemoCounterTotal] = useState('0');
 
-	const networkConfig = NETWORKS[chainId as keyof typeof NETWORKS] || NETWORKS[11155111];
+	const networkConfig = NETWORKS[chainId as keyof typeof NETWORKS] || NETWORKS[1];
 	const selectedToken = useMemo(() => {
 		return networkConfig.tokens.find((token) => token.key === selectedTokenKey) || networkConfig.tokens[0];
 	}, [networkConfig, selectedTokenKey]);
@@ -339,8 +324,7 @@ export default function Home() {
 				args: [selectedToken.address, ethers.parseEther(demoAmount || '0')]
 			});
 			setQuoteFee(ethers.formatEther(fee));
-    } catch (error) {
-			console.error('Failed to load pool stats', error);
+    } catch {
 			setPoolStats({ committed: '0', providers: '0', feeBps: 0 });
 			setQuoteFee('0');
 		}
@@ -447,8 +431,9 @@ export default function Home() {
 				setAllowance('0');
 				setAllowanceWei(0n);
 			}
-    } catch (error) {
-			console.error('Failed to load account state', error);
+    } catch {
+			// State resets handled by the guard clauses above; silent fail is fine here
+			// since the next poll or reconnect will retry.
 		}
 	}, [isMounted, isConnected, address, routerReady, selectedToken, networkConfig, publicClient]);
 
@@ -479,8 +464,7 @@ export default function Home() {
 				functionName: 'getStats'
 			});
 			setDemoCounterTotal(ethers.formatEther(stats[0] as bigint));
-		} catch (error) {
-			console.error('Failed to load demo counter', error);
+		} catch {
 			setDemoCounterTotal('0');
 		}
 	}, [publicClient, networkConfig]);
@@ -510,7 +494,6 @@ export default function Home() {
 			return await walletClient.writeContract(request);
 		} catch (error: any) {
 			if (allowRevert) {
-				console.warn('Simulation reverted but allowRevert=true, sending tx anyway');
 				return await walletClient.writeContract({
 					address: contractAddress,
 					abi,
@@ -520,7 +503,6 @@ export default function Home() {
 					value
 				} as any);
 			}
-			console.error(error);
 			throw error;
 		}
 	};
@@ -566,12 +548,12 @@ export default function Home() {
 					setLimitDirty(false);
 				})(),
 				{
-					loading: allowanceWei === 0n ? 'Step 2/2: Setting commitment...' : 'Setting commitment...',
-					success: 'Commitment active!',
-					error: 'Commitment failed'
-				}
-			);
-		} catch {}
+			loading: allowanceWei === 0n ? 'Step 2/2: Setting commitment...' : 'Setting commitment...',
+				success: 'Commitment active!',
+				error: 'Commitment failed'
+			}
+		);
+		} catch { /* toast.promise already handles user-facing errors */ }
 	};
 
 	const handlePauseResume = async () => {
@@ -593,12 +575,12 @@ export default function Home() {
 					setLimitDirty(false);
 				})(),
 				{
-					loading: newPausedState ? 'Pausing...' : 'Resuming...',
-					success: newPausedState ? 'Paused' : 'Resumed',
-					error: 'Update failed'
-				}
-			);
-		} catch {}
+				loading: newPausedState ? 'Pausing...' : 'Resuming...',
+				success: newPausedState ? 'Paused' : 'Resumed',
+				error: 'Update failed'
+			}
+		);
+		} catch { /* toast.promise already handles user-facing errors */ }
 	};
 
 	const handleWrap = async () => {
@@ -612,12 +594,12 @@ export default function Home() {
 					await loadAccountState();
 				})(),
 				{
-					loading: 'Wrapping ETH...',
-					success: 'Wrapped successfully',
-					error: 'Wrap failed'
-				}
-			);
-		} catch {}
+				loading: 'Wrapping ETH...',
+				success: 'Wrapped successfully',
+				error: 'Wrap failed'
+			}
+		);
+		} catch { /* toast.promise already handles user-facing errors */ }
 	};
 
 	const handleUnwrap = async () => {
@@ -631,12 +613,12 @@ export default function Home() {
 					await loadAccountState();
 				})(),
 				{
-					loading: 'Unwrapping WETH...',
-					success: 'Unwrapped successfully',
-					error: 'Unwrap failed'
-				}
-			);
-		} catch {}
+				loading: 'Unwrapping WETH...',
+				success: 'Unwrapped successfully',
+				error: 'Unwrap failed'
+			}
+		);
+		} catch { /* toast.promise already handles user-facing errors */ }
 	};
 
 	const handleRunDemo = async (failModeOverride: boolean) => {
@@ -720,8 +702,8 @@ export default function Home() {
   return (
     <>
       <Head>
-				<title>FlashBank Router - WETH Liquidity</title>
-				<meta name="description" content="Provide WETH liquidity directly from your wallet and earn flash loan fees." />
+				<title>FlashBank — Flash Loans From Your Wallet</title>
+			<meta name="description" content="Provide WETH liquidity directly from your wallet and earn flash loan fees. No deposits. Live on Ethereum, Arbitrum, and Base." />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
@@ -742,7 +724,7 @@ export default function Home() {
 							{Object.entries(NETWORKS).map(([id, cfg]) => (
                     <button
 									key={id}
-									onClick={() => switchChain({ chainId: Number(id) })}
+									onClick={() => switchChain({ chainId: Number(id) }).catch(() => {})}
 									className={`px-3 py-1 rounded-full text-sm ${Number(id) === chainId ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}
 								>
 									{cfg.name}
@@ -809,15 +791,15 @@ export default function Home() {
 									<p className="text-sm font-semibold text-blue-900 mb-1">📝 FlashBankRouter Contract</p>
 									<p className="text-xs text-blue-700 font-mono break-all">{networkConfig.router}</p>
 								</div>
-								<a
-									href={`https://${chainId === 11155111 ? 'sepolia.' : ''}etherscan.io/address/${networkConfig.router}#code`}
-									target="_blank"
-									rel="noopener noreferrer"
-									className="inline-flex items-center gap-1 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors whitespace-nowrap"
-								>
-									View on Explorer
-									<ExternalLink className="h-3 w-3" />
-								</a>
+							<a
+								href={`${networkConfig.explorer}/address/${networkConfig.router}#code`}
+								target="_blank"
+								rel="noopener noreferrer"
+								className="inline-flex items-center gap-1 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors whitespace-nowrap"
+							>
+								View on Explorer
+								<ExternalLink className="h-3 w-3" />
+							</a>
 							</div>
 						</div>
 					)}
@@ -1065,15 +1047,15 @@ export default function Home() {
 						<div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
 							<p className="text-sm font-semibold text-blue-900 mb-2">Demo Requirements:</p>
 							<div className="space-y-1 text-sm text-blue-800">
-								<div className="flex items-center gap-2">
-									{Number(poolStats.committed) >= Number(demoAmount) ? '✓' : '✗'} 
-									<span>Pool has ≥ {demoAmount} WETH committed (current: {formatEth(poolStats.committed, 4)} WETH)</span>
-								</div>
-								<div className="flex items-center gap-2">
-									{Number(ethBalance) >= Number(quoteFee) ? '✓' : '✗'} 
-									<span>You have ≥ {quoteFee} ETH for the fee</span>
-								</div>
+							<div className="flex items-center gap-2">
+								{parseFloat(poolStats.committed) >= parseFloat(demoAmount || '0') ? '✓' : '✗'} 
+								<span>Pool has ≥ {demoAmount} WETH committed (current: {formatEth(poolStats.committed, 4)} WETH)</span>
 							</div>
+							<div className="flex items-center gap-2">
+								{parseFloat(ethBalance) >= parseFloat(quoteFee) ? '✓' : '✗'} 
+								<span>You have ≥ {quoteFee} ETH for the fee</span>
+							</div>
+						</div>
 							<p className="text-xs text-blue-700 mt-2 italic">Note: The demo borrows from the pool, not your personal commitment</p>
 						</div>
 						<div className="grid md:grid-cols-2 gap-4">
@@ -1084,18 +1066,18 @@ export default function Home() {
                             </div>
 							<div className="flex items-end gap-2">
 								<button 
-									onClick={() => handleRunDemo(false)} 
-									disabled={isRunningDemo || Number(poolStats.committed) < Number(demoAmount) || Number(ethBalance) < Number(quoteFee)} 
-									className="flex-1 bg-green-600 text-white py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-									title={Number(poolStats.committed) < Number(demoAmount) || Number(ethBalance) < Number(quoteFee) ? 'Check requirements above' : 'Borrow, prove funds, and repay successfully'}
+								onClick={() => handleRunDemo(false)} 
+								disabled={isRunningDemo || parseFloat(poolStats.committed) < parseFloat(demoAmount || '0') || parseFloat(ethBalance) < parseFloat(quoteFee)} 
+								className="flex-1 bg-green-600 text-white py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+								title={parseFloat(poolStats.committed) < parseFloat(demoAmount || '0') || parseFloat(ethBalance) < parseFloat(quoteFee) ? 'Check requirements above' : 'Borrow, prove funds, and repay successfully'}
 								>
 									{isRunningDemo && !demoFailMode ? 'Running...' : 'Run Demo (Success)'}
 								</button>
 								<button 
-									onClick={() => handleRunDemo(true)} 
-									disabled={isRunningDemo || Number(poolStats.committed) < Number(demoAmount) || Number(ethBalance) < Number(quoteFee)} 
-									className="flex-1 bg-red-600 text-white py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-									title={Number(poolStats.committed) < Number(demoAmount) || Number(ethBalance) < Number(quoteFee) ? 'Check requirements above' : 'Attempt to steal funds - transaction will revert'}
+								onClick={() => handleRunDemo(true)} 
+								disabled={isRunningDemo || parseFloat(poolStats.committed) < parseFloat(demoAmount || '0') || parseFloat(ethBalance) < parseFloat(quoteFee)} 
+								className="flex-1 bg-red-600 text-white py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+								title={parseFloat(poolStats.committed) < parseFloat(demoAmount || '0') || parseFloat(ethBalance) < parseFloat(quoteFee) ? 'Check requirements above' : 'Attempt to steal funds - transaction will revert'}
 								>
 									{isRunningDemo && demoFailMode ? 'Running...' : 'Run Demo (Fail)'}
 								</button>
@@ -1210,8 +1192,8 @@ export default function Home() {
 						)}
           </div>
           
-					<div className="bg-white rounded-xl shadow p-6 border border-gray-200">
-						<h3 className="text-lg font-semibold text-gray-900 mb-4">Guide</h3>
+				<div id="guide" className="bg-white rounded-xl shadow p-6 border border-gray-200">
+					<h3 className="text-lg font-semibold text-gray-900 mb-4">Guide</h3>
 						<ol className="list-decimal list-inside space-y-2 text-gray-700">
 							<li>Wrap the ETH amount you wish to make available (WETH stays in your wallet).</li>
 							<li>Approve the FlashBank Router once.</li>
@@ -1270,15 +1252,15 @@ export default function Home() {
 										</li>
 									)}
 									<li>
-										<a 
-											href="https://github.com/your-repo/flashbank-net"
-											target="_blank"
-											rel="noopener noreferrer"
-											className="text-blue-600 hover:text-blue-800 inline-flex items-center gap-1"
-										>
-											View on GitHub
-											<ExternalLink className="h-3 w-3" />
-										</a>
+								<a 
+										href="https://github.com/flashbank-net/flashbank"
+										target="_blank"
+										rel="noopener noreferrer"
+										className="text-blue-600 hover:text-blue-800 inline-flex items-center gap-1"
+									>
+										View on GitHub
+										<ExternalLink className="h-3 w-3" />
+									</a>
 									</li>
 								</ul>
 							</div>
@@ -1287,9 +1269,9 @@ export default function Home() {
 								<p className="text-sm text-gray-600 mb-3">
 									FlashBank is the first flash loan protocol where liquidity providers maintain full custody of their funds until the moment a loan executes.
 								</p>
-								<p className="text-xs text-gray-500">
-									⚠️ Soft launch on Sepolia. Use at your own risk.
-								</p>
+							<p className="text-xs text-gray-500">
+								Live on Ethereum, Arbitrum, and Base. Use at your own risk.
+							</p>
 							</div>
 						</div>
 						<div className="mt-8 pt-6 border-t border-gray-200 text-center text-sm text-gray-500">

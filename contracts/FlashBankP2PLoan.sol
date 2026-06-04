@@ -13,7 +13,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
  *         only as a neutral escrow and timeline keeper. No pools, no shared liquidity, no
  *         price oracle.
  *
- * @dev Design highlights (see P2P_LENDING_DESIGN.md):
+ * @dev Design highlights (see docs/design/P2P_LENDING_DESIGN.md):
  *      - Liquidation is purely time-based. Repay `principal + repaymentFee` before
  *        `maturity + gracePeriod` to redeem collateral; otherwise the lender claims it.
  *        No prices are read on-chain, so no oracle is required.

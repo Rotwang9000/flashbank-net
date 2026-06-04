@@ -4,16 +4,18 @@ import { ethers } from 'ethers';
 import { useAppKitAccount } from '@reown/appkit/library/react';
 import { useChainId, useSwitchChain, usePublicClient, useWalletClient, useDisconnect } from 'wagmi';
 import toast, { Toaster } from 'react-hot-toast';
-import { Zap, Repeat, Shield, PauseCircle, PlayCircle, ArrowRightCircle, BookOpen, Code, ExternalLink } from 'lucide-react';
+import { Zap, Repeat, Shield, PauseCircle, PlayCircle, ArrowRightCircle, ArrowRight, Coins, ExternalLink } from 'lucide-react';
 import { useIsMounted } from '../hooks/useIsMounted';
+import Nav from '../components/Nav';
+import SiteFooter from '../components/SiteFooter';
 
 const NETWORKS = {
 	1: {
-    name: 'Ethereum',
+		name: 'Ethereum',
 		rpcUrl: process.env.NEXT_PUBLIC_MAINNET_RPC_URL || 'https://cloudflare-eth.com',
 		router: process.env.NEXT_PUBLIC_MAINNET_ROUTER_ADDRESS || '',
 		explorer: 'https://etherscan.io',
-    color: 'purple',
+		color: 'purple',
 		tokens: [
 			{
 				key: 'weth',
@@ -29,7 +31,7 @@ const NETWORKS = {
 		demoCounter: process.env.NEXT_PUBLIC_MAINNET_DEMO_COUNTER_ADDRESS || ''
 	},
 	8453: {
-    name: 'Base',
+		name: 'Base',
 		rpcUrl: process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org',
 		router: process.env.NEXT_PUBLIC_BASE_ROUTER_ADDRESS || '',
 		explorer: 'https://basescan.org',
@@ -220,11 +222,11 @@ const formatAddress = (addr?: string | null) => {
 };
 
 export default function Home() {
-  const { address, isConnected } = useAppKitAccount();
-  const chainId = useChainId();
+	const { address, isConnected } = useAppKitAccount();
+	const chainId = useChainId();
 	const publicClient = usePublicClient({ chainId });
 	const { data: walletClient } = useWalletClient();
-  const { switchChain } = useSwitchChain();
+	const { switchChain } = useSwitchChain();
 	const { disconnect } = useDisconnect();
 	const isMounted = useIsMounted();
 
@@ -259,7 +261,7 @@ export default function Home() {
 		return networkConfig.tokens.find((token) => token.key === selectedTokenKey) || networkConfig.tokens[0];
 	}, [networkConfig, selectedTokenKey]);
 
-  useEffect(() => {
+	useEffect(() => {
 		if (!networkConfig.tokens.find((token) => token.key === selectedTokenKey)) {
 			setSelectedTokenKey(networkConfig.tokens[0].key);
 		}
@@ -280,15 +282,15 @@ export default function Home() {
 				abi: ROUTER_ABI,
 				functionName: 'getTokenStats',
 				args: [selectedToken.address]
-			});
-			
+			} as any);
+
 			// Get actual available liquidity by checking provider balances
 			const providerAddresses = await publicClient.readContract({
 				address: networkConfig.router as `0x${string}`,
 				abi: ROUTER_ABI,
 				functionName: 'getProviders',
 				args: [selectedToken.address]
-			}) as `0x${string}`[];
+			} as any) as `0x${string}`[];
 
 			let actualCommitted = 0n;
 			for (const provider of providerAddresses) {
@@ -297,7 +299,7 @@ export default function Home() {
 					abi: ROUTER_ABI,
 					functionName: 'getProviderInfo',
 					args: [selectedToken.address, provider]
-				});
+				} as any);
 				const limit = info[0] as bigint;
 				const paused = info[3] as boolean;
 				if (!paused && limit > 0n) {
@@ -306,13 +308,13 @@ export default function Home() {
 						abi: ERC20_ABI,
 						functionName: 'balanceOf',
 						args: [provider]
-					}) as bigint;
+					} as any) as bigint;
 					// Available = min(limit, balance)
 					actualCommitted += balance < limit ? balance : limit;
 				}
 			}
 
-      setPoolStats({
+			setPoolStats({
 				committed: ethers.formatEther(actualCommitted),
 				providers: (stats[1] as bigint).toString(),
 				feeBps: Number(stats[2])
@@ -322,16 +324,16 @@ export default function Home() {
 				abi: ROUTER_ABI,
 				functionName: 'quoteFee',
 				args: [selectedToken.address, ethers.parseEther(demoAmount || '0')]
-			});
-			setQuoteFee(ethers.formatEther(fee));
-    } catch {
+			} as any);
+			setQuoteFee(ethers.formatEther(fee as bigint));
+		} catch {
 			setPoolStats({ committed: '0', providers: '0', feeBps: 0 });
 			setQuoteFee('0');
 		}
 	}, [routerReady, selectedToken, networkConfig, demoAmount, publicClient]);
 
 	const loadAccountState = useCallback(async () => {
-	if (!publicClient || !isMounted || !selectedToken) {
+		if (!publicClient || !isMounted || !selectedToken) {
 			setProviderLimit('Not set');
 			setProviderLimitWei(0n);
 			setProviderPaused(true);
@@ -344,7 +346,7 @@ export default function Home() {
 			return;
 		}
 
-	if (!isConnected || !address) {
+		if (!isConnected || !address) {
 			setProviderLimit('Not set');
 			setProviderLimitWei(0n);
 			setProviderPaused(true);
@@ -364,8 +366,8 @@ export default function Home() {
 				abi: ERC20_ABI,
 				functionName: 'balanceOf',
 				args: [address as `0x${string}`]
-			});
-			setWethBalance(ethers.formatEther(balanceWei));
+			} as any);
+			setWethBalance(ethers.formatEther(balanceWei as bigint));
 
 			const signerBalance = await publicClient.getBalance({ address: address as `0x${string}` });
 			setEthBalance(ethers.formatEther(signerBalance));
@@ -377,7 +379,7 @@ export default function Home() {
 					abi: ROUTER_ABI,
 					functionName: 'getProviderInfo',
 					args: [selectedToken.address, address as `0x${string}`]
-				});
+				} as any);
 				const limitValue = info[0] as bigint;
 				const registered = Boolean(info[4]);
 				setProviderRegistered(registered);
@@ -409,7 +411,7 @@ export default function Home() {
 					abi: ERC20_ABI,
 					functionName: 'allowance',
 					args: [address as `0x${string}`, networkConfig.router as `0x${string}`]
-				}) as bigint;
+				} as any) as bigint;
 				setAllowanceWei(allowanceWeiValue);
 				if (allowanceWeiValue === ethers.MaxUint256) {
 					setAllowance('Unlimited');
@@ -431,7 +433,7 @@ export default function Home() {
 				setAllowance('0');
 				setAllowanceWei(0n);
 			}
-    } catch {
+		} catch {
 			// State resets handled by the guard clauses above; silent fail is fine here
 			// since the next poll or reconnect will retry.
 		}
@@ -462,7 +464,7 @@ export default function Home() {
 				address: networkConfig.demoCounter as `0x${string}`,
 				abi: DEMO_COUNTER_ABI,
 				functionName: 'getStats'
-			});
+			} as any);
 			setDemoCounterTotal(ethers.formatEther(stats[0] as bigint));
 		} catch {
 			setDemoCounterTotal('0');
@@ -548,11 +550,11 @@ export default function Home() {
 					setLimitDirty(false);
 				})(),
 				{
-			loading: allowanceWei === 0n ? 'Step 2/2: Setting commitment...' : 'Setting commitment...',
-				success: 'Commitment active!',
-				error: 'Commitment failed'
-			}
-		);
+					loading: allowanceWei === 0n ? 'Step 2/2: Setting commitment...' : 'Setting commitment...',
+					success: 'Commitment active!',
+					error: 'Commitment failed'
+				}
+			);
 		} catch { /* toast.promise already handles user-facing errors */ }
 	};
 
@@ -575,11 +577,11 @@ export default function Home() {
 					setLimitDirty(false);
 				})(),
 				{
-				loading: newPausedState ? 'Pausing...' : 'Resuming...',
-				success: newPausedState ? 'Paused' : 'Resumed',
-				error: 'Update failed'
-			}
-		);
+					loading: newPausedState ? 'Pausing...' : 'Resuming...',
+					success: newPausedState ? 'Paused' : 'Resumed',
+					error: 'Update failed'
+				}
+			);
 		} catch { /* toast.promise already handles user-facing errors */ }
 	};
 
@@ -590,15 +592,15 @@ export default function Home() {
 			await toast.promise(
 				(async () => {
 					const hash = await safeWrite(selectedToken.address as `0x${string}`, ERC20_ABI, 'deposit', [], { value: amountWei });
-        await publicClient.waitForTransactionReceipt({ hash });
+					await publicClient.waitForTransactionReceipt({ hash });
 					await loadAccountState();
 				})(),
 				{
-				loading: 'Wrapping ETH...',
-				success: 'Wrapped successfully',
-				error: 'Wrap failed'
-			}
-		);
+					loading: 'Wrapping ETH...',
+					success: 'Wrapped successfully',
+					error: 'Wrap failed'
+				}
+			);
 		} catch { /* toast.promise already handles user-facing errors */ }
 	};
 
@@ -613,11 +615,11 @@ export default function Home() {
 					await loadAccountState();
 				})(),
 				{
-				loading: 'Unwrapping WETH...',
-				success: 'Unwrapped successfully',
-				error: 'Unwrap failed'
-			}
-		);
+					loading: 'Unwrapping WETH...',
+					success: 'Unwrapped successfully',
+					error: 'Unwrap failed'
+				}
+			);
 		} catch { /* toast.promise already handles user-facing errors */ }
 	};
 
@@ -635,12 +637,12 @@ export default function Home() {
 			setDemoResult(null);
 			setDemoCounterTotal('0');
 			const amountWei = ethers.parseEther(demoAmount || '0');
-			const feeWei: bigint = await publicClient.readContract({
+			const feeWei = await publicClient.readContract({
 				address: networkConfig.router as `0x${string}`,
 				abi: ROUTER_ABI,
 				functionName: 'quoteFee',
 				args: [selectedToken.address, amountWei]
-			});
+			} as any) as bigint;
 
 			// For fail demo, show the flow immediately before attempting transaction
 			if (failModeOverride) {
@@ -690,7 +692,7 @@ export default function Home() {
 			// For fail demo, if wallet rejected, that's expected
 			if (failModeOverride && (msg.includes('rejected') || msg.includes('denied') || msg.includes('cancelled'))) {
 				setDemoError('Your wallet rejected the transaction (expected - it detected the revert). See the flow above for what would have happened.');
-				toast.info('Wallet rejected transaction (expected behaviour)');
+				toast.success('Wallet rejected transaction (expected behaviour)');
 			} else {
 				toast.error(msg);
 			}
@@ -699,213 +701,184 @@ export default function Home() {
 		}
 	};
 
-  return (
-    <>
-      <Head>
-				<title>FlashBank — Flash Loans From Your Wallet</title>
-			<meta name="description" content="Provide WETH liquidity directly from your wallet and earn flash loan fees. No deposits. Live on Ethereum, Arbitrum, and Base." />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="icon" href="/favicon.ico" />
-      </Head>
-			<div className="min-h-screen bg-gray-50">
-        <Toaster position="top-right" />
-        <header className="bg-white border-b border-gray-200">
-					<div className="container mx-auto px-6 py-4 flex flex-wrap gap-4 justify-between items-center">
-						<div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                  <Zap className="h-6 w-6 text-white" />
-                </div>
-							<div>
-								<h1 className="text-xl font-bold text-gray-900">FlashBank Router</h1>
-								<p className="text-sm text-gray-500">Permit-based WETH commitments (no deposits)</p>
-              </div>
-                </div>
-						<div className="flex flex-wrap gap-2 items-center">
-							{Object.entries(NETWORKS).map(([id, cfg]) => (
-                    <button
-									key={id}
-									onClick={() => switchChain({ chainId: Number(id) }).catch(() => {})}
-									className={`px-3 py-1 rounded-full text-sm ${Number(id) === chainId ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}
-								>
-									{cfg.name}
-                    </button>
-							))}
-							{isConnected && address ? (
-								<div className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-700">
-									<span className="font-mono">{formatAddress(address)}</span>
-                  <button
-										onClick={() => disconnect()}
-										className="text-blue-600 hover:text-blue-800 transition-colors"
-                    >
-										Disconnect
-                  </button>
-                </div>
-							) : (
-                    <appkit-connect-button />
-							)}
-                  </div>
-              </div>
-				</header>
+	const networks = Object.entries(NETWORKS).map(([id, cfg]) => ({ id: Number(id), name: cfg.name }));
+	const demoReady = parseFloat(poolStats.committed) >= parseFloat(demoAmount || '0') && parseFloat(ethBalance) >= parseFloat(quoteFee);
 
-				<main className="container mx-auto px-6 py-8 space-y-8">
-					{/* Welcome Banner with Links */}
-					<div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-xl shadow-lg p-6 text-white">
-						<div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-							<div>
-								<h2 className="text-2xl font-bold mb-2">🏦 Welcome to FlashBank</h2>
-								<p className="text-blue-100 text-sm">
-									The only flash loan protocol where <strong>funds stay in your wallet</strong>. No deposits, just approve & commit.
-								</p>
+	return (
+		<>
+			<Head>
+				<title>FlashBank — Flash Loans From Your Wallet</title>
+				<meta name="description" content="Provide WETH liquidity directly from your wallet and earn flash loan fees. No deposits. Live on Ethereum, Arbitrum, and Base." />
+				<meta name="viewport" content="width=device-width, initial-scale=1" />
+				<link rel="icon" href="/favicon.ico" />
+			</Head>
+			<div className="min-h-screen bg-gradient-to-b from-slate-50 to-blue-50/40">
+				<Toaster position="top-right" />
+
+				<Nav
+					active="flash"
+					networks={networks}
+					chainId={chainId}
+					onSelectNetwork={(id) => switchChain({ chainId: id })}
+					isConnected={isConnected}
+					address={address}
+					onDisconnect={disconnect}
+				/>
+
+				<main className="container mx-auto px-4 sm:px-6 py-6 space-y-6 max-w-6xl">
+					{/* Intro — the two products, made obvious */}
+					<section className="space-y-5">
+						<div className="text-center max-w-2xl mx-auto pt-2">
+							<h2 className="text-2xl sm:text-3xl font-bold text-gray-900">One protocol, two ways to flashbank</h2>
+							<p className="text-gray-500 mt-2 text-sm sm:text-base">Keep custody of your funds. Pick the tool that fits the job.</p>
+						</div>
+						<div className="grid md:grid-cols-2 gap-4">
+							{/* Flash Loans — this page */}
+							<div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white p-6 shadow-sm flex flex-col">
+								<span className="inline-flex items-center gap-1.5 self-start text-[11px] font-semibold bg-white/15 rounded-full px-2.5 py-1 mb-3"><Zap className="h-3.5 w-3.5" /> You&apos;re here</span>
+								<h3 className="text-xl font-bold mb-1.5">Flash Loans</h3>
+								<p className="text-blue-50 text-sm mb-4">Atomic, same-transaction liquidity for arbitrage, liquidations and MEV. Lenders commit WETH straight from their wallet — no deposits — and earn a fee on every loan.</p>
+								<ul className="space-y-1.5 text-sm text-blue-50/90 mb-5">
+									<li>· Repaid in the same transaction, or the whole thing reverts</li>
+									<li>· Funds never leave the lender&apos;s wallet until a loan executes</li>
+									<li>· 0.02% configurable fee, split with the protocol</li>
+								</ul>
+								<a href="#flash-tools" className="mt-auto inline-flex items-center gap-1.5 self-start bg-white text-blue-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-50 transition-colors">
+									Provide liquidity or run the demo <ArrowRight className="h-4 w-4" />
+								</a>
 							</div>
-							<div className="flex flex-wrap gap-2">
-								<a
-									href="/guides/lend"
-									className="inline-flex items-center gap-1 bg-white text-blue-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-50 transition-colors"
-								>
-									<BookOpen className="h-4 w-4" />
-									Lender Guide
-								</a>
-								<a
-									href="/guides/borrow"
-									className="inline-flex items-center gap-1 bg-white text-blue-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-50 transition-colors"
-								>
-									<Code className="h-4 w-4" />
-									Borrower Guide
-								</a>
-								<a
-									href="/security"
-									className="inline-flex items-center gap-1 bg-white text-blue-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-50 transition-colors"
-								>
-									<Shield className="h-4 w-4" />
-									Security Audit
-								</a>
-								<a
-									href="/flashbank-loan"
-									className="inline-flex items-center gap-1 bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors"
-								>
-									<Repeat className="h-4 w-4" />
-									Flashbank a loan (P2P)
+							{/* P2P Loans — separate page */}
+							<div className="relative overflow-hidden rounded-2xl border border-emerald-200 bg-white p-6 shadow-sm flex flex-col">
+								<span className="inline-flex items-center gap-1.5 self-start text-[11px] font-semibold bg-emerald-50 text-emerald-700 rounded-full px-2.5 py-1 mb-3"><Coins className="h-3.5 w-3.5" /> Peer-to-peer</span>
+								<h3 className="text-xl font-bold text-gray-900 mb-1.5">P2P Term Loans</h3>
+								<p className="text-gray-600 text-sm mb-4">Fixed-term, collateral-backed loans agreed directly between two people. A single flat fee instead of interest, settled purely on time — no pools, no price oracle, no liquidations to watch.</p>
+								<ul className="space-y-1.5 text-sm text-gray-500 mb-5">
+									<li>· Repay principal + a flat fee before the deadline</li>
+									<li>· Miss it and the lender claims the collateral</li>
+									<li>· Held by a neutral on-chain escrow</li>
+								</ul>
+								<a href="/flashbank-loan" className="mt-auto inline-flex items-center gap-1.5 self-start bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors">
+									Open P2P Loans <ArrowRight className="h-4 w-4" />
 								</a>
 							</div>
 						</div>
+					</section>
+
+					{/* ---------------- FLASH LOANS ---------------- */}
+					<div id="flash-tools" className="pt-4 scroll-mt-20">
+						<h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+							<Zap className="h-5 w-5 text-blue-600" /> Flash Loans
+						</h2>
+						<p className="text-sm text-gray-500 mt-1">Provide WETH liquidity from your wallet, or run the live Sepolia demo end-to-end.</p>
 					</div>
 
-					{/* Contract Info */}
+					{/* Contract chip */}
 					{networkConfig.router && (
-						<div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-							<div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-								<div>
-									<p className="text-sm font-semibold text-blue-900 mb-1">📝 FlashBankRouter Contract</p>
-									<p className="text-xs text-blue-700 font-mono break-all">{networkConfig.router}</p>
-								</div>
-							<a
-								href={`${networkConfig.explorer}/address/${networkConfig.router}#code`}
-								target="_blank"
-								rel="noopener noreferrer"
-								className="inline-flex items-center gap-1 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors whitespace-nowrap"
-							>
-								View on Explorer
-								<ExternalLink className="h-3 w-3" />
-							</a>
+						<div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-xs">
+							<div className="flex items-center gap-2 text-gray-500">
+								<Shield className="h-3.5 w-3.5 text-blue-600" />
+								<span>Router on {networkConfig.name}</span>
+								<span className="font-mono text-gray-700">{formatAddress(networkConfig.router)}</span>
+								<span className="hidden sm:inline text-gray-300">·</span>
+								<span className="hidden sm:inline">fee {poolStats.feeBps} bps</span>
 							</div>
+							<a href={`${networkConfig.explorer}/address/${networkConfig.router}#code`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-blue-700 hover:text-blue-900 font-medium">
+								Verified code <ExternalLink className="h-3 w-3" />
+							</a>
 						</div>
 					)}
 
-					<div className="bg-white rounded-xl shadow p-6 border border-gray-200">
-						<h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+					{/* Liquidity overview */}
+					<div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
+						<h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
 							<Shield className="h-5 w-5 text-blue-500" />
-							WETH Liquidity Overview
-						</h2>
-						<div className="grid md:grid-cols-3 gap-6">
+							WETH liquidity overview
+						</h3>
+						<div className="grid grid-cols-3 gap-6">
 							<div>
-								<p className="text-sm text-gray-500">Total Committed</p>
-								<p className="text-2xl font-bold text-gray-900">{poolStats.committed} WETH</p>
-                </div>
-                  <div>
-								<p className="text-sm text-gray-500">Active Providers</p>
+								<p className="text-sm text-gray-500">Total committed</p>
+								<p className="text-2xl font-bold text-gray-900">{poolStats.committed} <span className="text-base font-medium text-gray-400">WETH</span></p>
+							</div>
+							<div>
+								<p className="text-sm text-gray-500">Active providers</p>
 								<p className="text-2xl font-bold text-gray-900">{poolStats.providers}</p>
-                          </div>
-                          <div>
+							</div>
+							<div>
 								<p className="text-sm text-gray-500">Fee</p>
-								<p className="text-2xl font-bold text-gray-900">{poolStats.feeBps} bps</p>
-                          </div>
-                        </div>
+								<p className="text-2xl font-bold text-gray-900">{poolStats.feeBps} <span className="text-base font-medium text-gray-400">bps</span></p>
+							</div>
+						</div>
 					</div>
 
-					<div className="bg-white rounded-xl shadow p-6 border border-gray-200">
+					{/* Wallet + provide liquidity */}
+					<div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
 						<div className="flex flex-wrap gap-3 mb-6">
 							{networkConfig.tokens.map((token) => (
 								<button
 									key={token.key}
 									onClick={() => setSelectedTokenKey(token.key)}
-									className={`px-4 py-2 rounded-lg text-sm font-medium ${token.key === selectedTokenKey ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'}`}
+									className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${token.key === selectedTokenKey ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
 								>
 									{token.symbol}
 								</button>
 							))}
-                  </div>
+						</div>
 
 						<div className="grid md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-								<h3 className="text-base font-semibold text-gray-900">Wallet Balances</h3>
-								<div className="bg-gray-50 rounded-lg p-4">
+							<div className="space-y-4">
+								<h4 className="text-sm font-semibold text-gray-900">Wallet balances</h4>
+								<div className="bg-gray-50 rounded-lg p-4 space-y-0.5">
 									<p className="text-sm text-gray-500">ETH: {ethBalance}</p>
 									<p className="text-sm text-gray-500">WETH: {wethBalance}</p>
-									<p className="text-sm text-gray-500">
-										Allowance: {allowance === 'Unlimited' ? 'Unlimited' : `${allowance} WETH`}
-									</p>
-                          </div>
+									<p className="text-sm text-gray-500">Allowance: {allowance === 'Unlimited' ? 'Unlimited' : `${allowance} WETH`}</p>
+								</div>
 								<div className="flex gap-4">
 									<div className="flex-1">
-										<label className="text-sm text-gray-600">Wrap Amount (ETH)</label>
-										<input value={wrapAmount} onChange={(e) => setWrapAmount(e.target.value)} className="w-full border rounded-lg px-3 py-2 mt-1" />
-                          </div>
-									<button onClick={handleWrap} className="self-end bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+										<label className="text-sm text-gray-600">Wrap amount (ETH)</label>
+										<input value={wrapAmount} onChange={(e) => setWrapAmount(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 mt-1" />
+									</div>
+									<button onClick={handleWrap} className="self-end bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors">
 										<Repeat className="h-4 w-4" /> Wrap
 									</button>
-                        </div>
+								</div>
 								<div className="flex gap-4">
 									<div className="flex-1">
-										<label className="text-sm text-gray-600">Unwrap Amount (WETH)</label>
-										<input value={unwrapAmount} onChange={(e) => setUnwrapAmount(e.target.value)} className="w-full border rounded-lg px-3 py-2 mt-1" />
-                    </div>
-									<button onClick={handleUnwrap} className="self-end bg-gray-800 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+										<label className="text-sm text-gray-600">Unwrap amount (WETH)</label>
+										<input value={unwrapAmount} onChange={(e) => setUnwrapAmount(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 mt-1" />
+									</div>
+									<button onClick={handleUnwrap} className="self-end bg-gray-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-900 transition-colors">
 										<Repeat className="h-4 w-4" /> Unwrap
 									</button>
-                  </div>
-                </div>
+								</div>
+							</div>
 
 							<div className="space-y-4">
-								<h3 className="text-base font-semibold text-gray-900">Provide Liquidity</h3>
+								<h4 className="text-sm font-semibold text-gray-900">Provide liquidity</h4>
 								{allowanceWei === 0n && (
 									<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-										<p className="text-sm text-yellow-800">⚠️ Router not approved yet. The button below will approve and then set your commitment.</p>
+										<p className="text-sm text-yellow-800">Router not approved yet. The button below will approve and then set your commitment.</p>
 									</div>
 								)}
 								{allowanceWei > 0n && (
-									<div className="bg-gray-50 rounded-lg p-4 space-y-2">
-									<p className="text-sm text-gray-500">
-										Current Limit:{' '}
-										{providerLimit === 'Unlimited'
-											? 'Unlimited'
-											: providerLimit === 'Not set'
-												? 'Not set (set a limit to start lending)'
-												: `${providerLimit} WETH`}
-									</p>
-									<p className="text-sm text-gray-500">
-										Status:{' '}
-										{providerRegistered
-											? providerPaused
-												? '⏸️ Paused'
-												: '✓ Active'
-											: 'No commitment yet'}
-									</p>
+									<div className="bg-gray-50 rounded-lg p-4 space-y-1">
+										<p className="text-sm text-gray-500">
+											Current limit:{' '}
+											{providerLimit === 'Unlimited'
+												? 'Unlimited'
+												: providerLimit === 'Not set'
+													? 'Not set (set a limit to start lending)'
+													: `${providerLimit} WETH`}
+										</p>
+										<p className="text-sm text-gray-500">
+											Status:{' '}
+											{providerRegistered ? (providerPaused ? 'Paused' : 'Active') : 'No commitment yet'}
+										</p>
 										<p className="text-sm text-gray-500">Expiry: {providerExpiry}</p>
 									</div>
 								)}
-								<div className="flex items-center gap-2 mb-2">
-									<input 
-										type="checkbox" 
+								<div className="flex items-center gap-2">
+									<input
+										type="checkbox"
 										id="unlimited-checkbox"
 										checked={isUnlimitedCommitment}
 										onChange={(e) => {
@@ -915,133 +888,97 @@ export default function Home() {
 										}}
 										className="w-4 h-4 text-blue-600 rounded"
 									/>
-									<label htmlFor="unlimited-checkbox" className="text-sm text-gray-700 cursor-pointer">
-										Unlimited commitment
-									</label>
+									<label htmlFor="unlimited-checkbox" className="text-sm text-gray-700 cursor-pointer">Unlimited commitment</label>
 								</div>
-								<label className="text-sm text-gray-600">Commitment Limit (WETH)</label>
-								<input 
-									value={limitInput} 
-									onChange={(e) => {
-										setLimitInput(e.target.value);
-										setLimitDirty(true);
-										setIsUnlimitedCommitment(false);
-									}} 
-									placeholder={isUnlimitedCommitment ? "Unlimited" : "e.g. 10.0"}
-									disabled={isUnlimitedCommitment}
-									className="w-full border rounded-lg px-3 py-2 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" 
-								/>
+								<div>
+									<label className="text-sm text-gray-600">Commitment limit (WETH)</label>
+									<input
+										value={limitInput}
+										onChange={(e) => {
+											setLimitInput(e.target.value);
+											setLimitDirty(true);
+											setIsUnlimitedCommitment(false);
+										}}
+										placeholder={isUnlimitedCommitment ? 'Unlimited' : 'e.g. 10.0'}
+										disabled={isUnlimitedCommitment}
+										className="w-full border border-gray-200 rounded-lg px-3 py-2 mt-1 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+									/>
+								</div>
 								{allowanceWei === 0n || limitDirty || !providerRegistered ? (
-									<button onClick={handleApproveAndCommit} className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold">
-										{allowanceWei === 0n ? 'Approve & Set Commitment' : providerRegistered ? 'Update Commitment' : 'Set Commitment'}
+									<button onClick={handleApproveAndCommit} className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+										{allowanceWei === 0n ? 'Approve & set commitment' : providerRegistered ? 'Update commitment' : 'Set commitment'}
 									</button>
 								) : (
-									<button onClick={handlePauseResume} className={`w-full py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${providerPaused ? 'bg-green-600 text-white' : 'bg-yellow-500 text-white'}`}>
-										{providerPaused ? (
-											<><PlayCircle className="h-5 w-5" /> Resume</>
-										) : (
-											<><PauseCircle className="h-5 w-5" /> Pause</>
-										)}
+									<button onClick={handlePauseResume} className={`w-full py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors ${providerPaused ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-yellow-500 hover:bg-yellow-600 text-white'}`}>
+										{providerPaused ? (<><PlayCircle className="h-5 w-5" /> Resume</>) : (<><PauseCircle className="h-5 w-5" /> Pause</>)}
 									</button>
 								)}
-                  </div>
-                  </div>
-                </div>
+							</div>
+						</div>
+					</div>
 
-					{/* How It Works */}
-					<div className="bg-white rounded-xl shadow p-6 border border-gray-200">
-						<h3 className="text-lg font-semibold text-gray-900 mb-4">💡 How FlashBank Works</h3>
+					{/* How it works */}
+					<div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
+						<h3 className="text-base font-semibold text-gray-900 mb-4">How flash loans work here</h3>
 						<div className="grid md:grid-cols-2 gap-6">
 							<div>
-								<h4 className="font-semibold text-gray-900 mb-2">For Lenders (You earn fees)</h4>
+								<h4 className="font-semibold text-gray-900 mb-2">For lenders (you earn fees)</h4>
 								<ol className="space-y-2 text-sm text-gray-700">
-									<li className="flex gap-2">
-										<span className="font-semibold text-blue-600">1.</span>
-										<span>Wrap some ETH to WETH (or use existing WETH)</span>
-									</li>
-									<li className="flex gap-2">
-										<span className="font-semibold text-blue-600">2.</span>
-										<span>Approve the FlashBankRouter to access your WETH</span>
-									</li>
-									<li className="flex gap-2">
-										<span className="font-semibold text-blue-600">3.</span>
-										<span>Set a commitment limit (or unlimited) - <strong>WETH stays in your wallet!</strong></span>
-									</li>
-									<li className="flex gap-2">
-										<span className="font-semibold text-blue-600">4.</span>
-										<span>Earn fees every time borrowers use your liquidity</span>
-									</li>
-									<li className="flex gap-2">
-										<span className="font-semibold text-blue-600">5.</span>
-										<span>Pause/unpause or change limits anytime - instant effect</span>
-									</li>
+									<li className="flex gap-2"><span className="font-semibold text-blue-600">1.</span><span>Wrap some ETH to WETH (or use existing WETH).</span></li>
+									<li className="flex gap-2"><span className="font-semibold text-blue-600">2.</span><span>Approve the FlashBankRouter to access your WETH.</span></li>
+									<li className="flex gap-2"><span className="font-semibold text-blue-600">3.</span><span>Set a commitment limit (or unlimited) — <strong>WETH stays in your wallet</strong>.</span></li>
+									<li className="flex gap-2"><span className="font-semibold text-blue-600">4.</span><span>Earn a fee every time borrowers use your liquidity.</span></li>
+									<li className="flex gap-2"><span className="font-semibold text-blue-600">5.</span><span>Pause or change limits anytime — instant effect.</span></li>
 								</ol>
 							</div>
 							<div>
-								<h4 className="font-semibold text-gray-900 mb-2">For Borrowers (MEV/Arb bots)</h4>
+								<h4 className="font-semibold text-gray-900 mb-2">For borrowers (MEV / arb bots)</h4>
 								<ol className="space-y-2 text-sm text-gray-700">
-									<li className="flex gap-2">
-										<span className="font-semibold text-purple-600">1.</span>
-										<span>Implement the <code className="bg-gray-100 px-1 rounded text-xs">IFlashLoanReceiver</code> interface</span>
-									</li>
-									<li className="flex gap-2">
-										<span className="font-semibold text-purple-600">2.</span>
-										<span>Call <code className="bg-gray-100 px-1 rounded text-xs">flashLoan(token, amount, toNative, data)</code></span>
-									</li>
-									<li className="flex gap-2">
-										<span className="font-semibold text-purple-600">3.</span>
-										<span>Router pulls WETH from providers (all in one tx)</span>
-									</li>
-									<li className="flex gap-2">
-										<span className="font-semibold text-purple-600">4.</span>
-										<span>Your contract receives WETH or native ETH</span>
-									</li>
-									<li className="flex gap-2">
-										<span className="font-semibold text-purple-600">5.</span>
-										<span>Execute your arbitrage/MEV logic</span>
-									</li>
-									<li className="flex gap-2">
-										<span className="font-semibold text-purple-600">6.</span>
-										<span>Repay principal + fee or entire tx reverts</span>
-									</li>
+									<li className="flex gap-2"><span className="font-semibold text-purple-600">1.</span><span>Implement the <code className="bg-gray-100 px-1 rounded text-xs">IFlashLoanReceiver</code> interface.</span></li>
+									<li className="flex gap-2"><span className="font-semibold text-purple-600">2.</span><span>Call <code className="bg-gray-100 px-1 rounded text-xs">flashLoan(token, amount, toNative, data)</code>.</span></li>
+									<li className="flex gap-2"><span className="font-semibold text-purple-600">3.</span><span>The router pulls WETH from providers, all in one tx.</span></li>
+									<li className="flex gap-2"><span className="font-semibold text-purple-600">4.</span><span>Your contract receives WETH or native ETH.</span></li>
+									<li className="flex gap-2"><span className="font-semibold text-purple-600">5.</span><span>Run your arbitrage / MEV logic.</span></li>
+									<li className="flex gap-2"><span className="font-semibold text-purple-600">6.</span><span>Repay principal + fee, or the entire tx reverts.</span></li>
 								</ol>
 							</div>
 						</div>
 						<div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
 							<p className="text-sm text-blue-900">
-								<strong>🔐 Key Difference:</strong> Traditional flash loan protocols require you to <em>deposit</em> your funds into their contract. 
-								FlashBank lets you <strong>keep WETH in your own wallet</strong> and just approve the router. You maintain full custody until the moment a loan is executed.
+								<strong>Key difference:</strong> traditional flash-loan protocols make you <em>deposit</em> funds into their contract.
+								FlashBank lets you <strong>keep WETH in your own wallet</strong> and just approve the router — full custody until the moment a loan executes.
 							</p>
 						</div>
 					</div>
 
-					<div className="bg-white rounded-xl shadow p-6 border border-gray-200">
-						<h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+					{/* Demo */}
+					<div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
+						<h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
 							<ArrowRightCircle className="h-5 w-5 text-purple-500" />
-							Demo Flash Loan
-                    </h3>
+							Demo flash loan
+						</h3>
 						<div className="grid md:grid-cols-2 gap-4 mb-4">
 							<div className="bg-green-50 border border-green-200 rounded-lg p-4">
-								<h4 className="font-semibold text-green-900 mb-2">✓ Success Demo</h4>
+								<h4 className="font-semibold text-green-900 mb-2">Success demo</h4>
 								<p className="text-sm text-green-800">
-									Borrows WETH from the pool → unwraps to ETH → passes through counter (proving you used others' funds) → proves funds on-chain → repays router. Transaction succeeds.
+									Borrows WETH from the pool → unwraps to ETH → passes through the counter (proving you used others&apos; funds) → proves funds on-chain → repays the router. Transaction succeeds.
 								</p>
 							</div>
-					<div className="bg-red-50 border border-red-200 rounded-lg p-4">
-						<h4 className="font-semibold text-red-900 mb-2">✗ Fail Demo</h4>
-						<p className="text-sm text-red-800 mb-2">
-							Borrows WETH → unwraps → passes through counter → attempts to keep funds by sending to proof sink. Router detects missing repayment and <strong>reverts the entire transaction</strong>. Funds are safe.
-						</p>
-						<p className="text-xs text-red-700 italic">
-							⚠️ Note: Most wallets will reject this transaction before sending because they simulate it and detect the revert. If your wallet blocks it, that's expected! <a href="https://sepolia.etherscan.io/tx/0xd721f1d04f0c2662542c8c3fddd37ee28020606000ea22e2b356ba22299301dd" target="_blank" rel="noopener noreferrer" className="underline">See example test transaction</a>.
-						</p>
-					</div>
+							<div className="bg-red-50 border border-red-200 rounded-lg p-4">
+								<h4 className="font-semibold text-red-900 mb-2">Fail demo</h4>
+								<p className="text-sm text-red-800 mb-2">
+									Borrows WETH → unwraps → passes through the counter → attempts to keep the funds. The router detects the missing repayment and <strong>reverts the entire transaction</strong>. Funds are safe.
+								</p>
+								<p className="text-xs text-red-700 italic">
+									Most wallets reject this before sending because they simulate it and detect the revert. If your wallet blocks it, that&apos;s expected. <a href="https://sepolia.etherscan.io/tx/0xd721f1d04f0c2662542c8c3fddd37ee28020606000ea22e2b356ba22299301dd" target="_blank" rel="noopener noreferrer" className="underline">See example test transaction</a>.
+								</p>
+							</div>
 						</div>
 						{networkConfig.demoCounter && (
 							<div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
 								<div className="flex items-center justify-between">
 									<div>
-										<p className="text-sm font-semibold text-purple-900">Demo Counter</p>
+										<p className="text-sm font-semibold text-purple-900">Demo counter</p>
 										<p className="text-xs text-purple-700">Total ETH that has passed through the counter</p>
 									</div>
 									<div className="text-right">
@@ -1052,118 +989,103 @@ export default function Home() {
 							</div>
 						)}
 						<div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-							<p className="text-sm font-semibold text-blue-900 mb-2">Demo Requirements:</p>
+							<p className="text-sm font-semibold text-blue-900 mb-2">Demo requirements</p>
 							<div className="space-y-1 text-sm text-blue-800">
-							<div className="flex items-center gap-2">
-								{parseFloat(poolStats.committed) >= parseFloat(demoAmount || '0') ? '✓' : '✗'} 
-								<span>Pool has ≥ {demoAmount} WETH committed (current: {formatEth(poolStats.committed, 4)} WETH)</span>
+								<div className="flex items-center gap-2">
+									<span>{parseFloat(poolStats.committed) >= parseFloat(demoAmount || '0') ? '✓' : '✗'}</span>
+									<span>Pool has ≥ {demoAmount} WETH committed (current: {formatEth(poolStats.committed, 4)} WETH)</span>
+								</div>
+								<div className="flex items-center gap-2">
+									<span>{parseFloat(ethBalance) >= parseFloat(quoteFee) ? '✓' : '✗'}</span>
+									<span>You have ≥ {quoteFee} ETH for the fee</span>
+								</div>
 							</div>
-							<div className="flex items-center gap-2">
-								{parseFloat(ethBalance) >= parseFloat(quoteFee) ? '✓' : '✗'} 
-								<span>You have ≥ {quoteFee} ETH for the fee</span>
-							</div>
-						</div>
-							<p className="text-xs text-blue-700 mt-2 italic">Note: The demo borrows from the pool, not your personal commitment</p>
+							<p className="text-xs text-blue-700 mt-2 italic">The demo borrows from the pool, not your personal commitment.</p>
 						</div>
 						<div className="grid md:grid-cols-2 gap-4">
-                  <div>
+							<div>
 								<label className="text-sm text-gray-600">Amount (ETH)</label>
-								<input value={demoAmount} onChange={(e) => setDemoAmount(e.target.value)} className="w-full border rounded-lg px-3 py-2 mt-1" />
-								<p className="text-xs text-gray-500 mt-2">Estimated Fee: {quoteFee} ETH</p>
-                            </div>
+								<input value={demoAmount} onChange={(e) => setDemoAmount(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 mt-1" />
+								<p className="text-xs text-gray-500 mt-2">Estimated fee: {quoteFee} ETH</p>
+							</div>
 							<div className="flex items-end gap-2">
-								<button 
-								onClick={() => handleRunDemo(false)} 
-								disabled={isRunningDemo || parseFloat(poolStats.committed) < parseFloat(demoAmount || '0') || parseFloat(ethBalance) < parseFloat(quoteFee)} 
-								className="flex-1 bg-green-600 text-white py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-								title={parseFloat(poolStats.committed) < parseFloat(demoAmount || '0') || parseFloat(ethBalance) < parseFloat(quoteFee) ? 'Check requirements above' : 'Borrow, prove funds, and repay successfully'}
+								<button
+									onClick={() => handleRunDemo(false)}
+									disabled={isRunningDemo || !demoReady}
+									className="flex-1 bg-green-600 text-white py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-green-700 transition-colors"
+									title={!demoReady ? 'Check requirements above' : 'Borrow, prove funds, and repay successfully'}
 								>
-									{isRunningDemo && !demoFailMode ? 'Running...' : 'Run Demo (Success)'}
+									{isRunningDemo && !demoFailMode ? 'Running...' : 'Run demo (success)'}
 								</button>
-								<button 
-								onClick={() => handleRunDemo(true)} 
-								disabled={isRunningDemo || parseFloat(poolStats.committed) < parseFloat(demoAmount || '0') || parseFloat(ethBalance) < parseFloat(quoteFee)} 
-								className="flex-1 bg-red-600 text-white py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-								title={parseFloat(poolStats.committed) < parseFloat(demoAmount || '0') || parseFloat(ethBalance) < parseFloat(quoteFee) ? 'Check requirements above' : 'Attempt to steal funds - transaction will revert'}
+								<button
+									onClick={() => handleRunDemo(true)}
+									disabled={isRunningDemo || !demoReady}
+									className="flex-1 bg-red-600 text-white py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-red-700 transition-colors"
+									title={!demoReady ? 'Check requirements above' : 'Attempt to steal funds — the transaction will revert'}
 								>
-									{isRunningDemo && demoFailMode ? 'Running...' : 'Run Demo (Fail)'}
+									{isRunningDemo && demoFailMode ? 'Running...' : 'Run demo (fail)'}
 								</button>
 							</div>
-                              </div>
-					{(demoTxHash || demoOutcome === 'blocked') && (
-						<>
-						<div className="mt-4 space-y-4">
-							{demoTxHash && demoTxHash !== 'pending' && (
-								<div className="bg-gray-50 rounded-lg p-4">
-									<p className="text-sm text-gray-600">
-										Tx:{' '}
-										<a href={`${networkConfig.explorer}/tx/${demoTxHash}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
-											{demoTxHash.slice(0, 10)}...{demoTxHash.slice(-8)}
-										</a>
-									</p>
-									{demoResult && (
-										<p className="text-sm text-gray-600 mt-2">
-											Amount {demoResult.amount} ETH · Fee {demoResult.fee} ETH
+						</div>
+						{(demoTxHash || demoOutcome === 'blocked') && (
+							<div className="mt-4 space-y-4">
+								{demoTxHash && demoTxHash !== 'pending' && (
+									<div className="bg-gray-50 rounded-lg p-4">
+										<p className="text-sm text-gray-600">
+											Tx:{' '}
+											<a href={`${networkConfig.explorer}/tx/${demoTxHash}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+												{demoTxHash.slice(0, 10)}...{demoTxHash.slice(-8)}
+											</a>
 										</p>
-									)}
-								</div>
-							)}
-							{demoTxHash === 'pending' && demoOutcome === 'blocked' && (
-								<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-									<p className="text-sm text-yellow-800 font-semibold mb-1">⚠️ Wallet Simulation Detected Revert</p>
-									<p className="text-xs text-yellow-700">
-										Most wallets will reject this transaction before sending. If yours does, that's working as intended! The flow below shows what would happen if the transaction were sent.
-									</p>
-									{demoResult && (
-										<p className="text-xs text-yellow-700 mt-2">
-											Attempted: {demoResult.amount} ETH · Fee: {demoResult.fee} ETH
+										{demoResult && (
+											<p className="text-sm text-gray-600 mt-2">Amount {demoResult.amount} ETH · Fee {demoResult.fee} ETH</p>
+										)}
+									</div>
+								)}
+								{demoTxHash === 'pending' && demoOutcome === 'blocked' && (
+									<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+										<p className="text-sm text-yellow-800 font-semibold mb-1">Wallet simulation detected the revert</p>
+										<p className="text-xs text-yellow-700">
+											Most wallets reject this transaction before sending. If yours does, that&apos;s working as intended. The flow below shows what would happen if the transaction were sent.
 										</p>
-									)}
-								</div>
-							)}
+										{demoResult && (
+											<p className="text-xs text-yellow-700 mt-2">Attempted: {demoResult.amount} ETH · Fee: {demoResult.fee} ETH</p>
+										)}
+									</div>
+								)}
 								<div className="bg-white border-2 border-gray-200 rounded-lg p-4">
-									<p className="text-sm font-semibold text-gray-900 mb-3">Transaction Flow:</p>
+									<p className="text-sm font-semibold text-gray-900 mb-3">Transaction flow</p>
 									<div className="flex flex-col gap-2 text-sm">
 										<div className="flex items-center gap-2">
 											<span className="text-2xl">💰</span>
-											<a href={`${networkConfig.explorer}/address/${networkConfig.router}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline flex-1">
-												Pool providers' WETH
-											</a>
+											<a href={`${networkConfig.explorer}/address/${networkConfig.router}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline flex-1">Pool providers&apos; WETH</a>
 											<span className="text-gray-400">→</span>
 										</div>
 										<div className="flex items-center gap-2">
 											<span className="text-2xl">📦</span>
-											<a href={`${networkConfig.explorer}/address/${networkConfig.router}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline flex-1">
-												FlashBank Router (unwrap)
-											</a>
+											<a href={`${networkConfig.explorer}/address/${networkConfig.router}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline flex-1">FlashBank Router (unwrap)</a>
 											<span className="text-gray-400">→</span>
 										</div>
 										<div className="flex items-center gap-2">
 											<span className="text-2xl">🤖</span>
-											<a href={`${networkConfig.explorer}/address/${networkConfig.demoBorrower}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline flex-1">
-												Demo Borrower (receives ETH)
-											</a>
+											<a href={`${networkConfig.explorer}/address/${networkConfig.demoBorrower}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline flex-1">Demo borrower (receives ETH)</a>
 											<span className="text-gray-400">→</span>
 										</div>
 										<div className="flex items-center gap-2">
 											<span className="text-2xl">🔢</span>
-											<a href={`${networkConfig.explorer}/address/${networkConfig.demoCounter}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline flex-1">
-												Counter (proves you used {demoResult?.amount} ETH)
-											</a>
+											<a href={`${networkConfig.explorer}/address/${networkConfig.demoCounter}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline flex-1">Counter (proves you used {demoResult?.amount} ETH)</a>
 											<span className="text-gray-400">→</span>
 										</div>
 										{demoOutcome === 'success' && (
 											<>
 												<div className="flex items-center gap-2">
 													<span className="text-2xl">✅</span>
-													<a href={`${networkConfig.explorer}/address/${networkConfig.proofSink}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline flex-1">
-														Proof (refunds ETH)
-													</a>
+													<a href={`${networkConfig.explorer}/address/${networkConfig.proofSink}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline flex-1">Proof (refunds ETH)</a>
 													<span className="text-gray-400">→</span>
 												</div>
 												<div className="flex items-center gap-2">
 													<span className="text-2xl">💸</span>
-													<span className="text-green-600 font-semibold flex-1">Repaid to Router + Fee</span>
+													<span className="text-green-600 font-semibold flex-1">Repaid to router + fee</span>
 													<span className="text-green-600">✓</span>
 												</div>
 											</>
@@ -1172,18 +1094,14 @@ export default function Home() {
 											<>
 												<div className="flex items-center gap-2">
 													<span className="text-2xl">🚫</span>
-													<a href={`${networkConfig.explorer}/address/${networkConfig.proofSink}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline flex-1">
-														Proof (keeps ETH - theft attempt)
-													</a>
+													<a href={`${networkConfig.explorer}/address/${networkConfig.proofSink}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline flex-1">Proof (keeps ETH — theft attempt)</a>
 													<span className="text-red-600">✗</span>
 												</div>
 												<div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded p-2">
 													<span className="text-2xl">⛔</span>
-													<span className="text-red-600 font-semibold flex-1">Router detected missing repayment → REVERT</span>
+													<span className="text-red-600 font-semibold flex-1">Router detected missing repayment → revert</span>
 												</div>
-												<p className="text-xs text-red-700 italic mt-2">
-													All state changes rolled back. Providers' WETH never left their wallets.
-												</p>
+												<p className="text-xs text-red-700 italic mt-2">All state changes rolled back. Providers&apos; WETH never left their wallets.</p>
 											</>
 										)}
 										{demoOutcome === 'none' && (
@@ -1191,103 +1109,14 @@ export default function Home() {
 										)}
 									</div>
 								</div>
+								{demoError && (<p className="text-sm text-red-600">{demoError}</p>)}
 							</div>
-							{demoError && (
-								<p className="text-sm text-red-600 mt-2">{demoError}</p>
-							)}
-							</>
 						)}
-          </div>
-          
-				<div id="guide" className="bg-white rounded-xl shadow p-6 border border-gray-200">
-					<h3 className="text-lg font-semibold text-gray-900 mb-4">Guide</h3>
-						<ol className="list-decimal list-inside space-y-2 text-gray-700">
-							<li>Wrap the ETH amount you wish to make available (WETH stays in your wallet).</li>
-							<li>Approve the FlashBank Router once.</li>
-							<li>Set your commitment limit and optional expiry. Pause/resume at any time.</li>
-							<li>Earn 0.02% (configurable) each time your WETH is pulled into a flash loan.</li>
-							<li>Use the demo to verify behaviour on Sepolia before moving to production chains.</li>
-						</ol>
-          </div>
+					</div>
 				</main>
 
-				{/* Footer */}
-				<footer className="bg-white border-t border-gray-200 py-8 mt-12">
-					<div className="container mx-auto px-6">
-						<div className="grid md:grid-cols-3 gap-8">
-							<div>
-								<h4 className="font-semibold text-gray-900 mb-3">📚 Documentation</h4>
-								<ul className="space-y-2 text-sm">
-									<li>
-										<a href="/guides/lend" className="text-blue-600 hover:text-blue-800">Lender Guide</a>
-									</li>
-									<li>
-										<a href="/guides/borrow" className="text-blue-600 hover:text-blue-800">Borrower Guide</a>
-									</li>
-									<li>
-										<a href="/security" className="text-blue-600 hover:text-blue-800">Security Audit</a>
-									</li>
-								</ul>
-							</div>
-							<div>
-								<h4 className="font-semibold text-gray-900 mb-3">🔗 Smart Contracts</h4>
-								<ul className="space-y-2 text-sm">
-									{networkConfig.router && (
-										<li>
-											<a 
-												href={`${networkConfig.explorer}/address/${networkConfig.router}#code`}
-												target="_blank"
-												rel="noopener noreferrer"
-												className="text-blue-600 hover:text-blue-800 inline-flex items-center gap-1"
-											>
-												FlashBankRouter
-												<ExternalLink className="h-3 w-3" />
-											</a>
-										</li>
-									)}
-									{selectedToken && (
-										<li>
-											<a 
-												href={`${networkConfig.explorer}/address/${selectedToken.address}#code`}
-												target="_blank"
-												rel="noopener noreferrer"
-												className="text-blue-600 hover:text-blue-800 inline-flex items-center gap-1"
-											>
-												WETH Token
-												<ExternalLink className="h-3 w-3" />
-											</a>
-										</li>
-									)}
-									<li>
-								<a 
-										href="https://github.com/flashbank-net/flashbank"
-										target="_blank"
-										rel="noopener noreferrer"
-										className="text-blue-600 hover:text-blue-800 inline-flex items-center gap-1"
-									>
-										View on GitHub
-										<ExternalLink className="h-3 w-3" />
-									</a>
-									</li>
-								</ul>
-							</div>
-							<div>
-								<h4 className="font-semibold text-gray-900 mb-3">ℹ️ About</h4>
-								<p className="text-sm text-gray-600 mb-3">
-									FlashBank is the first flash loan protocol where liquidity providers maintain full custody of their funds until the moment a loan executes.
-								</p>
-							<p className="text-xs text-gray-500">
-								Live on Ethereum, Arbitrum, and Base. Use at your own risk.
-							</p>
-							</div>
-						</div>
-						<div className="mt-8 pt-6 border-t border-gray-200 text-center text-sm text-gray-500">
-							<p>Built with ❤️ for the Ethereum community · No deposits, no custody, no nonsense</p>
-						</div>
-					</div>
-				</footer>
-      </div>
-    </>
-  );
+				<SiteFooter />
+			</div>
+		</>
+	);
 }
-

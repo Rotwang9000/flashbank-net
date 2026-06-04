@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { useIsMounted } from '../hooks/useIsMounted';
 import HowItWorks from '../components/HowItWorks';
+import Nav from '../components/Nav';
+import SiteFooter from '../components/SiteFooter';
 
 // "flashbank" is used here only as a VERB (you *flashbank* a loan). This product is a neutral
 // peer-to-peer escrow; it is not a bank and takes no custody as a financial institution.
@@ -539,39 +541,15 @@ export default function FlashbankLoan() {
 			<div className="min-h-screen bg-gradient-to-b from-slate-50 to-emerald-50/40">
 				<Toaster position="top-right" />
 
-				{/* Header */}
-				<header className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-gray-200">
-					<div className="container mx-auto px-4 sm:px-6 py-3 flex flex-wrap gap-3 justify-between items-center">
-						<a href="/flashbank-loan" className="flex items-center gap-3 group">
-							<div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-sm">
-								<Coins className="h-6 w-6 text-white" />
-							</div>
-							<div>
-								<h1 className="text-lg font-bold text-gray-900 leading-tight">Flashbank a loan</h1>
-								<p className="text-xs text-gray-500">Peer-to-peer · fixed-term · collateral-backed</p>
-							</div>
-						</a>
-						<div className="flex flex-wrap gap-2 items-center">
-							<div className="hidden sm:flex bg-gray-100 rounded-full p-0.5">
-								{Object.entries(NETWORKS).map(([id, cfg]) => (
-									<button key={id} onClick={() => selectNetwork(Number(id))}
-										className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${Number(id) === chainId ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-										{cfg.name}
-									</button>
-								))}
-							</div>
-							{isConnected && address ? (
-								<div className="flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-full text-sm text-gray-700">
-									<span className="w-2 h-2 rounded-full bg-emerald-500" />
-									<span className="font-mono text-xs">{formatAddress(address)}</span>
-									<button onClick={() => disconnect()} className="text-gray-400 hover:text-gray-700 text-xs">✕</button>
-								</div>
-							) : (
-								<appkit-connect-button />
-							)}
-						</div>
-					</div>
-				</header>
+				<Nav
+					active="loans"
+					networks={Object.entries(NETWORKS).map(([id, cfg]) => ({ id: Number(id), name: cfg.name }))}
+					chainId={chainId}
+					onSelectNetwork={(id) => selectNetwork(id)}
+					isConnected={isConnected}
+					address={address}
+					onDisconnect={() => disconnect()}
+				/>
 
 				<main className="container mx-auto px-4 sm:px-6 py-6 space-y-6 max-w-6xl">
 					{/* Playground ribbon */}
@@ -867,9 +845,10 @@ export default function FlashbankLoan() {
 					<p className="text-xs text-gray-400 text-center pt-2 pb-8 max-w-2xl mx-auto">
 						Collateral is held by a neutral escrow contract; nothing is priced on-chain. Lenders should require enough
 						collateral to cover the loan — its value can move during the term. Smart-contract and token risk apply.
-						<a href="/" className="block mt-2 text-emerald-700 hover:underline">← Back to flash loans</a>
 					</p>
 				</main>
+
+				<SiteFooter />
 			</div>
 
 			<style jsx global>{`

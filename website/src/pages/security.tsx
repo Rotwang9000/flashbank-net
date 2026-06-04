@@ -382,7 +382,7 @@ export default function Security() {
 									<p className="text-xs text-gray-600">
 										Need a refresher? See the{" "}
 										<a
-											href="https://github.com/flashbank-net/flashbank/blob/master/DUAL_CONTROL.md"
+											href="https://github.com/Rotwang9000/flashbank-net/blob/master/docs/security/DUAL_CONTROL.md"
 											target="_blank"
 											rel="noopener noreferrer"
 											className="text-blue-600 underline"

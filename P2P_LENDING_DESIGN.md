@@ -144,14 +144,13 @@ pre-seeded. Addresses are recorded in `deployments/sepolia-playground.json`:
 
 | Contract | Address |
 | --- | --- |
-| `FlashBankP2PLoan` | `0x41c8f8eB74A73261D7E2702aE7748EE5753e2Be5` |
+| `FlashBankP2PLoan` (boost-enabled) | `0x56E6aCB38ccFb82AC158955e8f7Dd2F59a66B607` |
 | `PlaygroundToken` fpUSD (6 decimals) | `0x4aBb056aA5aB39b55039ACAf795Ff9403Fa9760c` |
 | `PlaygroundToken` fpETH (18 decimals) | `0xB9CCa9CfE38e583CF1cf456F03946ac6376396F5` |
 
-> ⏳ **Boost-enabled redeploy queued.** The address above is the pre-boost build; the
-> boost-enabled `FlashBankP2PLoan` is built, tested and ready, awaiting a small Sepolia
-> top-up of the deployer before redeploy. The two `PlaygroundToken`s are **reused** across
-> redeploys (their addresses — and faucet links — stay stable); only the P2P address changes.
+The `PlaygroundToken`s are **reused** across redeploys (their addresses — and faucet links —
+stay stable); only the P2P address changes. Seeded offers `#0`/`#1` carry a boost (50/15 fpUSD)
+to demonstrate featured ranking; `#2` is a plain lend offer and `#3` a plain borrow request.
 
 Redeploy: `npx hardhat run scripts/deploy-playground.js --network sepolia`, then
 `npx hardhat verify --network sepolia <address> <constructor args>` (the deploy script prints

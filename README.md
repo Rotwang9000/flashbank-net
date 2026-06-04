@@ -131,14 +131,9 @@ the interface fee is `0`. **These are unaudited demos; never send real assets.**
 
 | Contract | Address (verified) |
 | --- | --- |
-| `FlashBankP2PLoan` | [`0x41c8…2Be5`](https://sepolia.etherscan.io/address/0x41c8f8eB74A73261D7E2702aE7748EE5753e2Be5#code) |
+| `FlashBankP2PLoan` (boost-enabled) | [`0x56E6…B607`](https://sepolia.etherscan.io/address/0x56E6aCB38ccFb82AC158955e8f7Dd2F59a66B607#code) |
 | `PlaygroundToken` fpUSD (6d) | [`0x4aBb…760c`](https://sepolia.etherscan.io/address/0x4aBb056aA5aB39b55039ACAf795Ff9403Fa9760c#code) |
 | `PlaygroundToken` fpETH (18d) | [`0xB9CC…96F5`](https://sepolia.etherscan.io/address/0xB9CCa9CfE38e583CF1cf456F03946ac6376396F5#code) |
-
-> ⏳ **Boost-enabled redeploy queued.** The `FlashBankP2PLoan` above is the pre-boost build. The
-> boost-enabled version (featured-placement spend + the new fee model) is built, tested (32
-> passing) and ready — it just needs a small Sepolia top-up of the deployer before redeploy.
-> The two faucet tokens are reused across redeploys, so only the P2P address will change.
 
 Try it: open `/flashbank-loan`, switch to Sepolia, hit the faucet to mint test tokens, then
 post or take an offer (offers are pre-seeded, including a couple of boosted ones to show

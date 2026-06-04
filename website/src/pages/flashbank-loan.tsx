@@ -55,7 +55,7 @@ const NETWORKS = {
 		name: 'Sepolia',
 		explorer: 'https://sepolia.etherscan.io',
 		// Public testnet playground — addresses are not secrets. Override via env if redeployed.
-		p2pLoan: process.env.NEXT_PUBLIC_SEPOLIA_P2P_LOAN_ADDRESS || '0x41c8f8eB74A73261D7E2702aE7748EE5753e2Be5',
+		p2pLoan: process.env.NEXT_PUBLIC_SEPOLIA_P2P_LOAN_ADDRESS || '0x56E6aCB38ccFb82AC158955e8f7Dd2F59a66B607',
 		weth: process.env.NEXT_PUBLIC_SEPOLIA_WETH_ADDRESS || '0xdd13E55209Fd76AfE204dBda4007C227904f0a81',
 		isPlayground: true,
 		tokens: [

@@ -2,7 +2,7 @@
 	"network": "sepolia",
 	"chainId": 11155111,
 	"deployer": "0x4F0B3C7fdf5D7C3C7179E1E180b28D23a16fd036",
-	"flashBankP2PLoan": "0x41c8f8eB74A73261D7E2702aE7748EE5753e2Be5",
+	"flashBankP2PLoan": "0x56E6aCB38ccFb82AC158955e8f7Dd2F59a66B607",
 	"protocolFeeBps": 0,
 	"tokens": {
 		"fpUSD": {
@@ -14,6 +14,31 @@
 			"decimals": 18
 		}
 	},
-	"sampleOfferId": 0,
-	"deployedAt": "2026-06-03T19:16:36.845Z"
+	"seededOffers": [
+		{
+			"id": 0,
+			"kind": "lend",
+			"boost": "50",
+			"note": "featured · top boost"
+		},
+		{
+			"id": 1,
+			"kind": "lend",
+			"boost": "15",
+			"note": "featured · smaller boost"
+		},
+		{
+			"id": 2,
+			"kind": "lend",
+			"boost": "0",
+			"note": "plain lend offer"
+		},
+		{
+			"id": 3,
+			"kind": "borrow",
+			"boost": "0",
+			"note": "plain borrow request"
+		}
+	],
+	"deployedAt": "2026-06-04T07:24:12.512Z"
 }

@@ -1,5 +1,6 @@
 require("@nomicfoundation/hardhat-verify");
 require("@nomicfoundation/hardhat-ethers");
+require("@nomicfoundation/hardhat-chai-matchers");
 require("hardhat-contract-sizer");
 require("hardhat-gas-reporter");
 require("dotenv").config();
@@ -56,7 +57,7 @@ module.exports = {
 		url: process.env.SEPOLIA_HTTP_URL || "https://ethereum-sepolia-rpc.publicnode.com",
 		chainId: 11155111,
 		accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-		gasPrice: 2000000000, // 2 gwei for testnet
+		// Let ethers auto-calculate EIP-1559 fees (a fixed 2 gwei stalls when base fee is higher).
 	},
 
     base: {

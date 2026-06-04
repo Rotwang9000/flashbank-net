@@ -1,0 +1,19 @@
+{
+	"network": "sepolia",
+	"chainId": 11155111,
+	"deployer": "0x4F0B3C7fdf5D7C3C7179E1E180b28D23a16fd036",
+	"flashBankP2PLoan": "0x41c8f8eB74A73261D7E2702aE7748EE5753e2Be5",
+	"protocolFeeBps": 0,
+	"tokens": {
+		"fpUSD": {
+			"address": "0x4aBb056aA5aB39b55039ACAf795Ff9403Fa9760c",
+			"decimals": 6
+		},
+		"fpETH": {
+			"address": "0xB9CCa9CfE38e583CF1cf456F03946ac6376396F5",
+			"decimals": 18
+		}
+	},
+	"sampleOfferId": 0,
+	"deployedAt": "2026-06-03T19:16:36.845Z"
+}

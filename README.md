@@ -94,6 +94,59 @@ npx hardhat run scripts/deploy-router.js --network <network>
 
 ---
 
+## 🤝 New: P2P Term Lending (flashbank a loan, peer-to-peer)
+
+> Status: **proposal / first implementation**. Full design in
+> [P2P_LENDING_DESIGN.md](P2P_LENDING_DESIGN.md).
+
+A second product line alongside flash loans: two parties **flashbank a fixed-term,
+collateral-backed loan directly**, with the contract acting only as escrow and timeline
+keeper. No pools, no shared liquidity, no price oracle.
+
+- **Time-only liquidation** — repay `principal + a flat fee` before `maturity + grace`, or
+  the lender claims the collateral. Nothing is priced on-chain, so no oracle is needed.
+- **Flat fee, not interest** — a single fixed fee rather than time-accruing interest (more
+  compatible with faith-based finance that avoids *riba*; **not** a Sharia-certification claim).
+- **Optional, customisable fees, default-off** — an opt-in **interface fee** (lender-paid, only
+  on offers posted through flashbank; `0%` introductory), an optional **boost** that buys
+  featured marketplace placement ranked by spend (an advert, not interest — non-refundable), and
+  a per-offer service fee to any address (insurance/third party). Go direct on the contract and
+  it's **zero commission**.
+- **Tokens are just ERC-20s** — `fpETH`/`fpUSD` are free faucet tokens that exist *only on the
+  testnet playground*. The escrow is token-agnostic, so on mainnet/L2 it uses real assets
+  (WETH, USDC, …); there's nothing flashbank-specific about them.
+
+> ✍️ **Branding rule:** "flashbank" is only ever used as a **verb** (you *flashbank* a loan).
+> We never claim to be a bank, hold deposits, or take custody as a financial institution.
+
+Contract: `contracts/FlashBankP2PLoan.sol` · Tests: `test/FlashBankP2PLoan.test.js` ·
+Deploy: `npx hardhat run scripts/deploy-p2p-loan.js --network <network>`
+
+### 🧪 Live on Sepolia (playground — testnet only, no real value)
+
+A self-serve playground is deployed on the **Sepolia** testnet so anyone can try the whole
+flow end-to-end. All source is **verified on Etherscan** (we're open about this — the repo is
+public, only key material stays in the untracked `.env`). Tokens are free, openly mintable, and
+the interface fee is `0`. **These are unaudited demos; never send real assets.**
+
+| Contract | Address (verified) |
+| --- | --- |
+| `FlashBankP2PLoan` | [`0x41c8…2Be5`](https://sepolia.etherscan.io/address/0x41c8f8eB74A73261D7E2702aE7748EE5753e2Be5#code) |
+| `PlaygroundToken` fpUSD (6d) | [`0x4aBb…760c`](https://sepolia.etherscan.io/address/0x4aBb056aA5aB39b55039ACAf795Ff9403Fa9760c#code) |
+| `PlaygroundToken` fpETH (18d) | [`0xB9CC…96F5`](https://sepolia.etherscan.io/address/0xB9CCa9CfE38e583CF1cf456F03946ac6376396F5#code) |
+
+> ⏳ **Boost-enabled redeploy queued.** The `FlashBankP2PLoan` above is the pre-boost build. The
+> boost-enabled version (featured-placement spend + the new fee model) is built, tested (32
+> passing) and ready — it just needs a small Sepolia top-up of the deployer before redeploy.
+> The two faucet tokens are reused across redeploys, so only the P2P address will change.
+
+Try it: open `/flashbank-loan`, switch to Sepolia, hit the faucet to mint test tokens, then
+post or take an offer (offers are pre-seeded, including a couple of boosted ones to show
+ranking). Redeploy with `npx hardhat run scripts/deploy-playground.js --network sepolia`
+(addresses recorded in `deployments/sepolia-playground.json`).
+
+---
+
 ## 🎯 What is FlashBank?
 
 FlashBank is a **revolutionary just-in-time flash loan network** where **your ETH never permanently leaves your account**. Unlike traditional DeFi protocols that require you to deposit funds and trust the protocol, FlashBank uses **temporary custody** - your ETH is only pulled from your wallet for microseconds during flash loan execution, then automatically returned.

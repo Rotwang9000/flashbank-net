@@ -779,6 +779,13 @@ export default function Home() {
 									<Shield className="h-4 w-4" />
 									Security Audit
 								</a>
+								<a
+									href="/flashbank-loan"
+									className="inline-flex items-center gap-1 bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors"
+								>
+									<Repeat className="h-4 w-4" />
+									Flashbank a loan (P2P)
+								</a>
 							</div>
 						</div>
 					</div>

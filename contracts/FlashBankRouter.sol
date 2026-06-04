@@ -108,6 +108,7 @@ contract FlashBankRouter is Ownable, ReentrancyGuard {
 	event ChangeExecuted(bytes32 indexed changeHash, address indexed executor);
 
 	constructor(address _admin) {
+		require(_admin != address(0), "Invalid admin");
 		admin = _admin;
 		emit AdminUpdated(address(0), _admin);
 	}
@@ -774,10 +775,6 @@ contract FlashBankRouter is Ownable, ReentrancyGuard {
 				totalCommitted[token] = 0;
 			}
 		}
-	}
-
-	function _min(uint256 a, uint256 b) internal pure returns (uint256) {
-		return a < b ? a : b;
 	}
 
 	function _maxBorrowable(

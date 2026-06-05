@@ -50,7 +50,7 @@ async function main() {
 	console.log("Recipient:", recipient);
 
 	// Read router address
-	const envPath = path.join(__dirname, "../website/.env.local");
+	const envPath = path.join(__dirname, "../../website/.env.local");
 	let ROUTER_ADDRESS, WETH_ADDRESS;
 	
 	if (fs.existsSync(envPath)) {

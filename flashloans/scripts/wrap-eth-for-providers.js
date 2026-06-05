@@ -26,7 +26,7 @@ async function main() {
 	console.log("Provider 2:", provider2.address);
 
 	// Read WETH address
-	const envPath = path.join(__dirname, "../website/.env.local");
+	const envPath = path.join(__dirname, "../../website/.env.local");
 	let WETH_ADDRESS = "0xdd13E55209Fd76AfE204dBda4007C227904f0a81";
 	
 	if (fs.existsSync(envPath)) {

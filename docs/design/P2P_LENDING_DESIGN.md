@@ -125,7 +125,7 @@ paid when a loan activates; a listed lender-offer that is cancelled refunds the 
 - **Fee-on-transfer / rebasing tokens are unsupported** — transfers must arrive exactly, or
   the call reverts (keeps agreed terms exact).
 - Solidity `0.8.24`, OpenZeppelin v4 (`Ownable`, `ReentrancyGuard`, `SafeERC20`), tabs,
-  custom errors, basis points — matching `contracts/FlashBankRouter.sol`.
+  custom errors, basis points — matching `flashloans/contracts/FlashBankRouter.sol`.
 - Penalty model for v1 is implicit: **default = collateral forfeiture**. Configurable
   penalties/partial repayment are future work.
 
@@ -140,7 +140,7 @@ paid when a loan activates; a listed lender-offer that is cancelled refunds the 
 
 A self-serve playground is live on Sepolia with all source **verified on Etherscan**. The
 interface fee is `0` (introductory), tokens are openly mintable via a faucet, and offers are
-pre-seeded. Addresses are recorded in `deployments/sepolia-playground.json`:
+pre-seeded. Addresses are recorded in `loans/deployments/sepolia-playground.json`:
 
 | Contract | Address |
 | --- | --- |
@@ -152,7 +152,7 @@ The `PlaygroundToken`s are **reused** across redeploys (their addresses — and 
 stay stable); only the P2P address changes. Seeded offers `#0`/`#1` carry a boost (50/15 fpUSD)
 to demonstrate featured ranking; `#2` is a plain lend offer and `#3` a plain borrow request.
 
-Redeploy: `npx hardhat run scripts/deploy-playground.js --network sepolia`, then
+Redeploy: `cd loans && npx hardhat run scripts/deploy-playground.js --network sepolia`, then
 `npx hardhat verify --network sepolia <address> <constructor args>` (the deploy script prints
 the exact verify commands). The website bakes these as defaults for chain `11155111`, overridable
 via `NEXT_PUBLIC_SEPOLIA_P2P_LOAN_ADDRESS` / `_FPUSD_ADDRESS` / `_FPETH_ADDRESS`.
@@ -166,12 +166,12 @@ via `NEXT_PUBLIC_SEPOLIA_P2P_LOAN_ADDRESS` / `_FPUSD_ADDRESS` / `_FPETH_ADDRESS`
 
 ## Artifacts in this change
 
-- `contracts/FlashBankP2PLoan.sol` — the escrow/marketplace contract.
-- `contracts/PlaygroundToken.sol` — freely-mintable faucet ERC-20 for testnet playgrounds.
-- `test/FlashBankP2PLoan.test.js` — 32 unit tests (happy path, default, cancel, both offer
+- `loans/contracts/FlashBankP2PLoan.sol` — the escrow/marketplace contract.
+- `loans/contracts/PlaygroundToken.sol` — freely-mintable faucet ERC-20 for testnet playgrounds.
+- `loans/test/FlashBankP2PLoan.test.js` — 32 unit tests (happy path, default, cancel, both offer
   directions, fees, **featured boost**, edge cases, reentrancy, randomised fund-conservation fuzzing).
-- `scripts/deploy-p2p-loan.js` — generic deploy script.
-- `scripts/deploy-playground.js` — Sepolia playground deploy (P2P + reused faucet tokens + a
+- `loans/scripts/deploy-p2p-loan.js` — generic deploy script.
+- `loans/scripts/deploy-playground.js` — Sepolia playground deploy (P2P + reused faucet tokens + a
   spread of seeded offers, including boosted ones to show ranking).
 - `website/src/pages/flashbank-loan.tsx` — the marketplace UI (Browse / Flashbank a loan / Your
   loans / How it works) with the Sepolia playground.

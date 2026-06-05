@@ -30,19 +30,27 @@ This project handles real user funds. All contributions must prioritise security
 ### Setup Development Environment
 
 ```bash
-git clone https://github.com/flashbank-net/flashbank
-cd flashbank
-npm install
+git clone https://github.com/Rotwang9000/flashbank-net
+cd flashbank-net
+npm install            # installs the shared toolchain for both features
 ```
+
+The repo is split into self-contained features — [`flashloans/`](flashloans) (the router) and
+[`loans/`](loans) (P2P term loans) — that share [`common/`](common). Run Hardhat commands from inside
+the feature you're working on.
 
 ### Run Tests
 
 ```bash
-# Run all tests
+# Run both features' suites
 npm test
 
-# Run security tests specifically
-npx hardhat test test/SecurityTests.test.js
+# A single feature
+npm run test:flashloans
+npm run test:loans
+
+# Security tests specifically (router feature)
+cd flashloans && npx hardhat test test/SecurityTests.test.js
 
 # Run with gas reporting
 REPORT_GAS=true npm test
@@ -51,11 +59,11 @@ REPORT_GAS=true npm test
 ### Local Development
 
 ```bash
-# Start local hardhat network
-npx hardhat node
+# Start a local hardhat network (from a feature dir)
+cd flashloans && npx hardhat node
 
 # Deploy contracts locally
-npx hardhat run scripts/deploy-immutable.js --network localhost
+cd flashloans && npx hardhat run scripts/deploy-router.js --network localhost
 
 # Start website development server
 cd website && npm run dev

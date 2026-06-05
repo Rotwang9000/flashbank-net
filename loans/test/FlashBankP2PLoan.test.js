@@ -41,10 +41,13 @@ describe("FlashBankP2PLoan", () => {
 	beforeEach(async () => {
 		[owner, lender, borrower, feeCollector, insurer, stranger] = await ethers.getSigners();
 
-		const Token = await ethers.getContractFactory("MockWETH");
-		principal = await Token.deploy();
+		// Plain ERC-20s for principal and collateral. PlaygroundToken ships with the
+		// loans feature (its testnet faucet token) and exposes mint(to, amount), so the
+		// suite has no dependency on any other feature's mocks.
+		const Token = await ethers.getContractFactory("PlaygroundToken");
+		principal = await Token.deploy("Test Principal", "tPRIN", 18);
 		await principal.waitForDeployment();
-		collateral = await Token.deploy();
+		collateral = await Token.deploy("Test Collateral", "tCOLL", 18);
 		await collateral.waitForDeployment();
 		principalAddr = await principal.getAddress();
 		collateralAddr = await collateral.getAddress();

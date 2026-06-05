@@ -22,7 +22,7 @@ async function main() {
 	console.log("Note: Using demo borrower contract to execute flash loans");
 
 	// Read addresses from website/.env.local
-	const envPath = path.join(__dirname, "../website/.env.local");
+	const envPath = path.join(__dirname, "../../website/.env.local");
 	let ROUTER_ADDRESS, WETH_ADDRESS, DEMO_BORROWER_ADDRESS;
 	
 	if (fs.existsSync(envPath)) {

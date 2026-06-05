@@ -32,7 +32,7 @@ async function main() {
 	const provider2 = new ethers.Wallet(provider2Key, provider);
 
 	// Read addresses
-	const envPath = path.join(__dirname, "../website/.env.local");
+	const envPath = path.join(__dirname, "../../website/.env.local");
 	let ROUTER_ADDRESS, WETH_ADDRESS;
 	
 	if (fs.existsSync(envPath)) {

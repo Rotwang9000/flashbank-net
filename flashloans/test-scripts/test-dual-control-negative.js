@@ -18,7 +18,7 @@ async function main() {
 	console.log("\n=== Dual-Control Negative Tests ===\n");
 
 	// Load environment
-	const envPath = path.join(__dirname, "../website/.env.local");
+	const envPath = path.join(__dirname, "../../website/.env.local");
 	if (!fs.existsSync(envPath)) {
 		console.error("Error: website/.env.local not found");
 		process.exit(1);

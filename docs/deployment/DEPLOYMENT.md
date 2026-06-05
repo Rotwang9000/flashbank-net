@@ -2,6 +2,12 @@
 
 This guide explains how to deploy FlashBank.net contracts to Arbitrum mainnet and testnet networks.
 
+> **Repository layout note.** Since the repo was split into self-contained features, the flash-loan
+> contracts and scripts referenced below live under [`flashloans/`](../../flashloans). Run the
+> `npx hardhat …` commands from inside that directory (e.g. `cd flashloans && npx hardhat run
+> scripts/deploy-router.js --network sepolia`). The P2P term-loan equivalents live under
+> [`loans/`](../../loans). The repository-root `.env` is shared by both.
+
 ## ⚠️ Security Warning
 
 **NEVER commit private keys or sensitive data to version control!**

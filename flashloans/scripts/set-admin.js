@@ -16,7 +16,7 @@ async function main() {
 	console.log("Signer:", signer.address);
 	console.log("New admin:", NEW_ADMIN);
 
-	const envPath = path.join(__dirname, "../website/.env.local");
+	const envPath = path.join(__dirname, "../../website/.env.local");
 	let ROUTER_ADDRESS;
 
 	if (fs.existsSync(envPath)) {

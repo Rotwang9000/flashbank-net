@@ -42,7 +42,7 @@ async function main() {
 	console.log("Borrower 2:", borrower2.address);
 
 	// Read addresses
-	const envPath = path.join(__dirname, "../website/.env.local");
+	const envPath = path.join(__dirname, "../../website/.env.local");
 	let ROUTER_ADDRESS, WETH_ADDRESS;
 	
 	if (fs.existsSync(envPath)) {

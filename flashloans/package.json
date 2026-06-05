@@ -1,0 +1,23 @@
+{
+	"name": "@flashbank/flashloans",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Zero-risk flash-loan router with transparent, dual-controlled profit sharing.",
+	"scripts": {
+		"compile": "hardhat compile",
+		"test": "hardhat test",
+		"size": "hardhat size-contracts",
+		"deploy:router": "hardhat run scripts/deploy-router.js --network sepolia",
+		"deploy:demo-borrower": "hardhat run scripts/deploy-demo-borrower.js --network sepolia",
+		"verify": "hardhat verify"
+	},
+	"keywords": [
+		"defi",
+		"flash-loans",
+		"mev",
+		"arbitrum",
+		"base",
+		"router"
+	],
+	"license": "MIT"
+}

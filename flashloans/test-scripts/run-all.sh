@@ -4,20 +4,28 @@ set -euo pipefail
 
 NETWORK="${1:-sepolia}"
 
+# Resolve paths relative to this script so it works from any working directory.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # flashloans/test-scripts
+FEATURE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"                # flashloans
+ROOT_DIR="$(cd "$FEATURE_DIR/.." && pwd)"                  # repository root
+
+# Hardhat must run from the feature directory (that is where hardhat.config.js lives).
+cd "$FEATURE_DIR"
+
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "FlashBank Test Suite"
 echo "Network: $NETWORK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# Check prerequisites
-if [ ! -f ".env" ]; then
-	echo "❌ Error: .env file not found"
+# Check prerequisites (.env and website/.env.local live at the repository root).
+if [ ! -f "$ROOT_DIR/.env" ]; then
+	echo "❌ Error: .env file not found at repository root"
 	echo "Please create .env with required keys (see test-scripts/README.md)"
 	exit 1
 fi
 
-if [ ! -f "website/.env.local" ]; then
+if [ ! -f "$ROOT_DIR/website/.env.local" ]; then
 	echo "❌ Error: website/.env.local not found"
 	echo "Please deploy contracts first"
 	exit 1
@@ -25,7 +33,7 @@ fi
 
 # Load .env to check for required keys
 set -a
-source .env
+source "$ROOT_DIR/.env"
 set +a
 
 if [ -z "${PRIVATE_KEY:-}" ]; then

@@ -3,7 +3,9 @@
 Reference material for the two FlashBank products — the **flash-loan Router** and the
 **peer-to-peer term Loans** escrow — plus the website and operational runbooks.
 
-Start with the [project README](../README.md) for the high-level overview and live addresses.
+Start with the [project README](../README.md) for the high-level overview and live addresses. Each
+feature is self-contained and has its own README: [`flashloans/`](../flashloans/README.md) and
+[`loans/`](../loans/README.md).
 
 ## Architecture
 
@@ -19,6 +21,7 @@ Start with the [project README](../README.md) for the high-level overview and li
 ## P2P term lending
 
 - [P2P lending design](design/P2P_LENDING_DESIGN.md)
+- [Lorrow standard compatibility](design/LORROW_COMPATIBILITY.md)
 
 ## Security
 

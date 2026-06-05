@@ -1,0 +1,21 @@
+{
+	"name": "@flashbank/loans",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Peer-to-peer, fixed-term, collateral-backed loans with time-only liquidation and a flat fee.",
+	"scripts": {
+		"compile": "hardhat compile",
+		"test": "hardhat test",
+		"size": "hardhat size-contracts",
+		"deploy:playground": "hardhat run scripts/deploy-playground.js --network sepolia",
+		"deploy:p2p": "hardhat run scripts/deploy-p2p-loan.js --network sepolia"
+	},
+	"keywords": [
+		"defi",
+		"p2p-lending",
+		"fixed-term",
+		"collateral",
+		"sharia-compatible"
+	],
+	"license": "MIT"
+}

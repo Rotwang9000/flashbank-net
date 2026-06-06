@@ -126,14 +126,23 @@ paid when a loan activates; a listed lender-offer that is cancelled refunds the 
   the call reverts (keeps agreed terms exact).
 - Solidity `0.8.24`, OpenZeppelin v4 (`Ownable`, `ReentrancyGuard`, `SafeERC20`), tabs,
   custom errors, basis points — matching `flashloans/contracts/FlashBankRouter.sol`.
-- Penalty model for v1 is implicit: **default = collateral forfeiture**. Configurable
-  penalties/partial repayment are future work.
+- Default handling has two modes, chosen per offer via `settlementValue` (the agreed worth of the
+  whole collateral in principal-token units, frozen at origination — **not** an oracle):
+  - `settlementValue == 0` → **full forfeit** (pledge/pawn style): the lender takes all collateral.
+  - `settlementValue > 0` → **surplus return**: the lender keeps only the collateral covering
+    `principal + repaymentFee` (`collateral * debt / settlementValue`, rounded in the borrower's
+    favour) and the surplus returns to the borrower. If the agreed value does not even cover the
+    debt, the lender takes everything and absorbs the shortfall. See
+    [LORROW_COMPATIBILITY.md](LORROW_COMPATIBILITY.md) (Option B).
+- Configurable penalties / partial repayment remain future work.
 
 ## Risks to surface in the UI
 
 - **Collateral can fall below the loan during the term** (no liquidation until maturity).
   Lenders mitigate by over-collateralising and keeping terms short. This is the lender's risk.
-- **Borrowers can lose collateral worth more than the loan** if they fail to repay on time.
+- **On default the borrower forfeits collateral.** With a `settlementValue` set they recover any
+  surplus beyond `principal + repaymentFee`; with it unset (`0`) they forfeit the whole collateral,
+  which can be worth more than the loan — show this clearly before they post or take an offer.
 - Smart-contract risk, token risk (malicious/rug tokens chosen by a counterparty).
 
 ## Deployed playground (Sepolia testnet — no real value)
@@ -144,7 +153,7 @@ pre-seeded. Addresses are recorded in `loans/deployments/sepolia-playground.json
 
 | Contract | Address |
 | --- | --- |
-| `FlashBankP2PLoan` (boost-enabled) | `0x56E6aCB38ccFb82AC158955e8f7Dd2F59a66B607` |
+| `FlashBankP2PLoan` (boost + surplus-return) | `0x990fc07f704e287dEB309B05420C6b19847145dA` |
 | `PlaygroundToken` fpUSD (6 decimals) | `0x4aBb056aA5aB39b55039ACAf795Ff9403Fa9760c` |
 | `PlaygroundToken` fpETH (18 decimals) | `0xB9CCa9CfE38e583CF1cf456F03946ac6376396F5` |
 

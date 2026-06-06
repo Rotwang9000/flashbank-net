@@ -17,13 +17,17 @@ escrow, no pools, no protocol-set rates, immutable terms, a dual order book and 
 **Lorrow Core, as written, mandates three things that directly collide with our two intents**: an
 oracle-priced `breach_threshold`, an `interest_rate`, and **mandatory surplus return at default**.
 
-So today we are **Lorrow-*spirited*, not Lorrow-*compatible*** in the strict sense the spec defines, and
-becoming strictly compatible would mean adding an oracle and giving up the flat-fee framing — i.e. losing
-the core intents. What we *can* do without losing them is adopt Lorrow's **common grammar** (variable
-names, lifecycle states, events) and **publish an Implementation Profile**, then propose to WHYSIDEAS a
-small Core extension that recognises a *time-settled, flat-fee* profile. One genuinely promising bridge —
-**a pre-agreed settlement price fixed at origination** — would even let us honour Lorrow's surplus-return
-guardrail with *no oracle at all* (see [Option B](#option-b--add-surplus-return-without-an-oracle)).
+So out of the box we are **Lorrow-*spirited*, not Lorrow-*compatible*** in the strict sense the spec
+defines, and becoming strictly compatible would mean adding an oracle and giving up the flat-fee framing —
+i.e. losing the core intents. What we *can* do without losing them is adopt Lorrow's **common grammar**
+(variable names, lifecycle states, events) and **publish an Implementation Profile**, then propose to
+WHYSIDEAS a small Core extension that recognises a *time-settled, flat-fee* profile.
+
+**Update — [Option B](#option-b--add-surplus-return-without-an-oracle) is now implemented.** Lorrow's
+surplus-return guardrail is honoured **with no oracle at all** via an optional `settlementValue` (the
+agreed worth of the whole collateral in loan-asset terms, frozen at origination). It is opt-in: set it and
+a defaulting borrower recovers any surplus beyond `principal + repaymentFee`; leave it `0` and the original
+full-forfeit pledge still applies. This closes the only Core *guardrail* we were breaching.
 
 ## Where we already align
 
@@ -43,16 +47,17 @@ guardrail with *no oracle at all* (see [Option B](#option-b--add-surplus-return-
 | --- | --- | --- |
 | `breach_threshold` ≥ 110%, oracle-priced, with `reportBreach`/`checkRecovery` and a breach window | **None.** No oracle, no breach state | Core intent #1. Oracles are the main attack surface and complexity in collateralized lending; time-only settlement removes them entirely. |
 | `interest_rate`, 0–36% APR | Flat `repaymentFee` | Core intent #2. A fixed fee, not a rate. (Note: a small flat fee on a short term can *annualise* well above 36% — see below.) |
-| **Surplus Return at default (mandatory guardrail)** | `claimDefault` sends the **whole** collateral to the lender | Without a price you cannot compute "debt portion vs surplus". Our instrument is a fixed-term **pledge/pawn**: the borrower knows the exact deal up front (repay by the deadline or forfeit the pledged asset). |
+| **Surplus Return at default (mandatory guardrail)** | ✅ **now honoured** via an opt-in `settlementValue` (Option B). With it set, `claimDefault` returns the surplus to the borrower; left `0`, the lender takes the whole collateral (the original pledge/pawn). | Surplus return needs a *valuation*. Rather than a live oracle we use a price/value **agreed at origination and frozen** — satisfying the guardrail while keeping intent #1 (no oracle). |
 | `loan_term` from a fixed set (14d/30d/60d/90d/12m/18m) | Arbitrary `duration` (seconds, ≤ 365d) | We let the two parties pick any term. |
 | `repayment_structure` ∈ {LUMP, INSTALLMENT, BALLOON} | LUMP only (principal + fee at maturity) | Simplicity; matches the flat-fee model. |
 | Standardized variable set, **no custom fields** | Adds `allowedTaker`, `listed`, `boost`, `serviceFee` | Private offers and an opt-in marketplace/fee model. |
 
 The honest crux: **surplus return is a Lorrow Core *guardrail*** — it calls seizing surplus "the single
-most predatory move in collateralized lending." Our full-forfeit-on-time model is a legitimate, fully
-**disclosed** instrument (no oracle games, no margin calls, no liquidation cascades — the borrower knows
-the precise terms at origination), but it is **not** what Lorrow Core permits. Compatibility cannot be
-claimed by relabelling; it has to be earned by honouring the guardrails.
+most predatory move in collateralized lending." We now honour it (Option B): with a `settlementValue` set,
+a defaulting borrower recovers the surplus beyond the debt. The full-forfeit pledge remains available
+(`settlementValue == 0`) as a legitimate, fully **disclosed** instrument for parties who explicitly want
+it — but surplus return is the guardrail-respecting default we point users toward. Compatibility cannot be
+claimed by relabelling; it has to be earned by honouring the guardrails, which on this point we now do.
 
 ### The interest-ceiling subtlety
 
@@ -84,7 +89,7 @@ divergence.
 | POSTED | `Open` | |
 | ACTIVE | `Active` | |
 | BREACHED | — | no oracle/breach |
-| DEFAULTED | `Defaulted` | but full forfeit, no surplus |
+| DEFAULTED | `Defaulted` | surplus returned when `settlementValue` set; full forfeit when `0` |
 | COMPLETED | `Repaid` | |
 | EXPIRED | `Cancelled` (+ `offerExpiry`) | |
 
@@ -101,8 +106,9 @@ divergence.
 | `LoanCreated`, `LoanDefaulted`, … | `LoanCreated`, `LoanRepaid`, `LoanDefaulted`, `LoanCancelled`, `OfferBoosted` | naming is close but not identical |
 
 Notably, Lorrow's `executeDefault` already supports a **purely time-based "maturity default"** path
-(default after the maturity grace period, no breach needed). That path is exactly our model — so our
-settlement is a *subset* of Lorrow's, minus the surplus return.
+(default after the maturity grace period, no breach needed). That path is exactly our model — and with
+Option B's surplus return now implemented, our `claimDefault` matches that path *including* the surplus
+guardrail, differing only in *how* the collateral is valued (a frozen agreed value, not a live oracle).
 
 ## Can we be compatible without losing the core intents?
 
@@ -119,20 +125,30 @@ Keep the contract and both intents exactly as they are, and add **legibility**:
 
 Cost: documentation + optional event/field renames. No change to mechanics, no oracle, no interest.
 
-### Option B — Add surplus return *without* an oracle
+### Option B — Add surplus return *without* an oracle ✅ **IMPLEMENTED**
 
-The only Core *guardrail* we breach is surplus return, and the reason we breach it is that surplus needs a
-**valuation**. An oracle is one source of valuation — but a **settlement price agreed by both parties at
-origination and stored immutably** is another, and it needs no oracle. With an optional
-`settlementPrice` (collateral priced in principal terms, fixed at creation), `claimDefault` could:
+The only Core *guardrail* we breached was surplus return, and the reason was that surplus needs a
+**valuation**. An oracle is one source of valuation — but a **value agreed by both parties at origination
+and stored immutably** is another, and it needs no oracle.
 
-1. value the collateral at the agreed price,
-2. transfer only `principal + repaymentFee` worth to the lender,
-3. return the surplus collateral to the borrower.
+Each offer now carries an optional `uint256 settlementValue`: the agreed worth of the **whole** pledged
+collateral, denominated in the principal (loan) token, frozen at `createLoan`. On default `claimDefault`
+splits the collateral (see `_splitCollateralOnDefault`):
 
-This honours the anti-predation guardrail **and** keeps intent #1 (no oracle — the price is a fixed term,
+1. `settlementValue == 0` → **full forfeit**: the lender takes all collateral (the original pledge/pawn).
+2. `settlementValue <= principal + repaymentFee` → the agreed value does not even cover the debt, so the
+   lender takes everything and **absorbs the shortfall** (Lorrow: "lender is made whole, not enriched").
+3. otherwise → the lender keeps `collateral * debt / settlementValue` (the debt's share, rounded down in
+   the borrower's favour via `Math.mulDiv`) and the **surplus returns to the borrower**.
+
+Working in the principal token's units means the principal decimals cancel in `debt / settlementValue`, so
+the split is correct for any token-decimal combination with **no oracle and no per-unit price**. A
+same-asset loan (e.g. ETH collateral for an ETH loan) needs no price at all — just set
+`settlementValue` to the collateral amount (a 1:1 value). The `quoteDefault(id)` view previews the split.
+
+This honours the anti-predation guardrail **and** keeps intent #1 (no oracle — the value is a fixed term,
 not a live feed). It is opt-in, so the pure pledge/forfeit product still exists for those who want it.
-This is the most promising "made compatible without losing intent" path and is worth prototyping.
+Covered by unit tests in `loans/test/FlashBankP2PLoan.test.js` ("Surplus return on default").
 
 ### Option C — Propose a Core profile to WHYSIDEAS
 
@@ -167,7 +183,7 @@ Published here so the claim is verifiable. Fields outside Core's accommodation a
 | Interest rate range | **[variant]** None — a flat `repaymentFee` instead of an APR |
 | Oracle provider | **[variant]** None — settlement is time-only |
 | Oracle fallback / failure behaviour | N/A (no oracle) |
-| Default settlement method | **[variant]** Time-based: after `maturity + grace`, lender claims the full collateral (no surplus return in v1; see Option B) |
+| Default settlement method | **[variant]** Time-based: after `maturity + grace` the lender calls `claimDefault`. With a per-offer `settlementValue` set, **surplus is returned to the borrower** (Core guardrail honoured, no oracle); with `settlementValue == 0`, the lender claims the full collateral (pledge/forfeit) |
 | Liquidation method | None — no liquidations, only deadline-based default |
 | Maturity grace period | Configurable `gracePeriod` (≤ 90 days; **no Core 3-day minimum enforced** — **[variant]**) |
 | Breach window policy | N/A (no breach state) |
@@ -180,6 +196,8 @@ Published here so the claim is verifiable. Fields outside Core's accommodation a
 
 ## Recommendation
 
-Do **Option A now** (adopt the grammar + publish this Profile — no loss of intent), prototype **Option B**
-(agreed settlement price → surplus return with no oracle), and open **Option C** with WHYSIDEAS. That path
-maximises interoperability and honesty while keeping time-only settlement and the flat fee fully intact.
+**Option B is now implemented** (agreed settlement value → surplus return with no oracle), closing the one
+Core guardrail we were breaching. Remaining work: do **Option A** (adopt the grammar + publish this Profile
+— no loss of intent) and open **Option C** with WHYSIDEAS to recognise a time-settled, flat-fee profile.
+That path maximises interoperability and honesty while keeping time-only settlement and the flat fee fully
+intact.

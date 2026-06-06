@@ -13,6 +13,10 @@ This directory is a **self-contained Hardhat project**. It shares nothing with
 - **Time-only settlement.** Repay `principal + a flat fee` before `maturity + grace`, or the lender
   claims the collateral. Nothing is priced on-chain, so **no oracle is needed** and there is no
   liquidation bot to watch.
+- **Optional surplus return (no oracle).** Each offer carries an optional `settlementValue` — the worth
+  of the whole collateral in loan-asset terms, agreed and frozen at origination. Set it and a defaulting
+  borrower forfeits only the collateral covering `principal + fee`, getting the surplus back; leave it `0`
+  for a pure pledge/forfeit. See [Lorrow compatibility](../docs/design/LORROW_COMPATIBILITY.md).
 - **Flat fee, not interest.** A single fixed fee, not time-accruing interest — friendlier to
   faith-based finance that avoids *riba* (not a certification claim).
 - **Genuinely P2P.** No pools, no shared liquidity, no protocol-set rates. Go direct on the contract

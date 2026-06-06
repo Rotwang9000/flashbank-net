@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @title FlashBankP2PLoan
@@ -17,6 +18,11 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
  *      - Liquidation is purely time-based. Repay `principal + repaymentFee` before
  *        `maturity + gracePeriod` to redeem collateral; otherwise the lender claims it.
  *        No prices are read on-chain, so no oracle is required.
+ *      - Optional surplus return: each offer carries a `settlementValue` (the worth of the whole
+ *        collateral expressed in the principal token, agreed and frozen at origination — NOT an
+ *        oracle). When set, a defaulting borrower forfeits only the collateral that covers
+ *        `principal + repaymentFee`; the surplus returns to them. Left at `0`, the lender takes
+ *        all collateral (a pure pledge/forfeit).
  *      - The borrower's cost is a single flat `repaymentFee`, not time-accruing interest.
  *      - Three optional fee sinks, all default-off, so a direct P2P loan pays no commission:
  *          * interface/listing fee (bps of principal, paid by the lender) charged only when
@@ -69,6 +75,7 @@ contract FlashBankP2PLoan is Ownable, ReentrancyGuard {
 		uint64 startTime;            // activation timestamp (0 until taken)
 		bool listed;                 // opt-in to the interface/listing fee
 		uint256 boost;               // featured-placement spend (principal token), non-refundable
+		uint256 settlementValue;     // agreed worth of ALL collateral in principal-token units (0 = full forfeit on default)
 	}
 
 	/// @dev Calldata bundle for {createLoan} to keep the signature readable.
@@ -87,6 +94,7 @@ contract FlashBankP2PLoan is Ownable, ReentrancyGuard {
 		address serviceFeeRecipient;
 		uint256 serviceFee;
 		uint256 boost;
+		uint256 settlementValue;
 	}
 
 	uint256 public loanCount;
@@ -131,7 +139,12 @@ contract FlashBankP2PLoan is Ownable, ReentrancyGuard {
 	event OfferBoosted(uint256 indexed id, address indexed payer, uint256 amount);
 	event LoanActivated(uint256 indexed id, address indexed taker, uint64 startTime, uint256 maturity);
 	event LoanRepaid(uint256 indexed id, address indexed borrower, address indexed lender, uint256 amountRepaid);
-	event LoanDefaulted(uint256 indexed id, address indexed lender, uint256 collateralClaimed);
+	event LoanDefaulted(
+		uint256 indexed id,
+		address indexed lender,
+		uint256 collateralToLender,
+		uint256 surplusToBorrower
+	);
 	event LoanCancelled(uint256 indexed id, address indexed creator);
 
 	constructor(address _protocolFeeRecipient, uint16 _protocolFeeBps) {
@@ -203,6 +216,7 @@ contract FlashBankP2PLoan is Ownable, ReentrancyGuard {
 		loan.offerExpiry = p.offerExpiry;
 		loan.listed = p.listed;
 		loan.boost = p.boost;
+		loan.settlementValue = p.settlementValue;
 
 		userLoans[msg.sender].push(id);
 
@@ -290,19 +304,28 @@ contract FlashBankP2PLoan is Ownable, ReentrancyGuard {
 
 	/**
 	 * @notice After the repay window closes on an unpaid loan, the lender claims collateral.
+	 * @dev If the offer set a `settlementValue`, the lender keeps only the collateral covering
+	 *      `principal + repaymentFee` (valued at that agreed, frozen rate — no oracle) and the
+	 *      surplus is returned to the borrower. With `settlementValue == 0` the lender takes all.
 	 */
 	function claimDefault(uint256 id) external nonReentrant {
 		Loan storage loan = loans[id];
 		if (loan.status != Status.Active) revert LoanNotActive();
 
 		address lender = loan.creatorIsLender ? loan.creator : loan.taker;
+		address borrower = loan.creatorIsLender ? loan.taker : loan.creator;
 		if (msg.sender != lender) revert NotLender();
 		if (block.timestamp <= _defaultDeadline(loan)) revert NotYetDefaultable();
 
 		loan.status = Status.Defaulted;
-		_send(loan.collateralToken, lender, loan.collateral);
 
-		emit LoanDefaulted(id, lender, loan.collateral);
+		(uint256 toLender, uint256 toBorrower) = _splitCollateralOnDefault(loan);
+		_send(loan.collateralToken, lender, toLender);
+		if (toBorrower > 0) {
+			_send(loan.collateralToken, borrower, toBorrower);
+		}
+
+		emit LoanDefaulted(id, lender, toLender, toBorrower);
 	}
 
 	/**
@@ -330,6 +353,12 @@ contract FlashBankP2PLoan is Ownable, ReentrancyGuard {
 
 	function getLoan(uint256 id) external view returns (Loan memory) {
 		return loans[id];
+	}
+
+	/// @notice Preview how the collateral would split on default: collateral to the lender and
+	///         surplus returned to the borrower (both 0/whole when `settlementValue` is unset).
+	function quoteDefault(uint256 id) external view returns (uint256 toLender, uint256 toBorrower) {
+		return _splitCollateralOnDefault(loans[id]);
 	}
 
 	/// @notice The lender and borrower of a loan (taker is zero while the offer is Open).
@@ -416,6 +445,33 @@ contract FlashBankP2PLoan is Ownable, ReentrancyGuard {
 
 	function _defaultDeadline(Loan storage loan) internal view returns (uint256) {
 		return uint256(loan.startTime) + loan.duration + loan.gracePeriod;
+	}
+
+	/**
+	 * @dev Split the collateral at default between lender and borrower.
+	 *      - `settlementValue == 0`: pure forfeit, the lender takes everything.
+	 *      - agreed value at or below the debt: the collateral does not even cover what is owed, so
+	 *        the lender takes everything and absorbs the shortfall (lender's risk, as priced in).
+	 *      - agreed value above the debt: the lender keeps the debt's share of the collateral
+	 *        (`collateral * debt / settlementValue`, rounded down in the borrower's favour) and the
+	 *        remainder returns to the borrower.
+	 *      `settlementValue` is a fixed term agreed at origination; no price is read on-chain.
+	 */
+	function _splitCollateralOnDefault(Loan storage loan)
+		internal
+		view
+		returns (uint256 toLender, uint256 toBorrower)
+	{
+		uint256 collateral = loan.collateral;
+		uint256 settlementValue = loan.settlementValue;
+		uint256 debt = loan.principal + loan.repaymentFee;
+
+		if (settlementValue == 0 || settlementValue <= debt) {
+			return (collateral, 0);
+		}
+
+		toLender = Math.mulDiv(collateral, debt, settlementValue);
+		toBorrower = collateral - toLender;
 	}
 
 	/// @dev Pull `amount` and require it to arrive exactly (rejects fee-on-transfer tokens).

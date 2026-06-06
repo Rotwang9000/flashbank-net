@@ -57,7 +57,7 @@ const NETWORKS = {
 		name: 'Sepolia',
 		explorer: 'https://sepolia.etherscan.io',
 		// Public testnet playground — addresses are not secrets. Override via env if redeployed.
-		p2pLoan: process.env.NEXT_PUBLIC_SEPOLIA_P2P_LOAN_ADDRESS || '0x56E6aCB38ccFb82AC158955e8f7Dd2F59a66B607',
+		p2pLoan: process.env.NEXT_PUBLIC_SEPOLIA_P2P_LOAN_ADDRESS || '0x990fc07f704e287dEB309B05420C6b19847145dA',
 		weth: process.env.NEXT_PUBLIC_SEPOLIA_WETH_ADDRESS || '0xdd13E55209Fd76AfE204dBda4007C227904f0a81',
 		isPlayground: true,
 		tokens: [
@@ -109,7 +109,8 @@ const LOAN_COMPONENTS = [
 	{ internalType: 'uint64', name: 'offerExpiry', type: 'uint64' },
 	{ internalType: 'uint64', name: 'startTime', type: 'uint64' },
 	{ internalType: 'bool', name: 'listed', type: 'bool' },
-	{ internalType: 'uint256', name: 'boost', type: 'uint256' }
+	{ internalType: 'uint256', name: 'boost', type: 'uint256' },
+	{ internalType: 'uint256', name: 'settlementValue', type: 'uint256' }
 ] as const;
 
 const P2P_ABI = [
@@ -129,7 +130,8 @@ const P2P_ABI = [
 				{ internalType: 'bool', name: 'listed', type: 'bool' },
 				{ internalType: 'address', name: 'serviceFeeRecipient', type: 'address' },
 				{ internalType: 'uint256', name: 'serviceFee', type: 'uint256' },
-				{ internalType: 'uint256', name: 'boost', type: 'uint256' }
+				{ internalType: 'uint256', name: 'boost', type: 'uint256' },
+				{ internalType: 'uint256', name: 'settlementValue', type: 'uint256' }
 			], internalType: 'struct FlashBankP2PLoan.LoanParams', name: 'p', type: 'tuple'
 		}],
 		name: 'createLoan', outputs: [{ internalType: 'uint256', name: 'id', type: 'uint256' }], stateMutability: 'nonpayable', type: 'function'
@@ -148,7 +150,8 @@ const P2P_ABI = [
 		inputs: [{ internalType: 'uint256', name: 'id', type: 'uint256' }],
 		name: 'quoteTake', outputs: [{ internalType: 'address', name: 'token', type: 'address' }, { internalType: 'uint256', name: 'amount', type: 'uint256' }], stateMutability: 'view', type: 'function'
 	},
-	{ inputs: [{ internalType: 'uint256', name: 'id', type: 'uint256' }], name: 'quoteRepayment', outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }], stateMutability: 'view', type: 'function' }
+	{ inputs: [{ internalType: 'uint256', name: 'id', type: 'uint256' }], name: 'quoteRepayment', outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }], stateMutability: 'view', type: 'function' },
+	{ inputs: [{ internalType: 'uint256', name: 'id', type: 'uint256' }], name: 'quoteDefault', outputs: [{ internalType: 'uint256', name: 'toLender', type: 'uint256' }, { internalType: 'uint256', name: 'toBorrower', type: 'uint256' }], stateMutability: 'view', type: 'function' }
 ] as const;
 
 const ERC20_ABI = [
@@ -168,12 +171,22 @@ type LoanView = {
 	status: number; principalToken: string; collateralToken: string; principal: bigint; collateral: bigint;
 	repaymentFee: bigint; protocolFee: bigint; serviceFeeRecipient: string; serviceFee: bigint;
 	duration: bigint; gracePeriod: bigint; offerExpiry: bigint; startTime: bigint; listed: boolean; boost: bigint;
+	settlementValue: bigint;
 };
 
 type TokenMeta = { symbol: string; decimals: number };
 type TokenInfo = { symbol: string; name: string; address: string; decimals: number; kind: string };
 
 const formatAddress = (addr?: string | null) => (addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : '');
+
+// Mirror of FlashBankP2PLoan._splitCollateralOnDefault: with no agreed settlement value (0) or one
+// that doesn't cover the debt, the lender takes everything; otherwise the lender keeps the debt's
+// share and the borrower reclaims the surplus. JS bigint division floors exactly like Math.mulDiv here.
+function splitOnDefault(collateral: bigint, debt: bigint, settlementValue: bigint): { toLender: bigint; toBorrower: bigint } {
+	if (settlementValue === 0n || settlementValue <= debt) return { toLender: collateral, toBorrower: 0n };
+	const toLender = (collateral * debt) / settlementValue;
+	return { toLender, toBorrower: collateral - toLender };
+}
 
 const isAddr = (value: string) => {
 	try { return ethers.isAddress(value); } catch { return false; }
@@ -246,6 +259,10 @@ export default function FlashbankLoan() {
 	const [serviceRecipient, setServiceRecipient] = useState('');
 	const [serviceFee, setServiceFee] = useState('');
 	const [allowedTaker, setAllowedTaker] = useState('');
+	// Optional surplus return on default (Lorrow-style, no oracle): the borrower reclaims any
+	// collateral worth more than the debt, valued at a price agreed now and frozen on-chain.
+	const [returnSurplus, setReturnSurplus] = useState(false);
+	const [settlementPrice, setSettlementPrice] = useState(''); // principal-token units per 1 collateral token
 	// Posting through our interface always opts into the (currently 0%) interface fee.
 	const listed = true;
 
@@ -320,7 +337,7 @@ export default function FlashbankLoan() {
 				principal: l.principal, collateral: l.collateral, repaymentFee: l.repaymentFee, protocolFee: l.protocolFee,
 				serviceFeeRecipient: l.serviceFeeRecipient, serviceFee: l.serviceFee, duration: l.duration,
 				gracePeriod: l.gracePeriod, offerExpiry: l.offerExpiry, startTime: l.startTime, listed: l.listed,
-				boost: l.boost ?? 0n
+				boost: l.boost ?? 0n, settlementValue: l.settlementValue ?? 0n
 			}));
 			setLoans(mapped);
 			await fetchMeta(mapped.flatMap((l) => [l.principalToken, l.collateralToken]));
@@ -404,11 +421,21 @@ export default function FlashbankLoan() {
 			const grace = BigInt(Math.round(graceDays * 86400));
 			if (duration <= 0n) { toast.error('Term must be at least a fraction of a day'); return; }
 
+			// Optional surplus return: store the agreed worth of the WHOLE collateral in principal
+			// units (collateralUnits * price / 10^cDec). Frozen on-chain — never read from an oracle.
+			let settlementValue = 0n;
+			if (returnSurplus) {
+				if (!settlementPrice || Number(settlementPrice) <= 0) { toast.error('Set a settlement price to return surplus on default'); return; }
+				const priceUnits = ethers.parseUnits(settlementPrice, pDec);
+				settlementValue = (collateral * priceUnits) / (10n ** BigInt(cDec));
+				if (settlementValue <= fee + principal) { toast.error('Settlement price is too low — at that value the lender would still take all the collateral'); return; }
+			}
+
 			const params = {
 				creatorIsLender, allowedTaker: allowedTaker || ZERO, principalToken, collateralToken,
 				principal, collateral, repaymentFee: fee, duration, gracePeriod: grace, offerExpiry: 0n,
 				listed, serviceFeeRecipient: serviceFee ? serviceRecipient : ZERO, serviceFee: serviceFee ? svc : 0n,
-				boost
+				boost, settlementValue
 			};
 			// Lender escrows principal (+ interface fee) in the principal token; a borrower escrows
 			// collateral. The boost is always paid in the principal token on top, so it may need its
@@ -521,6 +548,14 @@ export default function FlashbankLoan() {
 	const feeAmount = principalNum * (feePct / 100);
 	const totalRepay = principalNum + feeAmount;
 	const boostNum = parseFloat(boostAmount) || 0;
+
+	// Surplus-return preview (human units, display only — the contract does this in integer maths).
+	const settlementPriceNum = parseFloat(settlementPrice) || 0;
+	const settlementWorth = collateralNum * settlementPriceNum; // worth of ALL collateral, in principal units
+	const defaultLenderColl = returnSurplus && settlementWorth > totalRepay
+		? collateralNum * (totalRepay / settlementWorth)
+		: collateralNum;
+	const defaultBorrowerColl = Math.max(collateralNum - defaultLenderColl, 0);
 
 	const createDisabledReason = !ready ? 'Switch to Sepolia to use the playground'
 		: !isConnected ? 'Connect your wallet to post'
@@ -755,6 +790,28 @@ export default function FlashbankLoan() {
 											<Field label={`Service fee (${pInfo.symbol})`} hint="Deducted from the borrower's disbursement.">
 												<input value={serviceFee} onChange={(e) => setServiceFee(e.target.value)} placeholder="0" className={INPUT_CLS} />
 											</Field>
+										</div>
+										<div className="rounded-lg border border-gray-200 p-3 space-y-3">
+											<label className="flex items-start gap-2 cursor-pointer">
+												<input type="checkbox" checked={returnSurplus} onChange={(e) => setReturnSurplus(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+												<span className="text-sm text-gray-700">
+													<span className="font-medium">Return surplus collateral on default</span>
+													<span className="block text-[11px] text-gray-400">On a default the lender keeps only the collateral worth <strong>{trimAmount(String(totalRepay))} {pInfo.symbol}</strong> (principal + fee); the rest returns to the borrower. The value is agreed now and frozen on-chain — never read from an oracle. Leave off for a straight pledge (the lender takes all the collateral).</span>
+												</span>
+											</label>
+											{returnSurplus && (
+												<>
+													<Field label={`Settlement price — 1 ${cInfo.symbol} = ? ${pInfo.symbol}`} hint="What you both agree the collateral is worth today. Same token on both sides? Use 1.">
+														<input value={settlementPrice} onChange={(e) => setSettlementPrice(e.target.value)} placeholder={pInfo.symbol === cInfo.symbol ? '1' : '0'} className={INPUT_CLS} />
+													</Field>
+													{collateralNum > 0 && settlementPriceNum > 0 && (
+														<p className="text-[11px] text-gray-600 bg-emerald-50/70 rounded-lg p-2">
+															On a default: lender receives <strong>{trimAmount(defaultLenderColl.toFixed(6))} {cInfo.symbol}</strong>, borrower reclaims <strong>{trimAmount(defaultBorrowerColl.toFixed(6))} {cInfo.symbol}</strong>.
+															{settlementWorth <= totalRepay && <span className="block text-amber-600 mt-0.5">At this price the collateral only just covers the debt, so the lender would still take it all — raise the price to leave a surplus.</span>}
+														</p>
+													)}
+												</>
+											)}
 										</div>
 										<p className="text-[11px] text-gray-400 bg-gray-50 rounded-lg p-3">
 											Posting here goes <strong>through flashbank</strong>, so the interface fee ({protocolBps / 100}%, currently waived) applies.
@@ -1129,6 +1186,7 @@ function OfferCard({ loan, mine, pInfo, cInfo, fmt, isConnected, onTake, onCance
 				<SummaryRow label="Collateral" value={fmt(loan.collateral, loan.collateralToken)} />
 				<SummaryRow label="Fee" value={fmt(loan.repaymentFee, loan.principalToken)} />
 				<SummaryRow label="Term" value={`${formatDuration(loan.duration)} (+${formatDuration(loan.gracePeriod)} grace)`} />
+				<SummaryRow label="On default" value={loan.settlementValue > 0n ? 'Surplus returned to borrower' : 'Lender keeps all collateral'} />
 				{featured && <SummaryRow label="Boost" value={fmt(loan.boost, loan.principalToken)} />}
 				{loan.serviceFee > 0n && <SummaryRow label="Service fee" value={`${fmt(loan.serviceFee, loan.principalToken)} → ${formatAddress(loan.serviceFeeRecipient)}`} />}
 				{loan.allowedTaker !== ZERO && (
@@ -1199,6 +1257,14 @@ function ActiveLoanCard({ loan, now, me, fmt, onRepay, onClaim }: {
 					<div className={`h-full ${barCls} transition-all`} style={{ width: `${progress}%` }} />
 				</div>
 				<p className={`text-xs mt-1.5 ${overdue ? 'text-red-600' : inGrace ? 'text-amber-600' : 'text-gray-500'}`}>{statusText}</p>
+				{loan.settlementValue > 0n && (() => {
+					const { toLender, toBorrower } = splitOnDefault(loan.collateral, loan.principal + loan.repaymentFee, loan.settlementValue);
+					return (
+						<p className="text-[11px] text-gray-400 mt-1">
+							On default the lender takes {fmt(toLender, loan.collateralToken)}; the borrower reclaims {fmt(toBorrower, loan.collateralToken)}.
+						</p>
+					);
+				})()}
 			</div>
 		</div>
 	);

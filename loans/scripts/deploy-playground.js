@@ -22,11 +22,14 @@ const TOKENS = [
 
 // Seed offers: a plain one, two paid boosts (different sizes => different ranking), and a borrow
 // request. Amounts are in human units; `boost` is in the principal token (fpUSD here).
+// `settlementValue` is the agreed worth of the WHOLE collateral in fpUSD, frozen at origination
+// (no oracle). "0" keeps the full-forfeit pledge; a value above the debt returns the surplus to a
+// defaulting borrower. We seed a mix so both behaviours are visible in the marketplace.
 const SEED_OFFERS = [
-	{ creatorIsLender: true,  principal: "500", collateral: "3", repaymentFee: "18", boost: "50", termDays: 30, graceDays: 2, note: "featured · top boost" },
-	{ creatorIsLender: true,  principal: "250", collateral: "2", repaymentFee: "9",  boost: "15", termDays: 14, graceDays: 1, note: "featured · smaller boost" },
-	{ creatorIsLender: true,  principal: "100", collateral: "1", repaymentFee: "5",  boost: "0",  termDays: 7,  graceDays: 1, note: "plain lend offer" },
-	{ creatorIsLender: false, principal: "300", collateral: "2", repaymentFee: "12", boost: "0",  termDays: 21, graceDays: 2, note: "plain borrow request" }
+	{ creatorIsLender: true,  principal: "500", collateral: "3", repaymentFee: "18", boost: "50", termDays: 30, graceDays: 2, settlementValue: "1500", note: "featured · top boost · surplus returned" },
+	{ creatorIsLender: true,  principal: "250", collateral: "2", repaymentFee: "9",  boost: "15", termDays: 14, graceDays: 1, settlementValue: "0",    note: "featured · smaller boost · full pledge" },
+	{ creatorIsLender: true,  principal: "100", collateral: "1", repaymentFee: "5",  boost: "0",  termDays: 7,  graceDays: 1, settlementValue: "500",  note: "plain lend offer · surplus returned" },
+	{ creatorIsLender: false, principal: "300", collateral: "2", repaymentFee: "12", boost: "0",  termDays: 21, graceDays: 2, settlementValue: "0",    note: "plain borrow request · full pledge" }
 ];
 
 function readExisting() {
@@ -112,7 +115,9 @@ async function main() {
 				listed: true, // posted "through flashbank" — interface fee applies (0 bps for now)
 				serviceFeeRecipient: ZERO,
 				serviceFee: 0,
-				boost: ethers.parseUnits(o.boost, usd.decimals)
+				boost: ethers.parseUnits(o.boost, usd.decimals),
+				// Agreed worth of the whole collateral in fpUSD (0 = full forfeit on default).
+				settlementValue: ethers.parseUnits(o.settlementValue, usd.decimals)
 			};
 			const id = Number(await p2p.loanCount());
 			await (await p2p.createLoan(params)).wait();
@@ -133,7 +138,7 @@ async function main() {
 			[usd.symbol]: { address: usd.address, decimals: usd.decimals },
 			[eth.symbol]: { address: eth.address, decimals: eth.decimals }
 		},
-		seededOffers: seeded.map((s) => ({ id: s.id, kind: s.creatorIsLender ? "lend" : "borrow", boost: s.boost, note: s.note })),
+		seededOffers: seeded.map((s) => ({ id: s.id, kind: s.creatorIsLender ? "lend" : "borrow", boost: s.boost, settlementValue: s.settlementValue, note: s.note })),
 		deployedAt: new Date().toISOString()
 	};
 

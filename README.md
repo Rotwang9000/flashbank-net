@@ -55,6 +55,7 @@ from `NEXT_PUBLIC_*` env vars by the website.
 `FlashBankP2PLoan` is a neutral escrow that lets two parties flashbank a fixed-term, collateral-backed loan:
 
 - **Time-only settlement.** Repay `principal + a flat fee` before `maturity + grace`, or the lender claims the collateral. Nothing is priced on-chain, so **no oracle is needed**.
+- **Optional surplus return (no oracle).** An offer can set a `settlementValue` (the agreed worth of the whole collateral in loan-asset terms, frozen at origination); on default the borrower then recovers any collateral beyond `principal + fee`. Leave it `0` for a pure pledge/forfeit. This honours [Lorrow](https://whysideas.github.io/lorrow/)'s surplus-return guardrail without an oracle — see [`docs/design/LORROW_COMPATIBILITY.md`](docs/design/LORROW_COMPATIBILITY.md).
 - **Flat fee, not interest.** A single fixed fee rather than time-accruing interest — more compatible with faith-based finance that avoids *riba* (this is **not** a Sharia-certification claim).
 - **Three optional, default-off fees:**
   - an opt-in **interface fee** (lender-paid, only on offers posted through flashbank; **0% introductory**),
@@ -73,7 +74,7 @@ never send real assets.**
 
 | Contract | Address (verified) |
 | --- | --- |
-| `FlashBankP2PLoan` (boost-enabled) | [`0x56E6…B607`](https://sepolia.etherscan.io/address/0x56E6aCB38ccFb82AC158955e8f7Dd2F59a66B607#code) |
+| `FlashBankP2PLoan` (boost + surplus-return) | [`0x990f…45dA`](https://sepolia.etherscan.io/address/0x990fc07f704e287dEB309B05420C6b19847145dA#code) |
 | `PlaygroundToken` fpUSD (6d) | [`0x4aBb…760c`](https://sepolia.etherscan.io/address/0x4aBb056aA5aB39b55039ACAf795Ff9403Fa9760c#code) |
 | `PlaygroundToken` fpETH (18d) | [`0xB9CC…96F5`](https://sepolia.etherscan.io/address/0xB9CCa9CfE38e583CF1cf456F03946ac6376396F5#code) |
 

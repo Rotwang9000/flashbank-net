@@ -34,6 +34,7 @@ describe("FlashBankP2PLoan", () => {
 			serviceFeeRecipient: ethers.ZeroAddress,
 			serviceFee: 0n,
 			boost: 0n,
+			settlementValue: 0n,
 			...overrides,
 		};
 	}
@@ -140,7 +141,7 @@ describe("FlashBankP2PLoan", () => {
 
 			await expect(p2p.connect(lender).claimDefault(0))
 				.to.emit(p2p, "LoanDefaulted")
-				.withArgs(0, lender.address, COLLATERAL);
+				.withArgs(0, lender.address, COLLATERAL, 0n);
 
 			// Lender holds the collateral; borrower kept the principal.
 			expect(await collateral.balanceOf(lender.address)).to.equal(MINT + COLLATERAL);
@@ -425,6 +426,85 @@ describe("FlashBankP2PLoan", () => {
 		});
 	});
 
+	describe("Surplus return on default (agreed settlement value, no oracle)", () => {
+		const COLL = ethers.parseEther("10");
+		const DEBT = PRINCIPAL + REPAY_FEE; // 105
+
+		async function defaultAfter(params) {
+			await p2p.connect(lender).createLoan(buildParams(params));
+			await p2p.connect(borrower).take(0);
+			await time.increase(DURATION + GRACE + 1);
+		}
+
+		it("returns the surplus to the borrower, keeping only the debt's share for the lender", async () => {
+			const SETTLE = ethers.parseEther("300"); // the 10 collateral is agreed to be worth 300 principal
+			await defaultAfter({ collateral: COLL, settlementValue: SETTLE });
+
+			const toLender = (COLL * DEBT) / SETTLE; // 10 * 105 / 300 = 3.5
+			const toBorrower = COLL - toLender; // 6.5
+
+			const q = await p2p.quoteDefault(0);
+			expect(q.toLender).to.equal(toLender);
+			expect(q.toBorrower).to.equal(toBorrower);
+
+			await expect(p2p.connect(lender).claimDefault(0)).to.changeTokenBalances(
+				collateral,
+				[lender, borrower, p2p],
+				[toLender, toBorrower, -COLL]
+			);
+		});
+
+		it("emits LoanDefaulted with the lender/borrower split", async () => {
+			const SETTLE = ethers.parseEther("300");
+			await defaultAfter({ collateral: COLL, settlementValue: SETTLE });
+			const toLender = (COLL * DEBT) / SETTLE;
+			const toBorrower = COLL - toLender;
+
+			await expect(p2p.connect(lender).claimDefault(0))
+				.to.emit(p2p, "LoanDefaulted")
+				.withArgs(0, lender.address, toLender, toBorrower);
+		});
+
+		it("forfeits the whole collateral when no settlement value is set", async () => {
+			await defaultAfter({ collateral: COLL, settlementValue: 0n });
+
+			const q = await p2p.quoteDefault(0);
+			expect(q.toLender).to.equal(COLL);
+			expect(q.toBorrower).to.equal(0n);
+
+			await expect(p2p.connect(lender).claimDefault(0)).to.changeTokenBalances(
+				collateral,
+				[lender, borrower],
+				[COLL, 0n]
+			);
+		});
+
+		it("gives the lender everything when the agreed value does not cover the debt", async () => {
+			const SETTLE = ethers.parseEther("50"); // below the 105 debt
+			await defaultAfter({ collateral: COLL, settlementValue: SETTLE });
+
+			const q = await p2p.quoteDefault(0);
+			expect(q.toLender).to.equal(COLL);
+			expect(q.toBorrower).to.equal(0n);
+		});
+
+		it("splits a same-asset loan with no price (settlement value = collateral amount)", async () => {
+			const SAME_COLL = ethers.parseEther("200"); // principal-token collateral
+			const SETTLE = SAME_COLL; // 1:1, the collateral is worth its own amount of principal
+			await p2p.connect(lender).createLoan(
+				buildParams({ collateralToken: principalAddr, collateral: SAME_COLL, settlementValue: SETTLE })
+			);
+			await p2p.connect(borrower).take(0);
+			await time.increase(DURATION + GRACE + 1);
+
+			const toLender = (SAME_COLL * DEBT) / SETTLE; // == DEBT (105)
+			expect(toLender).to.equal(DEBT);
+			const q = await p2p.quoteDefault(0);
+			expect(q.toLender).to.equal(DEBT);
+			expect(q.toBorrower).to.equal(SAME_COLL - DEBT); // 95 back to the borrower
+		});
+	});
+
 	describe("Randomised fund conservation", () => {
 		it("never creates or destroys tokens across random loans", async () => {
 			// Top up so funding never runs dry; conservation is checked from here on.
@@ -460,22 +540,26 @@ describe("FlashBankP2PLoan", () => {
 				const creatorIsLender = rand() < 0.5;
 				const listed = rand() < 0.5;
 				const useService = rand() < 0.5;
-				const boost = rand() < 0.5 ? ethers.parseEther(String(pick(0, 6))) : 0n;
-				let serviceFee = useService ? ethers.parseEther(String(pick(0, 10))) : 0n;
-				if (serviceFee >= principalAmt) {
-					serviceFee = 0n; // keep disbursement positive
-				}
+			const boost = rand() < 0.5 ? ethers.parseEther(String(pick(0, 6))) : 0n;
+			// Mix of 0 (forfeit), below-debt and above-debt settlement values so every default
+			// branch runs; the split always conserves funds (toLender + toBorrower == collateral).
+			const settlementValue = rand() < 0.5 ? ethers.parseEther(String(pick(0, 100))) : 0n;
+			let serviceFee = useService ? ethers.parseEther(String(pick(0, 10))) : 0n;
+			if (serviceFee >= principalAmt) {
+				serviceFee = 0n; // keep disbursement positive
+			}
 
-				const params = buildParams({
-					creatorIsLender,
-					principal: principalAmt,
-					collateral: collateralAmt,
-					repaymentFee: repayFee,
-					listed,
-					serviceFeeRecipient: useService ? insurer.address : ethers.ZeroAddress,
-					serviceFee: useService ? serviceFee : 0n,
-					boost,
-				});
+			const params = buildParams({
+				creatorIsLender,
+				principal: principalAmt,
+				collateral: collateralAmt,
+				repaymentFee: repayFee,
+				listed,
+				serviceFeeRecipient: useService ? insurer.address : ethers.ZeroAddress,
+				serviceFee: useService ? serviceFee : 0n,
+				boost,
+				settlementValue,
+			});
 
 				const creator = creatorIsLender ? lender : borrower;
 				const taker = creatorIsLender ? borrower : lender;

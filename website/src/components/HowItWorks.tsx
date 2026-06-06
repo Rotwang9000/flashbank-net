@@ -34,7 +34,7 @@ export default function HowItWorks({ explorer, contractAddress, isPlayground, pr
 						<Outcome tone="good" icon={<CheckCircle2 className="h-5 w-5" />} title="Repaid in time"
 							body="Borrower repays principal + the flat fee before the deadline. They get their collateral back; the lender keeps the fee." />
 						<Outcome tone="bad" icon={<ShieldAlert className="h-5 w-5" />} title="Deadline missed"
-							body="If the window closes unpaid, the lender claims the collateral. No price is read — the only trigger is the clock." />
+							body="If the window closes unpaid, the lender claims the collateral — the only trigger is the clock, no price is read. Offers can opt in to return any surplus beyond the debt to the borrower, valued at a rate agreed up front (still no oracle)." />
 					</div>
 				</div>
 			</section>
@@ -97,13 +97,16 @@ export default function HowItWorks({ explorer, contractAddress, isPlayground, pr
 					<Proof icon={<FileCheck2 className="h-5 w-5" />} title="Verified source &amp; ABI on Etherscan"
 						body="The exact bytecode running on-chain is published and verified. Read every line and the ABI yourself."
 						href={codeLink} cta="View verified contract" />
-					<Proof icon={<FlaskConical className="h-5 w-5" />} title="32 automated tests"
-						body="Including a live re-entrancy attack (caught by the guard), same-token edge cases, exact-deadline timing, and a randomised fund-conservation fuzz over 30 loans." />
+					<Proof icon={<FlaskConical className="h-5 w-5" />} title="37 automated tests"
+						body="Including a live re-entrancy attack (caught by the guard), the surplus-return split, same-token edge cases, exact-deadline timing, and a randomised fund-conservation fuzz over 30 loans." />
 					<Proof icon={<Code2 className="h-5 w-5" />} title="Open source, by design"
 						body="The repository is public and the fee is set in the open. Nothing is hidden behind a closed back-end; what you see is what runs." />
 					<Proof icon={<ShieldCheck className="h-5 w-5" />} title="Conservation invariant"
 						body="Every settled loan leaves the escrow holding exactly zero — no dust, no trapped funds. It's asserted in the contract and checked by the fuzz."
 						href="/security" cta="Security notes" internal />
+					<Proof icon={<Scale className="h-5 w-5" />} title="Lorrow-aware"
+						body="How this escrow maps to the Lorrow lending standard — where we align, where we differ, and how the optional surplus return honours its anti-predation guardrail with no oracle."
+						href="/lorrow" cta="Compatibility tables" internal />
 				</div>
 			</section>
 

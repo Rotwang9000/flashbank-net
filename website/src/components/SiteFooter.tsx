@@ -57,6 +57,7 @@ export default function SiteFooter() {
 						<FooterLink href="/guides/lend">Lender guide</FooterLink>
 						<FooterLink href="/guides/borrow">Borrower guide</FooterLink>
 						<FooterLink href="/security">Security</FooterLink>
+						<FooterLink href="/lorrow">Lorrow compatibility</FooterLink>
 						<FooterLink href="/gas-study">Gas study</FooterLink>
 					</Col>
 

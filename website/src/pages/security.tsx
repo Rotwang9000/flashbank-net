@@ -25,10 +25,13 @@ export default function Security() {
 					<div className="bg-blue-50 border-l-4 border-blue-500 p-4 mt-6">
 						<div className="flex items-center gap-2">
 							<CheckCircle className="w-6 h-6 text-blue-600" />
-							<p className="text-lg font-semibold text-blue-900">Live on Mainnet</p>
+							<p className="text-lg font-semibold text-blue-900">Self-reviewed · source verified</p>
 						</div>
 						<p className="text-blue-800 mt-2">
-							All critical security tests passed. Self-audited with 62+ automated tests. Source code verified on Etherscan. External audit pending.
+							This page is a router-specific deep-dive. Source is verified on Etherscan and self-reviewed with an automated
+							test suite — but <strong>no external audit</strong> has been done. For a candid look at <em>both</em> FlashBank
+							features, including trust assumptions and known limitations, read the{" "}
+							<Link href="/audit" className="underline font-semibold">honest audit</Link>.
 						</p>
 					</div>
 					</div>
@@ -675,7 +678,7 @@ if (amount > maxBorrow)
 							<div className="border border-blue-200 bg-blue-50 rounded-lg p-6">
 								<h3 className="font-semibold text-blue-900 mb-3">Automated Coverage</h3>
 								<ul className="space-y-2 text-sm text-blue-800">
-									<li>✓ 62+ Hardhat/Foundry tests</li>
+									<li>✓ 57 passing tests (21 pending)</li>
 									<li>✓ Dedicated failure-path tests (FlashLoanFailed, paused router)</li>
 									<li>✓ Demo borrower integration tests</li>
 									<li>✓ Concurrent loan tests (same block)</li>
@@ -736,7 +739,7 @@ if (amount > maxBorrow)
 										Self-audited (external review pending)
 									</span>
 									<span className="px-3 py-1 bg-green-100 text-green-800 rounded text-sm font-medium">
-										62+ automated tests
+										Self-reviewed test suite
 									</span>
 								</div>
 							</div>
@@ -794,7 +797,7 @@ if (amount > maxBorrow)
 					</h2>
 					
 					<div className="text-xl mb-6">
-						<strong>Self-Audited · 62+ Automated Tests · Source Verified</strong>
+						<strong>Self-Reviewed · Source Verified · No External Audit</strong>
 					</div>
 
 					<div className="space-y-2 text-white/90">

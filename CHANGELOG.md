@@ -1,5 +1,50 @@
 # FlashBank Changelog
 
+## v3.0 - P2P Term Loans (2026-06-07)
+
+A second, independent product alongside the flash-loan Router: `FlashBankP2PLoan`, a neutral escrow for
+fixed-term, collateral-backed loans agreed directly between two people. No pools, no price oracle, no
+liquidations — settlement is purely time-based.
+
+### ✨ Core feature
+- **Added** `FlashBankP2PLoan.sol` — create / take / repay / claimDefault / cancel, with the escrow held
+  only between creation and settlement. Lives in its own self-contained `loans/` Hardhat project.
+- **Time-only settlement.** Repay `principal + a flat fee` before `maturity + grace`, or the lender claims
+  the collateral. Nothing is priced on-chain, so **no oracle is needed**.
+- **Flat fee, not interest** — friendlier to faith-based finance that avoids *riba* (not a certification
+  claim).
+- **Three optional, default-off fees:** opt-in interface fee (0% introductory), non-refundable featured
+  **boost** (advert, ranks placement), and a per-offer service fee to any address. Direct P2P is zero
+  commission.
+
+### 🤝 Optional surplus return (agreed rate, still no oracle)
+- **Added** an optional per-offer **agreed rate** (`settlementValue`): on default the lender keeps only the
+  collateral covering `principal + fee` at that frozen rate and the borrower reclaims the surplus; leave it
+  `0` for a pure pledge/forfeit. Honours [Lorrow](https://whysideas.github.io/lorrow/)'s surplus-return
+  guardrail without a price feed (see `docs/design/LORROW_COMPATIBILITY.md`).
+
+### 📝 Editable offers (front-running-safe)
+- **Added** `updateOffer` — amend an open offer's non-escrow terms in place (agreed rate, flat fee, timing,
+  service fee) without forfeiting the existing featured placement.
+- **Added** `boostOffer` — top up featured placement on an open offer.
+- **Added** a `version` counter + `takeChecked(id, version)` so a taker can pin the exact terms they
+  reviewed and reject a last-second re-price.
+
+### 🧪 Testing
+- **Added** `loans/test/FlashBankP2PLoan.test.js` — 45 unit tests: full lifecycle, time-based default, the
+  three-tier fee model and boost, in-place amendments + version-pinned take, a live re-entrancy attack via
+  a malicious token, and a randomised fund-conservation fuzz test.
+
+### 🌐 Website
+- **Added** `/flashbank-loan` marketplace (Browse / Flashbank a loan / Your loans / How it works) with a
+  per-offer collateral-split diagram and an in-app edit-offer modal.
+- **Added** `/audit` — an honest, self-reviewed audit of **both** features (custody, trust assumptions,
+  what's tested, known limits), and `/lorrow` — the Lorrow compatibility write-up.
+
+### 📦 Deployment (Sepolia playground — testnet only, no real value)
+- **FlashBankP2PLoan:** `0x3Ce4B6DC383d3105A6D35a6816BC10D395Aa1017` (verified on Etherscan)
+- **fpUSD (6d):** `0x4aBb056aA5aB39b55039ACAf795Ff9403Fa9760c` · **fpETH (18d):** `0xB9CCa9CfE38e583CF1cf456F03946ac6376396F5`
+
 ## v2.1 - Dual-Control Security Architecture (2025-11-26)
 
 ### 🔐 Security Enhancements

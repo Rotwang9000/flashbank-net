@@ -163,7 +163,7 @@ e.g. two declared axes in the Profile:
 - `lender_return`: `INTEREST` (today's Core) **or** `FLAT_FEE` (with the fee disclosed and a sane
   effective-rate cap).
 
-Surplus return stays mandatory (satisfied via Option B's agreed settlement price). This keeps Lorrow's
+Surplus return stays mandatory (satisfied via Option B's agreed rate). This keeps Lorrow's
 anti-predation promise intact while widening the tent to cover oracle-free, riba-free designs.
 
 ### Not recommended — Strict compatibility today

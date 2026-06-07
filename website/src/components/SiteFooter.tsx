@@ -54,9 +54,10 @@ export default function SiteFooter() {
 					</Col>
 
 					<Col title="Resources">
+						<FooterLink href="/audit">Honest audit</FooterLink>
 						<FooterLink href="/guides/lend">Lender guide</FooterLink>
 						<FooterLink href="/guides/borrow">Borrower guide</FooterLink>
-						<FooterLink href="/security">Security</FooterLink>
+						<FooterLink href="/security">Router security</FooterLink>
 						<FooterLink href="/lorrow">Lorrow compatibility</FooterLink>
 						<FooterLink href="/gas-study">Gas study</FooterLink>
 					</Col>

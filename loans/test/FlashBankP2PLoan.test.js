@@ -39,6 +39,21 @@ describe("FlashBankP2PLoan", () => {
 		};
 	}
 
+	// Mirrors an offer's current amendable terms; override only what an updateOffer changes.
+	function buildUpdate(overrides = {}) {
+		return {
+			repaymentFee: REPAY_FEE,
+			duration: DURATION,
+			gracePeriod: GRACE,
+			offerExpiry: 0,
+			settlementValue: 0n,
+			allowedTaker: ethers.ZeroAddress,
+			serviceFeeRecipient: ethers.ZeroAddress,
+			serviceFee: 0n,
+			...overrides,
+		};
+	}
+
 	beforeEach(async () => {
 		[owner, lender, borrower, feeCollector, insurer, stranger] = await ethers.getSigners();
 
@@ -502,6 +517,101 @@ describe("FlashBankP2PLoan", () => {
 			const q = await p2p.quoteDefault(0);
 			expect(q.toLender).to.equal(DEBT);
 			expect(q.toBorrower).to.equal(SAME_COLL - DEBT); // 95 back to the borrower
+		});
+	});
+
+	describe("Amending an open offer", () => {
+		const COLL = ethers.parseEther("10");
+		const DEBT = PRINCIPAL + REPAY_FEE; // 105
+
+		it("re-prices the agreed rate; the new split applies on default and version bumps", async () => {
+			await p2p.connect(lender).createLoan(buildParams({ collateral: COLL, settlementValue: ethers.parseEther("300") }));
+			expect((await p2p.getLoan(0)).version).to.equal(0n);
+
+			const NEW_SETTLE = ethers.parseEther("210");
+			await expect(p2p.connect(lender).updateOffer(0, buildUpdate({ settlementValue: NEW_SETTLE })))
+				.to.emit(p2p, "OfferUpdated").withArgs(0, 1n);
+
+			const loan = await p2p.getLoan(0);
+			expect(loan.version).to.equal(1n);
+			expect(loan.settlementValue).to.equal(NEW_SETTLE);
+
+			await p2p.connect(borrower).take(0);
+			await time.increase(DURATION + GRACE + 1);
+			const toLender = (COLL * DEBT) / NEW_SETTLE; // 10 * 105 / 210 = 5
+			const q = await p2p.quoteDefault(0);
+			expect(q.toLender).to.equal(toLender);
+			expect(q.toBorrower).to.equal(COLL - toLender);
+		});
+
+		it("amends the flat fee and timing without touching the escrow", async () => {
+			await p2p.connect(lender).createLoan(buildParams());
+			const NEW_FEE = ethers.parseEther("9");
+			const NEW_DUR = 3 * 24 * 60 * 60;
+
+			await expect(p2p.connect(lender).updateOffer(0, buildUpdate({ repaymentFee: NEW_FEE, duration: NEW_DUR })))
+				.to.changeTokenBalances(principal, [lender, p2p], [0n, 0n]); // escrow unchanged
+
+			expect(await p2p.quoteRepayment(0)).to.equal(PRINCIPAL + NEW_FEE);
+			expect((await p2p.getLoan(0)).duration).to.equal(BigInt(NEW_DUR));
+		});
+
+		it("preserves the featured boost across an amendment (no need to cancel)", async () => {
+			const BOOST = ethers.parseEther("12");
+			await p2p.connect(lender).createLoan(buildParams({ boost: BOOST }));
+			await p2p.connect(lender).updateOffer(0, buildUpdate({ repaymentFee: ethers.parseEther("9") }));
+			expect((await p2p.getLoan(0)).boost).to.equal(BOOST);
+		});
+
+		it("only the creator may amend, and only while open", async () => {
+			await p2p.connect(lender).createLoan(buildParams());
+			await expect(p2p.connect(stranger).updateOffer(0, buildUpdate())).to.be.revertedWithCustomError(p2p, "NotCreator");
+			await p2p.connect(borrower).take(0);
+			await expect(p2p.connect(lender).updateOffer(0, buildUpdate())).to.be.revertedWithCustomError(p2p, "LoanNotOpen");
+		});
+
+		it("validates amended terms the same way create does", async () => {
+			await p2p.connect(lender).createLoan(buildParams());
+			await expect(p2p.connect(lender).updateOffer(0, buildUpdate({ duration: 0 }))).to.be.revertedWithCustomError(p2p, "InvalidDuration");
+			await expect(p2p.connect(lender).updateOffer(0, buildUpdate({ serviceFee: PRINCIPAL }))).to.be.revertedWithCustomError(p2p, "InvalidServiceFee");
+			await expect(p2p.connect(lender).updateOffer(0, buildUpdate({ allowedTaker: lender.address }))).to.be.revertedWithCustomError(p2p, "InvalidRecipient");
+			const now = await time.latest();
+			await expect(p2p.connect(lender).updateOffer(0, buildUpdate({ offerExpiry: now - 1 }))).to.be.revertedWithCustomError(p2p, "InvalidExpiry");
+		});
+
+		describe("takeChecked (version pin)", () => {
+			it("takes at the expected version and rejects a stale one", async () => {
+				await p2p.connect(lender).createLoan(buildParams());
+				// A re-price lands before the taker's transaction does.
+				await p2p.connect(lender).updateOffer(0, buildUpdate({ repaymentFee: ethers.parseEther("9") }));
+				await expect(p2p.connect(borrower).takeChecked(0, 0)).to.be.revertedWithCustomError(p2p, "OfferVersionMismatch");
+				await expect(p2p.connect(borrower).takeChecked(0, 1)).to.emit(p2p, "LoanActivated");
+				expect((await p2p.getLoan(0)).status).to.equal(Status.Active);
+			});
+		});
+
+		describe("boostOffer (top up featured placement)", () => {
+			const BOOST = ethers.parseEther("12");
+			const TOPUP = ethers.parseEther("8");
+
+			it("adds to the boost and forwards it to the protocol", async () => {
+				await p2p.connect(lender).createLoan(buildParams({ boost: BOOST }));
+				await expect(p2p.connect(lender).boostOffer(0, TOPUP))
+					.to.changeTokenBalances(principal, [lender, feeCollector], [-TOPUP, TOPUP]);
+				expect((await p2p.getLoan(0)).boost).to.equal(BOOST + TOPUP);
+
+				await expect(p2p.connect(lender).boostOffer(0, TOPUP))
+					.to.emit(p2p, "OfferBoosted").withArgs(0, lender.address, TOPUP);
+				expect((await p2p.getLoan(0)).boost).to.equal(BOOST + TOPUP + TOPUP);
+			});
+
+			it("guards caller, state and amount", async () => {
+				await p2p.connect(lender).createLoan(buildParams());
+				await expect(p2p.connect(stranger).boostOffer(0, TOPUP)).to.be.revertedWithCustomError(p2p, "NotCreator");
+				await expect(p2p.connect(lender).boostOffer(0, 0)).to.be.revertedWithCustomError(p2p, "InvalidAmount");
+				await p2p.connect(borrower).take(0);
+				await expect(p2p.connect(lender).boostOffer(0, TOPUP)).to.be.revertedWithCustomError(p2p, "LoanNotOpen");
+			});
 		});
 	});
 

@@ -36,10 +36,11 @@ Liquidation is triggered **purely by time**, never by price:
 
 Because nothing is ever valued on-chain, we need **no price feeds, no margin calls, no
 keepers watching health factors**. The lender's only protection against the collateral
-falling below the loan is to demand *enough* collateral up front — and since the lender
-chooses the terms, that risk is theirs to price in. Short terms + healthy
-over-collateralisation keep it sane. We document this risk explicitly; we do not try to
-manage it on-chain.
+falling in value is to demand *enough* collateral up front — i.e. to set a conservative
+**agreed rate** (how much principal one unit of collateral is taken to be worth). Since the
+lender chooses the terms, that risk is theirs to price in. Short terms + a conservative
+agreed rate keep it sane. We document this risk explicitly; we do not try to manage it
+on-chain.
 
 ### 2. Flat fee, not interest
 
@@ -87,10 +88,11 @@ Three independent fee sinks, **all default-off**:
 ```
                  create                take                 repay
    (lender or  ─────────▶  Open  ────────────▶  Active  ───────────────▶  Repaid
-    borrower)               │                     │
-                            │ cancel              │ (deadline + grace passes, unpaid)
-                            ▼                     ▼
-                        Cancelled             Defaulted  (lender claims collateral)
+    borrower)            ▲  │  │                  │
+        amend / boost ───┘  │  │ cancel           │ (deadline + grace passes, unpaid)
+     (updateOffer,          │  ▼                  ▼
+      boostOffer)           │ Cancelled        Defaulted  (lender claims collateral)
+                            └─ takeChecked(id, version) pins the reviewed terms
 ```
 
 Either side can be the **creator**:
@@ -117,6 +119,12 @@ paid when a loan activates; a listed lender-offer that is cancelled refunds the 
 - **Repay:** borrower pays `principal + repaymentFee` → lender; collateral → borrower.
 - **Default:** after `maturity + gracePeriod`, lender claims collateral; borrower keeps principal.
 - **Cancel (Open only):** creator reclaims whatever they escrowed.
+- **Amend (Open only):** the creator can `updateOffer` (re-price the agreed rate, change the flat fee,
+  timing or service fee) and `boostOffer` (top up featured placement) **in place** — the escrowed amount
+  and the existing boost are untouched, so re-pricing never forfeits placement. Each amend bumps the
+  offer's `version`; a taker can call `takeChecked(id, version)` to pin the exact terms they reviewed and
+  reject a last-second re-price. The escrowed amount, the tokens, the side and the listing opt-in are
+  intentionally immutable — change those by cancelling and posting a fresh offer.
 
 ## Scope / conventions for v1
 
@@ -174,7 +182,7 @@ pre-seeded. Addresses are recorded in `loans/deployments/sepolia-playground.json
 
 | Contract | Address |
 | --- | --- |
-| `FlashBankP2PLoan` (boost + surplus-return) | `0x990fc07f704e287dEB309B05420C6b19847145dA` |
+| `FlashBankP2PLoan` (boost + surplus-return + editable offers) | `0x3Ce4B6DC383d3105A6D35a6816BC10D395Aa1017` |
 | `PlaygroundToken` fpUSD (6 decimals) | `0x4aBb056aA5aB39b55039ACAf795Ff9403Fa9760c` |
 | `PlaygroundToken` fpETH (18 decimals) | `0xB9CCa9CfE38e583CF1cf456F03946ac6376396F5` |
 
@@ -191,6 +199,8 @@ via `NEXT_PUBLIC_SEPOLIA_P2P_LOAN_ADDRESS` / `_FPUSD_ADDRESS` / `_FPETH_ADDRESS`
 
 - ~~Marketplace UI on the website~~ — shipped at `website/src/pages/flashbank-loan.tsx`.
 - ~~Deploy script~~ — shipped (`deploy-p2p-loan.js`, plus `deploy-playground.js` for testnets).
+- ~~Editable offers (re-price / amend / boost top-up without losing placement)~~ — shipped
+  (`updateOffer` / `boostOffer` / `takeChecked`, with an in-app edit modal).
 - Mainnet/L2 addresses (currently only the Sepolia playground is live).
 - Optional: ERC-721 collateral, configurable penalties, permit-based funding.
 
@@ -198,8 +208,9 @@ via `NEXT_PUBLIC_SEPOLIA_P2P_LOAN_ADDRESS` / `_FPUSD_ADDRESS` / `_FPETH_ADDRESS`
 
 - `loans/contracts/FlashBankP2PLoan.sol` — the escrow/marketplace contract.
 - `loans/contracts/PlaygroundToken.sol` — freely-mintable faucet ERC-20 for testnet playgrounds.
-- `loans/test/FlashBankP2PLoan.test.js` — 32 unit tests (happy path, default, cancel, both offer
-  directions, fees, **featured boost**, edge cases, reentrancy, randomised fund-conservation fuzzing).
+- `loans/test/FlashBankP2PLoan.test.js` — 45 unit tests (happy path, default, cancel, both offer
+  directions, fees, **featured boost**, **in-place offer amendments + version-pinned take**, edge cases,
+  reentrancy, randomised fund-conservation fuzzing).
 - `loans/scripts/deploy-p2p-loan.js` — generic deploy script.
 - `loans/scripts/deploy-playground.js` — Sepolia playground deploy (P2P + reused faucet tokens + a
   spread of seeded offers, including boosted ones to show ranking).

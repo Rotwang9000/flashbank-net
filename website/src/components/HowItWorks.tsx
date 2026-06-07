@@ -138,7 +138,7 @@ export default function HowItWorks({ explorer, contractAddress, isPlayground, pr
 						body="The repository is public and the fee is set in the open. Nothing is hidden behind a closed back-end; what you see is what runs." />
 					<Proof icon={<ShieldCheck className="h-5 w-5" />} title="Conservation invariant"
 						body="Every settled loan leaves the escrow holding exactly zero — no dust, no trapped funds. It's asserted in the contract and checked by the fuzz."
-						href="/security" cta="Security notes" internal />
+						href="/audit" cta="Read the honest audit" internal />
 					<Proof icon={<Scale className="h-5 w-5" />} title="Lorrow-aware"
 						body="How this escrow maps to the Lorrow lending standard — where we align, where we differ, and how the optional surplus return honours its anti-predation guardrail with no oracle."
 						href="/lorrow" cta="Compatibility tables" internal />

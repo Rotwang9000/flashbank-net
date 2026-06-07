@@ -75,7 +75,8 @@ contract FlashBankP2PLoan is Ownable, ReentrancyGuard {
 		uint64 startTime;            // activation timestamp (0 until taken)
 		bool listed;                 // opt-in to the interface/listing fee
 		uint256 boost;               // featured-placement spend (principal token), non-refundable
-		uint256 settlementValue;     // agreed worth of ALL collateral in principal-token units (0 = full forfeit on default)
+		uint256 settlementValue;     // agreed rate × ALL collateral, in principal-token units (0 = full forfeit on default)
+		uint64 version;              // bumped on each {updateOffer}; pinned by {takeChecked} to stop re-price front-running
 	}
 
 	/// @dev Calldata bundle for {createLoan} to keep the signature readable.
@@ -95,6 +96,20 @@ contract FlashBankP2PLoan is Ownable, ReentrancyGuard {
 		uint256 serviceFee;
 		uint256 boost;
 		uint256 settlementValue;
+	}
+
+	/// @dev Calldata bundle for {updateOffer}: the terms a creator may amend on an Open offer.
+	///      Deliberately excludes anything that changes the escrow or the deal's identity
+	///      (principal, collateral, tokens, side, listing opt-in) — cancel and re-create for those.
+	struct OfferUpdate {
+		uint256 repaymentFee;
+		uint64 duration;
+		uint64 gracePeriod;
+		uint64 offerExpiry;
+		uint256 settlementValue;
+		address allowedTaker;
+		address serviceFeeRecipient;
+		uint256 serviceFee;
 	}
 
 	uint256 public loanCount;
@@ -123,6 +138,7 @@ contract FlashBankP2PLoan is Ownable, ReentrancyGuard {
 	error RepayWindowClosed();
 	error NotYetDefaultable();
 	error UnexpectedTokenBalance();
+	error OfferVersionMismatch();
 
 	event ProtocolFeeRecipientUpdated(address indexed oldRecipient, address indexed newRecipient);
 	event ProtocolFeeBpsUpdated(uint16 oldBps, uint16 newBps);
@@ -137,6 +153,7 @@ contract FlashBankP2PLoan is Ownable, ReentrancyGuard {
 		uint256 collateral
 	);
 	event OfferBoosted(uint256 indexed id, address indexed payer, uint256 amount);
+	event OfferUpdated(uint256 indexed id, uint64 version);
 	event LoanActivated(uint256 indexed id, address indexed taker, uint64 startTime, uint256 maturity);
 	event LoanRepaid(uint256 indexed id, address indexed borrower, address indexed lender, uint256 amountRepaid);
 	event LoanDefaulted(
@@ -250,9 +267,24 @@ contract FlashBankP2PLoan is Ownable, ReentrancyGuard {
 	 * @notice Accept an open offer, activating the loan.
 	 * @dev If the creator is the lender, the taker is the borrower and supplies collateral.
 	 *      If the creator is the borrower, the taker is the lender and supplies
-	 *      `principal + protocolFee`.
+	 *      `principal + protocolFee`. This unchecked variant accepts whatever the current terms are;
+	 *      prefer {takeChecked} (which the front-end uses) to pin the terms you reviewed.
 	 */
 	function take(uint256 id) external nonReentrant {
+		_take(id);
+	}
+
+	/**
+	 * @notice Accept an open offer only if its terms are still the version you reviewed.
+	 * @dev Pins `loan.version` so a creator cannot front-run your acceptance with a last-second
+	 *      {updateOffer} that worsens the terms. Reverts with {OfferVersionMismatch} on any drift.
+	 */
+	function takeChecked(uint256 id, uint64 expectedVersion) external nonReentrant {
+		if (loans[id].version != expectedVersion) revert OfferVersionMismatch();
+		_take(id);
+	}
+
+	function _take(uint256 id) internal {
 		Loan storage loan = loans[id];
 		if (loan.status != Status.Open) revert LoanNotOpen();
 		if (loan.offerExpiry != 0 && block.timestamp > loan.offerExpiry) revert OfferExpired();
@@ -347,6 +379,62 @@ contract FlashBankP2PLoan is Ownable, ReentrancyGuard {
 		}
 
 		emit LoanCancelled(id, loan.creator);
+	}
+
+	/**
+	 * @notice Amend the terms of an offer you posted that has not been taken yet.
+	 * @dev Only the creator, only while Open. Changes terms that do NOT touch the escrowed amount:
+	 *      the agreed rate (`settlementValue`), the flat `repaymentFee`, the timing
+	 *      (`duration`/`gracePeriod`/`offerExpiry`), who may take it, and the optional service fee.
+	 *      Principal, collateral, tokens, side and listing opt-in are intentionally immutable here
+	 *      (they alter the escrow or the deal's identity — cancel and re-create for those). The
+	 *      featured `boost` is preserved, so re-pricing never forfeits it. Each call bumps
+	 *      `version`, which {takeChecked} pins to protect a taker from a last-second re-price.
+	 */
+	function updateOffer(uint256 id, OfferUpdate calldata u) external {
+		Loan storage loan = loans[id];
+		if (loan.status != Status.Open) revert LoanNotOpen();
+		if (msg.sender != loan.creator) revert NotCreator();
+		if (u.duration == 0 || u.duration > MAX_DURATION) revert InvalidDuration();
+		if (u.gracePeriod > MAX_GRACE_PERIOD) revert InvalidGracePeriod();
+		if (u.offerExpiry != 0 && u.offerExpiry <= block.timestamp) revert InvalidExpiry();
+		if (u.allowedTaker == msg.sender) revert InvalidRecipient();
+		if (u.serviceFeeRecipient == address(0)) {
+			if (u.serviceFee != 0) revert InvalidServiceFee();
+		} else if (u.serviceFee >= loan.principal) {
+			revert InvalidServiceFee();
+		}
+
+		loan.repaymentFee = u.repaymentFee;
+		loan.duration = u.duration;
+		loan.gracePeriod = u.gracePeriod;
+		loan.offerExpiry = u.offerExpiry;
+		loan.settlementValue = u.settlementValue;
+		loan.allowedTaker = u.allowedTaker;
+		loan.serviceFeeRecipient = u.serviceFeeRecipient;
+		loan.serviceFee = u.serviceFee;
+
+		unchecked { loan.version += 1; }
+		emit OfferUpdated(id, loan.version);
+	}
+
+	/**
+	 * @notice Add featured-placement spend to an open offer you posted.
+	 * @dev Paid in the principal token straight to the protocol now (as in {createLoan}), added to
+	 *      the offer's cumulative `boost`, and non-refundable. Lets a creator raise their ranking,
+	 *      including alongside an {updateOffer} re-price.
+	 */
+	function boostOffer(uint256 id, uint256 amount) external nonReentrant {
+		Loan storage loan = loans[id];
+		if (loan.status != Status.Open) revert LoanNotOpen();
+		if (msg.sender != loan.creator) revert NotCreator();
+		if (amount == 0) revert InvalidAmount();
+		if (protocolFeeRecipient == address(0)) revert InvalidRecipient();
+
+		loan.boost += amount;
+		_pullExact(loan.principalToken, msg.sender, amount);
+		_send(loan.principalToken, protocolFeeRecipient, amount);
+		emit OfferBoosted(id, msg.sender, amount);
 	}
 
 	// --- Views ---------------------------------------------------------------

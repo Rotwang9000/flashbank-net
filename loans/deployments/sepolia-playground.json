@@ -2,7 +2,7 @@
 	"network": "sepolia",
 	"chainId": 11155111,
 	"deployer": "0x4F0B3C7fdf5D7C3C7179E1E180b28D23a16fd036",
-	"flashBankP2PLoan": "0x990fc07f704e287dEB309B05420C6b19847145dA",
+	"flashBankP2PLoan": "0x3Ce4B6DC383d3105A6D35a6816BC10D395Aa1017",
 	"protocolFeeBps": 0,
 	"tokens": {
 		"fpUSD": {
@@ -44,5 +44,5 @@
 			"note": "plain borrow request · full pledge"
 		}
 	],
-	"deployedAt": "2026-06-06T15:37:00.756Z"
+	"deployedAt": "2026-06-07T14:00:36.689Z"
 }

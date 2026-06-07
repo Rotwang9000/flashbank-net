@@ -55,7 +55,8 @@ from `NEXT_PUBLIC_*` env vars by the website.
 `FlashBankP2PLoan` is a neutral escrow that lets two parties flashbank a fixed-term, collateral-backed loan:
 
 - **Time-only settlement.** Repay `principal + a flat fee` before `maturity + grace`, or the lender claims the collateral. Nothing is priced on-chain, so **no oracle is needed**.
-- **Optional surplus return (no oracle).** An offer can set a `settlementValue` (the agreed worth of the whole collateral in loan-asset terms, frozen at origination); on default the borrower then recovers any collateral beyond `principal + fee`. Leave it `0` for a pure pledge/forfeit. This honours [Lorrow](https://whysideas.github.io/lorrow/)'s surplus-return guardrail without an oracle — see [`docs/design/LORROW_COMPATIBILITY.md`](docs/design/LORROW_COMPATIBILITY.md).
+- **Optional surplus return (no oracle).** An offer can set an **agreed rate** (stored as `settlementValue` — how much principal the whole collateral is taken to be worth, frozen at origination); on default the borrower then recovers any collateral beyond `principal + fee`. Leave it `0` for a pure pledge/forfeit. This honours [Lorrow](https://whysideas.github.io/lorrow/)'s surplus-return guardrail without an oracle — see [`docs/design/LORROW_COMPATIBILITY.md`](docs/design/LORROW_COMPATIBILITY.md).
+- **Editable offers, front-running-safe.** While an offer is open the creator can re-price or amend its non-escrow terms in place (`updateOffer`) and top up featured placement (`boostOffer`) without forfeiting the existing boost. Each edit bumps a `version`; a taker can call `takeChecked(id, version)` to pin the exact terms they reviewed.
 - **Flat fee, not interest.** A single fixed fee rather than time-accruing interest — more compatible with faith-based finance that avoids *riba* (this is **not** a Sharia-certification claim).
 - **Three optional, default-off fees:**
   - an opt-in **interface fee** (lender-paid, only on offers posted through flashbank; **0% introductory**),
@@ -74,7 +75,7 @@ never send real assets.**
 
 | Contract | Address (verified) |
 | --- | --- |
-| `FlashBankP2PLoan` (boost + surplus-return) | [`0x990f…45dA`](https://sepolia.etherscan.io/address/0x990fc07f704e287dEB309B05420C6b19847145dA#code) |
+| `FlashBankP2PLoan` (boost + surplus-return + editable offers) | [`0x3Ce4…1017`](https://sepolia.etherscan.io/address/0x3Ce4B6DC383d3105A6D35a6816BC10D395Aa1017#code) |
 | `PlaygroundToken` fpUSD (6d) | [`0x4aBb…760c`](https://sepolia.etherscan.io/address/0x4aBb056aA5aB39b55039ACAf795Ff9403Fa9760c#code) |
 | `PlaygroundToken` fpETH (18d) | [`0xB9CC…96F5`](https://sepolia.etherscan.io/address/0xB9CCa9CfE38e583CF1cf456F03946ac6376396F5#code) |
 
@@ -157,7 +158,7 @@ Browse [`docs/`](docs/README.md) for the full set:
 
 - **Architecture** — [overview](docs/architecture/ARCHITECTURE.md), [pool mechanics](docs/architecture/POOL_MECHANICS.md), [gas analysis](docs/architecture/GAS_ANALYSIS.md)
 - **P2P design** — [P2P_LENDING_DESIGN.md](docs/design/P2P_LENDING_DESIGN.md), [Lorrow compatibility](docs/design/LORROW_COMPATIBILITY.md)
-- **Security** — [audit](docs/security/SECURITY_AUDIT.md), [reentrancy analysis](docs/security/REENTRANCY_ANALYSIS.md), [dual-control runbook](docs/security/DUAL_CONTROL.md)
+- **Security** — the live [honest audit page](https://flashbank.net/audit) (both features, candid: trust assumptions, what's tested, known limits), plus [router audit notes](docs/security/SECURITY_AUDIT.md), [reentrancy analysis](docs/security/REENTRANCY_ANALYSIS.md), [dual-control runbook](docs/security/DUAL_CONTROL.md)
 - **Deployment** — [guide](docs/deployment/DEPLOYMENT.md), [website](docs/deployment/WEBSITE_DEPLOYMENT.md), [live networks](docs/deployment/LIVE_NETWORKS.md)
 
 Vulnerability disclosure: [SECURITY.md](SECURITY.md) · Contributing: [CONTRIBUTING.md](CONTRIBUTING.md) ·

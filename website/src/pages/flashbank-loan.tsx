@@ -7,7 +7,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import {
 	Coins, Clock, ShieldCheck, ArrowLeftRight, ExternalLink, Plus, Wallet, Search,
 	ChevronDown, SlidersHorizontal, Check, ArrowRight, Droplets, Timer, Lock, RefreshCw,
-	Layers, AlertTriangle, ArrowDown, Sparkles, ListFilter, BookOpen, Rocket, Star
+	Layers, AlertTriangle, ArrowDown, Sparkles, ListFilter, BookOpen, Rocket, Star, Pencil, X
 } from 'lucide-react';
 import { useIsMounted } from '../hooks/useIsMounted';
 import HowItWorks from '../components/HowItWorks';
@@ -57,7 +57,7 @@ const NETWORKS = {
 		name: 'Sepolia',
 		explorer: 'https://sepolia.etherscan.io',
 		// Public testnet playground — addresses are not secrets. Override via env if redeployed.
-		p2pLoan: process.env.NEXT_PUBLIC_SEPOLIA_P2P_LOAN_ADDRESS || '0x990fc07f704e287dEB309B05420C6b19847145dA',
+		p2pLoan: process.env.NEXT_PUBLIC_SEPOLIA_P2P_LOAN_ADDRESS || '0x3Ce4B6DC383d3105A6D35a6816BC10D395Aa1017',
 		weth: process.env.NEXT_PUBLIC_SEPOLIA_WETH_ADDRESS || '0xdd13E55209Fd76AfE204dBda4007C227904f0a81',
 		isPlayground: true,
 		tokens: [
@@ -110,7 +110,20 @@ const LOAN_COMPONENTS = [
 	{ internalType: 'uint64', name: 'startTime', type: 'uint64' },
 	{ internalType: 'bool', name: 'listed', type: 'bool' },
 	{ internalType: 'uint256', name: 'boost', type: 'uint256' },
-	{ internalType: 'uint256', name: 'settlementValue', type: 'uint256' }
+	{ internalType: 'uint256', name: 'settlementValue', type: 'uint256' },
+	{ internalType: 'uint64', name: 'version', type: 'uint64' }
+] as const;
+
+// Fields a creator may amend on an open offer (mirrors FlashBankP2PLoan.OfferUpdate).
+const OFFER_UPDATE_COMPONENTS = [
+	{ internalType: 'uint256', name: 'repaymentFee', type: 'uint256' },
+	{ internalType: 'uint64', name: 'duration', type: 'uint64' },
+	{ internalType: 'uint64', name: 'gracePeriod', type: 'uint64' },
+	{ internalType: 'uint64', name: 'offerExpiry', type: 'uint64' },
+	{ internalType: 'uint256', name: 'settlementValue', type: 'uint256' },
+	{ internalType: 'address', name: 'allowedTaker', type: 'address' },
+	{ internalType: 'address', name: 'serviceFeeRecipient', type: 'address' },
+	{ internalType: 'uint256', name: 'serviceFee', type: 'uint256' }
 ] as const;
 
 const P2P_ABI = [
@@ -137,6 +150,14 @@ const P2P_ABI = [
 		name: 'createLoan', outputs: [{ internalType: 'uint256', name: 'id', type: 'uint256' }], stateMutability: 'nonpayable', type: 'function'
 	},
 	{ inputs: [{ internalType: 'uint256', name: 'id', type: 'uint256' }], name: 'take', outputs: [], stateMutability: 'nonpayable', type: 'function' },
+	{ inputs: [{ internalType: 'uint256', name: 'id', type: 'uint256' }, { internalType: 'uint64', name: 'expectedVersion', type: 'uint64' }], name: 'takeChecked', outputs: [], stateMutability: 'nonpayable', type: 'function' },
+	{
+		inputs: [
+			{ internalType: 'uint256', name: 'id', type: 'uint256' },
+			{ components: OFFER_UPDATE_COMPONENTS as any, internalType: 'struct FlashBankP2PLoan.OfferUpdate', name: 'u', type: 'tuple' }
+		], name: 'updateOffer', outputs: [], stateMutability: 'nonpayable', type: 'function'
+	},
+	{ inputs: [{ internalType: 'uint256', name: 'id', type: 'uint256' }, { internalType: 'uint256', name: 'amount', type: 'uint256' }], name: 'boostOffer', outputs: [], stateMutability: 'nonpayable', type: 'function' },
 	{ inputs: [{ internalType: 'uint256', name: 'id', type: 'uint256' }], name: 'repay', outputs: [], stateMutability: 'nonpayable', type: 'function' },
 	{ inputs: [{ internalType: 'uint256', name: 'id', type: 'uint256' }], name: 'claimDefault', outputs: [], stateMutability: 'nonpayable', type: 'function' },
 	{ inputs: [{ internalType: 'uint256', name: 'id', type: 'uint256' }], name: 'cancel', outputs: [], stateMutability: 'nonpayable', type: 'function' },
@@ -171,7 +192,7 @@ type LoanView = {
 	status: number; principalToken: string; collateralToken: string; principal: bigint; collateral: bigint;
 	repaymentFee: bigint; protocolFee: bigint; serviceFeeRecipient: string; serviceFee: bigint;
 	duration: bigint; gracePeriod: bigint; offerExpiry: bigint; startTime: bigint; listed: boolean; boost: bigint;
-	settlementValue: bigint;
+	settlementValue: bigint; version: bigint;
 };
 
 type TokenMeta = { symbol: string; decimals: number };
@@ -240,6 +261,7 @@ export default function FlashbankLoan() {
 	const [loading, setLoading] = useState(false);
 	const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
 	const [browseFilter, setBrowseFilter] = useState<'all' | 'lend' | 'borrow'>('all');
+	const [editing, setEditing] = useState<LoanView | null>(null);
 
 	const pickKind = (kind: string) => registry.find((t) => t.kind === kind)?.address;
 	const defPrincipal = pickKind('usd') || registry[0]?.address || networkConfig.weth;
@@ -337,7 +359,7 @@ export default function FlashbankLoan() {
 				principal: l.principal, collateral: l.collateral, repaymentFee: l.repaymentFee, protocolFee: l.protocolFee,
 				serviceFeeRecipient: l.serviceFeeRecipient, serviceFee: l.serviceFee, duration: l.duration,
 				gracePeriod: l.gracePeriod, offerExpiry: l.offerExpiry, startTime: l.startTime, listed: l.listed,
-				boost: l.boost ?? 0n, settlementValue: l.settlementValue ?? 0n
+				boost: l.boost ?? 0n, settlementValue: l.settlementValue ?? 0n, version: l.version ?? 0n
 			}));
 			setLoans(mapped);
 			await fetchMeta(mapped.flatMap((l) => [l.principalToken, l.collateralToken]));
@@ -421,14 +443,14 @@ export default function FlashbankLoan() {
 			const grace = BigInt(Math.round(graceDays * 86400));
 			if (duration <= 0n) { toast.error('Term must be at least a fraction of a day'); return; }
 
-			// Optional surplus return: store the agreed worth of the WHOLE collateral in principal
-			// units (collateralUnits * price / 10^cDec). Frozen on-chain — never read from an oracle.
+			// Optional surplus return: settlementValue is the agreed rate applied to the WHOLE collateral
+			// (collateralUnits * rate / 10^cDec), in principal-token units. Frozen on-chain — never an oracle.
 			let settlementValue = 0n;
 			if (returnSurplus) {
-				if (!settlementPrice || Number(settlementPrice) <= 0) { toast.error('Set a settlement price to return surplus on default'); return; }
+				if (!settlementPrice || Number(settlementPrice) <= 0) { toast.error('Set an agreed rate to return surplus on default'); return; }
 				const priceUnits = ethers.parseUnits(settlementPrice, pDec);
 				settlementValue = (collateral * priceUnits) / (10n ** BigInt(cDec));
-				if (settlementValue <= fee + principal) { toast.error('Settlement price is too low — at that value the lender would still take all the collateral'); return; }
+				if (settlementValue <= fee + principal) { toast.error('Agreed rate is too low — at that rate the lender would still take all the collateral'); return; }
 			}
 
 			const params = {
@@ -471,7 +493,8 @@ export default function FlashbankLoan() {
 					address: contractAddress as `0x${string}`, abi: P2P_ABI, functionName: 'quoteTake', args: [BigInt(loan.id)]
 				} as any) as [string, bigint];
 				await ensureAllowance(token, amount);
-				const hash = await safeWrite(contractAddress as `0x${string}`, P2P_ABI, 'take', [BigInt(loan.id)]);
+				// Pin the terms we just quoted: takeChecked reverts if the creator re-priced in the meantime.
+				const hash = await safeWrite(contractAddress as `0x${string}`, P2P_ABI, 'takeChecked', [BigInt(loan.id), loan.version]);
 				await publicClient.waitForTransactionReceipt({ hash });
 				await refresh();
 				await fetchBalances([loan.principalToken, loan.collateralToken]);
@@ -507,6 +530,30 @@ export default function FlashbankLoan() {
 				await refresh();
 				await fetchBalances([loan.principalToken, loan.collateralToken]);
 			})(), labels);
+		} catch { /* handled */ }
+	};
+
+	// Amend an open offer in place (re-price / change terms) and/or top up its featured boost.
+	// In-place editing keeps the existing boost attached, so re-pricing never forfeits placement.
+	const handleUpdateOffer = async (loan: LoanView, update: any, termsChanged: boolean, boostTopUp: bigint) => {
+		if (!publicClient) return;
+		if (!isConnected) { toast.error('Connect a wallet first'); return; }
+		if (!termsChanged && boostTopUp <= 0n) { setEditing(null); return; }
+		try {
+			await toast.promise((async () => {
+				if (termsChanged) {
+					const hash = await safeWrite(contractAddress as `0x${string}`, P2P_ABI, 'updateOffer', [BigInt(loan.id), update]);
+					await publicClient.waitForTransactionReceipt({ hash });
+				}
+				if (boostTopUp > 0n) {
+					await ensureAllowance(loan.principalToken, boostTopUp);
+					const bh = await safeWrite(contractAddress as `0x${string}`, P2P_ABI, 'boostOffer', [BigInt(loan.id), boostTopUp]);
+					await publicClient.waitForTransactionReceipt({ hash: bh });
+				}
+				await refresh();
+				await fetchBalances([loan.principalToken, loan.collateralToken]);
+				setEditing(null);
+			})(), { loading: 'Updating offer...', success: 'Offer updated', error: 'Could not update offer' });
 		} catch { /* handled */ }
 	};
 
@@ -551,7 +598,7 @@ export default function FlashbankLoan() {
 
 	// Surplus-return preview (human units, display only — the contract does this in integer maths).
 	const settlementPriceNum = parseFloat(settlementPrice) || 0;
-	const settlementWorth = collateralNum * settlementPriceNum; // worth of ALL collateral, in principal units
+	const settlementWorth = collateralNum * settlementPriceNum; // ALL collateral valued at the agreed rate, in principal units
 	const defaultLenderColl = returnSurplus && settlementWorth > totalRepay
 		? collateralNum * (totalRepay / settlementWorth)
 		: collateralNum;
@@ -672,7 +719,7 @@ export default function FlashbankLoan() {
 								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 									{browseOffers.map((l) => (
 										<OfferCard key={l.id} loan={l} mine={l.creator.toLowerCase() === me} pInfo={tokenInfo(l.principalToken)} cInfo={tokenInfo(l.collateralToken)}
-											fmt={fmt} isConnected={isConnected} onTake={() => handleTake(l)} onCancel={() => handleSimpleAction(l, 'cancel')} />
+											fmt={fmt} isConnected={isConnected} onTake={() => handleTake(l)} onCancel={() => handleSimpleAction(l, 'cancel')} onEdit={() => setEditing(l)} />
 									))}
 								</div>
 							)}
@@ -796,18 +843,18 @@ export default function FlashbankLoan() {
 												<input type="checkbox" checked={returnSurplus} onChange={(e) => setReturnSurplus(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
 												<span className="text-sm text-gray-700">
 													<span className="font-medium">Return surplus collateral on default</span>
-													<span className="block text-[11px] text-gray-400">On a default the lender keeps only the collateral worth <strong>{trimAmount(String(totalRepay))} {pInfo.symbol}</strong> (principal + fee); the rest returns to the borrower. The value is agreed now and frozen on-chain — never read from an oracle. Leave off for a straight pledge (the lender takes all the collateral).</span>
+													<span className="block text-[11px] text-gray-400">On a default the lender keeps only the collateral that covers <strong>{trimAmount(String(totalRepay))} {pInfo.symbol}</strong> (principal + fee) <strong>at the agreed rate</strong>; the rest returns to the borrower. The rate is agreed now and frozen on-chain — never read from an oracle. Leave off for a straight pledge (the lender takes all the collateral).</span>
 												</span>
 											</label>
 											{returnSurplus && (
 												<>
-													<Field label={`Settlement price — 1 ${cInfo.symbol} = ? ${pInfo.symbol}`} hint="What you both agree the collateral is worth today. Same token on both sides? Use 1.">
+													<Field label={`Agreed rate — 1 ${cInfo.symbol} = ? ${pInfo.symbol}`} hint="The rate you both agree on, frozen on-chain — never an oracle. Same token on both sides? Use 1.">
 														<input value={settlementPrice} onChange={(e) => setSettlementPrice(e.target.value)} placeholder={pInfo.symbol === cInfo.symbol ? '1' : '0'} className={INPUT_CLS} />
 													</Field>
 													{collateralNum > 0 && settlementPriceNum > 0 && (
 														<p className="text-[11px] text-gray-600 bg-emerald-50/70 rounded-lg p-2">
 															On a default: lender receives <strong>{trimAmount(defaultLenderColl.toFixed(6))} {cInfo.symbol}</strong>, borrower reclaims <strong>{trimAmount(defaultBorrowerColl.toFixed(6))} {cInfo.symbol}</strong>.
-															{settlementWorth <= totalRepay && <span className="block text-amber-600 mt-0.5">At this price the collateral only just covers the debt, so the lender would still take it all — raise the price to leave a surplus.</span>}
+															{settlementWorth <= totalRepay && <span className="block text-amber-600 mt-0.5">At this rate the collateral only just covers the debt, so the lender would still take it all — raise the rate to leave a surplus.</span>}
 														</p>
 													)}
 												</>
@@ -826,7 +873,8 @@ export default function FlashbankLoan() {
 								<div className="lg:sticky lg:top-20 space-y-4">
 									<DealSummary role={role} pInfo={pInfo} cInfo={cInfo} principalNum={principalNum} collateralNum={collateralNum}
 										feeAmount={feeAmount} totalRepay={totalRepay} termDays={termDays} graceDays={graceDays} feePct={feePct}
-										boostNum={boostNum} interfacePct={protocolBps / 100} />
+										boostNum={boostNum} interfacePct={protocolBps / 100}
+										returnSurplus={returnSurplus} defaultLenderColl={defaultLenderColl} defaultBorrowerColl={defaultBorrowerColl} />
 
 									<button onClick={handleCreate} disabled={Boolean(createDisabledReason)}
 										className="w-full bg-emerald-600 text-white px-6 py-3 rounded-xl text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm">
@@ -868,7 +916,7 @@ export default function FlashbankLoan() {
 											<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 												{myOpenOffers.map((l) => (
 													<OfferCard key={l.id} loan={l} mine pInfo={tokenInfo(l.principalToken)} cInfo={tokenInfo(l.collateralToken)}
-														fmt={fmt} isConnected={isConnected} onTake={() => handleTake(l)} onCancel={() => handleSimpleAction(l, 'cancel')} />
+														fmt={fmt} isConnected={isConnected} onTake={() => handleTake(l)} onCancel={() => handleSimpleAction(l, 'cancel')} onEdit={() => setEditing(l)} />
 												))}
 											</div>
 										)}
@@ -904,6 +952,16 @@ export default function FlashbankLoan() {
 						collateral to cover the loan — its value can move during the term. Smart-contract and token risk apply.
 					</p>
 				</main>
+
+				{editing && (
+					<EditOfferModal
+						loan={editing}
+						pInfo={tokenInfo(editing.principalToken)}
+						cInfo={tokenInfo(editing.collateralToken)}
+						onClose={() => setEditing(null)}
+						onSubmit={(update, termsChanged, topUp) => handleUpdateOffer(editing, update, termsChanged, topUp)}
+					/>
+				)}
 
 				<SiteFooter />
 			</div>
@@ -1104,10 +1162,13 @@ function TokenAmountRow({ label, tokens, value, onSelect, info, balances, tokenI
 	);
 }
 
-function DealSummary({ role, pInfo, cInfo, principalNum, collateralNum, feeAmount, totalRepay, termDays, graceDays, feePct, boostNum, interfacePct }: {
+function DealSummary({ role, pInfo, cInfo, principalNum, collateralNum, feeAmount, totalRepay, termDays, graceDays, feePct, boostNum, interfacePct, returnSurplus, defaultLenderColl, defaultBorrowerColl }: {
 	role: 'lend' | 'borrow'; pInfo: TokenInfo; cInfo: TokenInfo; principalNum: number; collateralNum: number;
 	feeAmount: number; totalRepay: number; termDays: number; graceDays: number; feePct: number; boostNum: number; interfacePct: number;
+	returnSurplus: boolean; defaultLenderColl: number; defaultBorrowerColl: number;
 }) {
+	const surplus = returnSurplus && defaultBorrowerColl > 0;
+	const lenderPct = collateralNum > 0 ? Math.min((defaultLenderColl / collateralNum) * 100, 100) : 100;
 	const p = principalNum > 0 ? `${trimAmount(String(principalNum))} ${pInfo.symbol}` : `— ${pInfo.symbol}`;
 	const c = collateralNum > 0 ? `${trimAmount(String(collateralNum))} ${cInfo.symbol}` : `— ${cInfo.symbol}`;
 	const repay = principalNum > 0 ? `${trimAmount(String(totalRepay))} ${pInfo.symbol}` : `— ${pInfo.symbol}`;
@@ -1133,6 +1194,14 @@ function DealSummary({ role, pInfo, cInfo, principalNum, collateralNum, feeAmoun
 				<div className="border-t border-gray-100" />
 				<SummaryRow label="Interface fee" value={interfacePct === 0 ? '0% — introductory' : `${interfacePct}%`} />
 				<SummaryRow label="Featured boost" value={boostNum > 0 ? `${trimAmount(String(boostNum))} ${pInfo.symbol}` : 'none'} />
+				{collateralNum > 0 && (
+					<>
+						<div className="border-t border-gray-100" />
+						<DefaultSplit surplus={surplus} lenderPct={lenderPct}
+							lenderLabel={surplus ? `Lender ${trimAmount(defaultLenderColl.toFixed(4))} ${cInfo.symbol}` : `Lender keeps all ${cInfo.symbol}`}
+							borrowerLabel={`Borrower ${trimAmount(defaultBorrowerColl.toFixed(4))} ${cInfo.symbol}`} />
+					</>
+				)}
 			</dl>
 		</div>
 	);
@@ -1147,6 +1216,34 @@ function SummaryRow({ label, value, strong }: { label: string; value: string; st
 	);
 }
 
+// Compact collateral-split bar: red = the share the lender keeps on default, green = the surplus that
+// returns to the borrower. With no agreed rate (full forfeit) it renders as a single red bar.
+function MiniSplitBar({ lenderPct, lenderLabel, borrowerLabel }: { lenderPct: number; lenderLabel: string; borrowerLabel?: string }) {
+	const lp = Math.min(Math.max(lenderPct, 0), 100);
+	const hasSurplus = Boolean(borrowerLabel) && lp < 99.9;
+	return (
+		<div className="flex h-6 rounded-md overflow-hidden text-[10px] font-semibold text-white">
+			<div className="bg-red-500 flex items-center justify-center px-1.5 text-center leading-none truncate" style={{ flex: hasSurplus ? Math.max(lp, 1) : 100 }} title={lenderLabel}>{lenderLabel}</div>
+			{hasSurplus && (
+				<div className="bg-emerald-500 flex items-center justify-center px-1.5 text-center leading-none truncate" style={{ flex: Math.max(100 - lp, 1) }} title={borrowerLabel}>{borrowerLabel}</div>
+			)}
+		</div>
+	);
+}
+
+// Label + compact split bar describing what happens to the collateral if the deadline is missed.
+function DefaultSplit({ surplus, lenderPct, lenderLabel, borrowerLabel }: { surplus: boolean; lenderPct: number; lenderLabel: string; borrowerLabel?: string }) {
+	return (
+		<div>
+			<div className="flex items-center justify-between text-[11px] text-gray-400 mb-1">
+				<span>If the deadline is missed</span>
+				<span className={surplus ? 'text-emerald-600' : ''}>{surplus ? 'surplus returned' : 'full forfeit'}</span>
+			</div>
+			<MiniSplitBar lenderPct={lenderPct} lenderLabel={lenderLabel} borrowerLabel={surplus ? borrowerLabel : undefined} />
+		</div>
+	);
+}
+
 function TokenPair({ pInfo, cInfo }: { pInfo: TokenInfo; cInfo: TokenInfo }) {
 	return (
 		<div className="flex items-center">
@@ -1156,9 +1253,9 @@ function TokenPair({ pInfo, cInfo }: { pInfo: TokenInfo; cInfo: TokenInfo }) {
 	);
 }
 
-function OfferCard({ loan, mine, pInfo, cInfo, fmt, isConnected, onTake, onCancel }: {
+function OfferCard({ loan, mine, pInfo, cInfo, fmt, isConnected, onTake, onCancel, onEdit }: {
 	loan: LoanView; mine: boolean; pInfo: TokenInfo; cInfo: TokenInfo;
-	fmt: (a: bigint, t: string) => string; isConnected: boolean; onTake: () => void; onCancel: () => void;
+	fmt: (a: bigint, t: string) => string; isConnected: boolean; onTake: () => void; onCancel: () => void; onEdit?: () => void;
 }) {
 	const isLend = loan.creatorIsLender;
 	const featured = loan.boost > 0n;
@@ -1186,17 +1283,35 @@ function OfferCard({ loan, mine, pInfo, cInfo, fmt, isConnected, onTake, onCance
 				<SummaryRow label="Collateral" value={fmt(loan.collateral, loan.collateralToken)} />
 				<SummaryRow label="Fee" value={fmt(loan.repaymentFee, loan.principalToken)} />
 				<SummaryRow label="Term" value={`${formatDuration(loan.duration)} (+${formatDuration(loan.gracePeriod)} grace)`} />
-				<SummaryRow label="On default" value={loan.settlementValue > 0n ? 'Surplus returned to borrower' : 'Lender keeps all collateral'} />
 				{featured && <SummaryRow label="Boost" value={fmt(loan.boost, loan.principalToken)} />}
 				{loan.serviceFee > 0n && <SummaryRow label="Service fee" value={`${fmt(loan.serviceFee, loan.principalToken)} → ${formatAddress(loan.serviceFeeRecipient)}`} />}
 				{loan.allowedTaker !== ZERO && (
 					<div className="flex items-center gap-1 text-[11px] text-amber-600"><Lock className="h-3 w-3" /> Private to {formatAddress(loan.allowedTaker)}</div>
 				)}
 			</dl>
+			{(() => {
+				const { toLender, toBorrower } = splitOnDefault(loan.collateral, loan.principal + loan.repaymentFee, loan.settlementValue);
+				const surplus = loan.settlementValue > 0n && toBorrower > 0n;
+				const lenderPct = surplus && loan.collateral > 0n ? Number((toLender * 10000n) / loan.collateral) / 100 : 100;
+				return (
+					<div className="mt-3">
+						<DefaultSplit surplus={surplus} lenderPct={lenderPct}
+							lenderLabel={surplus ? `Lender ${fmt(toLender, loan.collateralToken)}` : `Lender keeps all ${cInfo.symbol}`}
+							borrowerLabel={`Borrower ${fmt(toBorrower, loan.collateralToken)}`} />
+					</div>
+				);
+			})()}
 			<div className="mt-3 flex items-center justify-between gap-2">
 				<span className="text-xs text-gray-400">by {mine ? 'you' : formatAddress(loan.creator)}</span>
 				{mine ? (
-					<button onClick={onCancel} className="text-sm bg-gray-100 text-gray-700 px-4 py-1.5 rounded-lg hover:bg-gray-200 font-medium">Cancel offer</button>
+					<div className="flex items-center gap-2">
+						{onEdit && (
+							<button onClick={onEdit} className="inline-flex items-center gap-1.5 text-sm bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-lg hover:bg-emerald-100 font-medium">
+								<Pencil className="h-3.5 w-3.5" /> Edit
+							</button>
+						)}
+						<button onClick={onCancel} className="text-sm bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-200 font-medium">Cancel</button>
+					</div>
 				) : (
 					<button onClick={onTake} disabled={!isConnected} className="inline-flex items-center gap-1.5 text-sm bg-emerald-600 text-white px-4 py-1.5 rounded-lg hover:bg-emerald-700 disabled:opacity-50 font-medium">
 						{isLend ? 'Borrow this' : 'Fund this'} <ArrowRight className="h-3.5 w-3.5" />
@@ -1265,6 +1380,137 @@ function ActiveLoanCard({ loan, now, me, fmt, onRepay, onClaim }: {
 						</p>
 					);
 				})()}
+			</div>
+		</div>
+	);
+}
+
+// Re-price / amend an open offer in place. Only edits terms that don't touch the escrow (fee, timing,
+// agreed rate) plus an optional featured top-up; amount/token changes need a fresh offer. Pre-fills the
+// current terms and previews the new on-default split live.
+function EditOfferModal({ loan, pInfo, cInfo, onClose, onSubmit }: {
+	loan: LoanView; pInfo: TokenInfo; cInfo: TokenInfo;
+	onClose: () => void;
+	onSubmit: (update: any, termsChanged: boolean, boostTopUp: bigint) => void;
+}) {
+	const pDec = pInfo.decimals;
+	const cDec = cInfo.decimals;
+	const collNum = Number(ethers.formatUnits(loan.collateral, cDec));
+	const principalNum = Number(ethers.formatUnits(loan.principal, pDec));
+	const initialFee = trimAmount(ethers.formatUnits(loan.repaymentFee, pDec));
+	const initialTerm = Number(loan.duration) / 86400;
+	const initialGrace = Number(loan.gracePeriod) / 86400;
+	const initialReturn = loan.settlementValue > 0n;
+	const initialRate = initialReturn && collNum > 0
+		? trimAmount(String(Number(ethers.formatUnits(loan.settlementValue, pDec)) / collNum))
+		: '';
+
+	const [fee, setFee] = useState(initialFee);
+	const [termDays, setTermDays] = useState(String(initialTerm));
+	const [graceDays, setGraceDays] = useState(String(initialGrace));
+	const [returnSurplus, setReturnSurplus] = useState(initialReturn);
+	const [rate, setRate] = useState(initialRate);
+	const [boostTopUp, setBoostTopUp] = useState('');
+
+	const feeNum = parseFloat(fee) || 0;
+	const rateNum = parseFloat(rate) || 0;
+	const termNum = parseFloat(termDays) || 0;
+	const graceNum = parseFloat(graceDays) || 0;
+	const topUpNum = parseFloat(boostTopUp) || 0;
+	const debtNum = principalNum + feeNum;
+	const worth = returnSurplus ? collNum * rateNum : 0;
+	const lenderColl = returnSurplus && worth > debtNum ? collNum * (debtNum / worth) : collNum;
+	const borrowerColl = Math.max(collNum - lenderColl, 0);
+	const surplus = returnSurplus && borrowerColl > 0;
+	const lenderPct = collNum > 0 ? Math.min((lenderColl / collNum) * 100, 100) : 100;
+	const rateTooLow = returnSurplus && rateNum > 0 && worth <= debtNum;
+
+	const changed = fee !== initialFee || termNum !== initialTerm || graceNum !== initialGrace
+		|| returnSurplus !== initialReturn || (returnSurplus && rate !== initialRate);
+	const canSave = termNum > 0 && !(returnSurplus && rateNum <= 0) && !rateTooLow && (changed || topUpNum > 0);
+
+	const submit = () => {
+		const repaymentFee = ethers.parseUnits(fee || '0', pDec);
+		const duration = BigInt(Math.round(termNum * 86400));
+		const gracePeriod = BigInt(Math.round(graceNum * 86400));
+		let settlementValue = 0n;
+		if (returnSurplus && rateNum > 0) {
+			settlementValue = (loan.collateral * ethers.parseUnits(rate, pDec)) / (10n ** BigInt(cDec));
+		}
+		// Carry the listing expiry through untouched, but clear one that has already lapsed:
+		// the contract rejects a past expiry, and editing a still-open offer effectively relists it.
+		const nowSec = BigInt(Math.floor(Date.now() / 1000));
+		const offerExpiry = loan.offerExpiry !== 0n && loan.offerExpiry <= nowSec ? 0n : loan.offerExpiry;
+		const update = {
+			repaymentFee, duration, gracePeriod, offerExpiry,
+			settlementValue, allowedTaker: loan.allowedTaker,
+			serviceFeeRecipient: loan.serviceFeeRecipient, serviceFee: loan.serviceFee
+		};
+		const termsChanged = repaymentFee !== loan.repaymentFee || duration !== loan.duration
+			|| gracePeriod !== loan.gracePeriod || settlementValue !== loan.settlementValue || offerExpiry !== loan.offerExpiry;
+		const topUp = boostTopUp ? ethers.parseUnits(boostTopUp, pDec) : 0n;
+		onSubmit(update, termsChanged, topUp);
+	};
+
+	return (
+		<div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 sm:p-4" onClick={onClose}>
+			<div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+				<div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
+					<div>
+						<h3 className="text-base font-semibold text-gray-900">Edit offer #{loan.id}</h3>
+						<p className="text-xs text-gray-400">Re-price or change terms — featured placement is kept.</p>
+					</div>
+					<button onClick={onClose} className="text-gray-400 hover:text-gray-700" aria-label="Close"><X className="h-5 w-5" /></button>
+				</div>
+
+				<div className="p-5 space-y-4">
+					<div className="text-xs text-gray-500 bg-gray-50 rounded-lg p-3">
+						Fixed for this offer: <strong>{loan.creatorIsLender ? 'lend' : 'borrow'} {trimAmount(ethers.formatUnits(loan.principal, pDec))} {pInfo.symbol}</strong> against <strong>{trimAmount(ethers.formatUnits(loan.collateral, cDec))} {cInfo.symbol}</strong>. To change the amounts or tokens, cancel and post a new offer.
+					</div>
+
+					<Field label={`Flat fee (${pInfo.symbol})`} hint={principalNum > 0 ? `${feeNum > 0 ? ((feeNum / principalNum) * 100).toFixed(2) : '0'}% of principal` : undefined}>
+						<input inputMode="decimal" value={fee} onChange={(e) => setFee(e.target.value.replace(/[^0-9.]/g, ''))} className={INPUT_CLS} />
+					</Field>
+
+					<div className="grid grid-cols-2 gap-3">
+						<Field label="Term (days)">
+							<input inputMode="decimal" value={termDays} onChange={(e) => setTermDays(e.target.value.replace(/[^0-9.]/g, ''))} className={INPUT_CLS} />
+						</Field>
+						<Field label="Grace (days)">
+							<input inputMode="decimal" value={graceDays} onChange={(e) => setGraceDays(e.target.value.replace(/[^0-9.]/g, ''))} className={INPUT_CLS} />
+						</Field>
+					</div>
+
+					<div className="rounded-lg border border-gray-200 p-3 space-y-3">
+						<label className="flex items-start gap-2 cursor-pointer">
+							<input type="checkbox" checked={returnSurplus} onChange={(e) => setReturnSurplus(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+							<span className="text-sm text-gray-700">
+								<span className="font-medium">Return surplus collateral on default</span>
+								<span className="block text-[11px] text-gray-400">Lender keeps only what covers the debt at the agreed rate; the rest goes back. Off = straight pledge.</span>
+							</span>
+						</label>
+						{returnSurplus && (
+							<Field label={`Agreed rate — 1 ${cInfo.symbol} = ? ${pInfo.symbol}`} hint="Frozen on-chain — never an oracle.">
+								<input inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value.replace(/[^0-9.]/g, ''))} placeholder={pInfo.symbol === cInfo.symbol ? '1' : '0'} className={INPUT_CLS} />
+							</Field>
+						)}
+						{collNum > 0 && (
+							<DefaultSplit surplus={surplus} lenderPct={lenderPct}
+								lenderLabel={surplus ? `Lender ${trimAmount(lenderColl.toFixed(4))} ${cInfo.symbol}` : `Lender keeps all ${cInfo.symbol}`}
+								borrowerLabel={`Borrower ${trimAmount(borrowerColl.toFixed(4))} ${cInfo.symbol}`} />
+						)}
+						{rateTooLow && <p className="text-[11px] text-amber-600">At this rate the collateral only covers the debt — raise it to leave a surplus, or turn this off.</p>}
+					</div>
+
+					<Field label={`Add featured boost (${pInfo.symbol})`} hint={loan.boost > 0n ? `Currently ${trimAmount(ethers.formatUnits(loan.boost, pDec))} ${pInfo.symbol} — top-ups add to it.` : 'Optional — ranks your offer higher. Non-refundable.'}>
+						<input inputMode="decimal" value={boostTopUp} onChange={(e) => setBoostTopUp(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="0.0" className={INPUT_CLS} />
+					</Field>
+				</div>
+
+				<div className="flex gap-2 px-5 py-4 border-t border-gray-100 sticky bottom-0 bg-white">
+					<button onClick={onClose} className="flex-1 text-sm bg-gray-100 text-gray-700 px-4 py-2.5 rounded-lg hover:bg-gray-200 font-medium">Cancel</button>
+					<button onClick={submit} disabled={!canSave} className="flex-1 text-sm bg-emerald-600 text-white px-4 py-2.5 rounded-lg hover:bg-emerald-700 disabled:opacity-50 font-medium">Save changes</button>
+				</div>
 			</div>
 		</div>
 	);

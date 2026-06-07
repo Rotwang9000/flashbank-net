@@ -24,8 +24,8 @@ i.e. losing the core intents. What we *can* do without losing them is adopt Lorr
 WHYSIDEAS a small Core extension that recognises a *time-settled, flat-fee* profile.
 
 **Update — [Option B](#option-b--add-surplus-return-without-an-oracle) is now implemented.** Lorrow's
-surplus-return guardrail is honoured **with no oracle at all** via an optional `settlementValue` (the
-agreed worth of the whole collateral in loan-asset terms, frozen at origination). It is opt-in: set it and
+surplus-return guardrail is honoured **with no oracle at all** via an optional agreed rate (loan-token per
+collateral-token, stored as `settlementValue` and frozen at origination). It is opt-in: set it and
 a defaulting borrower recovers any surplus beyond `principal + repaymentFee`; leave it `0` and the original
 full-forfeit pledge still applies. This closes the only Core *guardrail* we were breaching.
 
@@ -128,12 +128,14 @@ Cost: documentation + optional event/field renames. No change to mechanics, no o
 ### Option B — Add surplus return *without* an oracle ✅ **IMPLEMENTED**
 
 The only Core *guardrail* we breached was surplus return, and the reason was that surplus needs a
-**valuation**. An oracle is one source of valuation — but a **value agreed by both parties at origination
-and stored immutably** is another, and it needs no oracle.
+**valuation**. An oracle is one source of valuation — but the **exchange rate the two parties already
+agree on at origination**, stored immutably, is another, and it needs no oracle. A loan here is really
+just two tokens swapped at that agreed rate (loan-token per collateral-token) plus a flat fee, so
+"surplus" is simply collateral pledged *beyond* what was borrowed at that rate.
 
-Each offer now carries an optional `uint256 settlementValue`: the agreed worth of the **whole** pledged
-collateral, denominated in the principal (loan) token, frozen at `createLoan`. On default `claimDefault`
-splits the collateral (see `_splitCollateralOnDefault`):
+Each offer now carries an optional `uint256 settlementValue`: the agreed rate × the pledged collateral
+(i.e. the **whole** collateral's agreed worth in the principal/loan token), frozen at `createLoan`. On
+default `claimDefault` splits the collateral (see `_splitCollateralOnDefault`):
 
 1. `settlementValue == 0` → **full forfeit**: the lender takes all collateral (the original pledge/pawn).
 2. `settlementValue <= principal + repaymentFee` → the agreed value does not even cover the debt, so the

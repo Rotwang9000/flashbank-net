@@ -5,6 +5,7 @@ import {
 	Scale, Ban, Timer
 } from 'lucide-react';
 import CollateralSplitDiagram from './CollateralSplitDiagram';
+import SurplusCaseStudies from './SurplusCaseStudies';
 
 // Standalone, presentational "How it works" panel: the lifecycle, the timeline, the fee model
 // and the transparency "proofs". Everything it needs is passed in (no module-level state), so it
@@ -62,21 +63,37 @@ export default function HowItWorks({ explorer, contractAddress, isPlayground, pr
 				</div>
 			</section>
 
-			{/* Collateral on default — the surplus question */}
+			{/* Collateral on default — where surplus comes from */}
 			<section>
-				<Heading eyebrow="When a deadline is missed" title="Where the collateral goes on default" />
+				<Heading eyebrow="When a deadline is missed" title="Where does the &ldquo;surplus&rdquo; come from?" />
 				<p className="text-sm text-gray-600 mb-4 max-w-3xl">
-					Every figure is locked when the loan is created — there&apos;s no oracle and nothing floats — so the result of a
-					default is known up front. The only decision is <em>how much</em> of the pledge the lender may keep. &ldquo;Surplus&rdquo;
-					here isn&apos;t a market gain; it&apos;s simply the slice of a chunky pledge that <strong>isn&apos;t needed</strong> to cover
-					the debt at the value both sides agreed.
+					Forget price feeds. A loan here is just two tokens swapped at a rate you both agree — say
+					<strong> 1 fpETH = 500 fpUSD</strong> — plus a flat fee. Every figure is fixed when the loan is created, so a default&apos;s
+					outcome is known on day one. &ldquo;Surplus&rdquo; isn&apos;t a market gain: it&apos;s simply collateral you pledged
+					<em> beyond</em> what you borrowed at that agreed rate. So it depends entirely on how much you pledge:
 				</p>
-				<CollateralSplitDiagram />
+				<div className="grid lg:grid-cols-2 gap-4">
+					<CollateralSplitDiagram title="Borrow the full value (repo-style)" tag="≈ no surplus"
+						principal={1450} fee={50} collateral={3} agreedRate={500} />
+					<CollateralSplitDiagram title="Borrow less than the value (pawn-style)" tag="surplus exists"
+						principal={500} fee={18} collateral={3} agreedRate={500} />
+				</div>
 				<p className="text-xs text-gray-500 mt-4 max-w-3xl">
-					Leave the agreed value at zero for a classic, pawn-style pledge (the default). Set it, and a defaulting borrower
-					gets the excess back instead of losing a whole asset over a missed hour. It&apos;s opt-in per offer — and it&apos;s the
-					same switch that makes a loan <a href="/lorrow" className="text-emerald-700 hover:text-emerald-900 font-medium">Lorrow-compatible</a>.
+					Borrow right up to the collateral&apos;s agreed value and there&apos;s nothing extra — default just completes the swap.
+					Pledge <em>more</em> than you borrow and a surplus appears; the only question is who keeps it. Leave the agreed rate
+					unset for a plain pledge (lender keeps everything); set it and the borrower reclaims the over-pledge. It&apos;s opt-in per
+					offer — and the same switch that makes a loan <a href="/lorrow" className="text-emerald-700 hover:text-emerald-900 font-medium">Lorrow-compatible</a>.
 				</p>
+			</section>
+
+			{/* Case studies */}
+			<section>
+				<Heading eyebrow="Why bother, and who wins" title="Case studies: the agreed rate is the whole story" />
+				<p className="text-sm text-gray-600 mb-4 max-w-3xl">
+					Since nothing on-chain floats, the only thing that can change is the <em>real</em> market rate during the term.
+					Here&apos;s why someone picks each setting, and who comes out ahead when that rate drifts from the one they agreed.
+				</p>
+				<SurplusCaseStudies />
 			</section>
 
 			{/* The model */}
@@ -136,7 +153,7 @@ export default function HowItWorks({ explorer, contractAddress, isPlayground, pr
 						<h3 className="text-sm font-semibold">Be clear-eyed about the trade-offs</h3>
 					</div>
 					<ul className="grid sm:grid-cols-3 gap-3 text-xs text-amber-900/90">
-						<Caveat icon={<Scale className="h-4 w-4" />} text="No margin calls. Collateral value can drift during the term, so lenders should over-collateralise to taste." />
+						<Caveat icon={<Scale className="h-4 w-4" />} text="No margin calls. The market rate can drift from the rate you agreed during the term — a lender leans safe by agreeing a conservative rate (or taking the whole pledge)." />
 						<Caveat icon={<Ban className="h-4 w-4" />} text="No price oracle means no early liquidation — that's the point, but it's a deliberate trade-off." />
 						<Caveat icon={<Code2 className="h-4 w-4" />} text="Smart-contract and token risk always apply. Fee-on-transfer / rebasing tokens are unsupported." />
 					</ul>

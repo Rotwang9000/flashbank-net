@@ -38,8 +38,8 @@ const DIFFER: DifferRow[] = [
 	},
 	{
 		lorrow: 'Surplus Return at default (mandatory guardrail)',
-		flashbank: 'Now honoured via an opt-in settlementValue (Option B). Set it and claimDefault returns the surplus to the borrower; leave it 0 and the lender takes the whole collateral (the original pledge/pawn).',
-		why: 'Surplus needs a valuation. Rather than a live oracle we use a value agreed at origination and frozen — satisfying the guardrail while keeping intent #1 (no oracle).',
+		flashbank: 'Now honoured via an opt-in agreed rate (Option B). Set a rate (loan-token per collateral-token, stored as settlementValue) and claimDefault returns the over-pledged surplus to the borrower; leave it 0 and the lender takes the whole collateral (the original pledge/pawn).',
+		why: 'Surplus only needs the rate the two parties already agree on. Rather than a live oracle we freeze that rate at origination — satisfying the guardrail while keeping intent #1 (no oracle).',
 		honoured: true
 	},
 	{
@@ -197,9 +197,10 @@ export default function LorrowCompatibility() {
 						</div>
 						<p className="text-sm text-emerald-900/90">
 							Lorrow Core flags seizing a defaulter&apos;s surplus collateral as &ldquo;the single most predatory move in collateralized lending.&rdquo;
-							Each offer can now carry an optional <Mono>settlementValue</Mono> — the agreed worth of the whole collateral in loan-asset terms,
-							frozen at origination. On default the lender keeps only the collateral covering <Mono>principal + repaymentFee</Mono>; the surplus
-							returns to the borrower. Left at <Mono>0</Mono>, the original full-forfeit pledge still applies. No live price is ever read.
+							Each offer can now carry an optional <strong>agreed rate</strong> — loan-token per 1 collateral-token (e.g. 1 fpETH = 500 fpUSD),
+							stored on-chain as <Mono>settlementValue</Mono> and frozen at origination. On default the lender keeps only the collateral that
+							covers <Mono>principal + repaymentFee</Mono> at that rate; the over-pledged surplus returns to the borrower. Left at <Mono>0</Mono>,
+							the original full-forfeit pledge still applies. No live price is ever read.
 						</p>
 					</div>
 
@@ -207,8 +208,9 @@ export default function LorrowCompatibility() {
 					<section>
 						<h2 className="text-xl font-bold text-gray-900 mb-1 flex items-center gap-2"><GitCompareArrows className="h-5 w-5 text-emerald-600" /> What the split looks like</h2>
 						<p className="text-sm text-gray-600 mb-3 max-w-3xl">
-							Because the <Mono>settlementValue</Mono> is frozen at origination, the default outcome is fully determined on day one —
-							no price discovery, no keepers. The lender is made whole at the agreed value and the over-pledged remainder returns to the borrower.
+							Because the agreed rate is frozen at origination, the default outcome is fully determined on day one — no price
+							discovery, no keepers. The lender takes just enough collateral to cover <Mono>principal + repaymentFee</Mono> at that
+							rate, and the over-pledged remainder returns to the borrower.
 						</p>
 						<CollateralSplitDiagram />
 					</section>

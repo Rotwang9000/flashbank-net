@@ -126,24 +126,45 @@ paid when a loan activates; a listed lender-offer that is cancelled refunds the 
   the call reverts (keeps agreed terms exact).
 - Solidity `0.8.24`, OpenZeppelin v4 (`Ownable`, `ReentrancyGuard`, `SafeERC20`), tabs,
   custom errors, basis points — matching `flashloans/contracts/FlashBankRouter.sol`.
-- Default handling has two modes, chosen per offer via `settlementValue` (the agreed worth of the
-  whole collateral in principal-token units, frozen at origination — **not** an oracle):
+- A loan is really two tokens swapped at an **agreed rate** (loan-token per 1 collateral-token),
+  plus a flat fee. "Surplus" is just collateral pledged *beyond* what was borrowed at that rate —
+  it only exists if you over-pledge (a pawn), not if you borrow the full value (a repo).
+- Default handling has two modes, chosen per offer via `settlementValue` (the agreed rate × the
+  collateral amount, i.e. the collateral's agreed worth in principal-token units, frozen at
+  origination — **not** an oracle):
   - `settlementValue == 0` → **full forfeit** (pledge/pawn style): the lender takes all collateral.
   - `settlementValue > 0` → **surplus return**: the lender keeps only the collateral covering
-    `principal + repaymentFee` (`collateral * debt / settlementValue`, rounded in the borrower's
-    favour) and the surplus returns to the borrower. If the agreed value does not even cover the
-    debt, the lender takes everything and absorbs the shortfall. See
+    `principal + repaymentFee` at the agreed rate (`collateral * debt / settlementValue`, rounded in
+    the borrower's favour) and the surplus returns to the borrower. If the agreed rate is so low that
+    it does not even cover the debt, the lender takes everything and absorbs the shortfall. See
     [LORROW_COMPATIBILITY.md](LORROW_COMPATIBILITY.md) (Option B).
 - Configurable penalties / partial repayment remain future work.
 
 ## Risks to surface in the UI
 
-- **Collateral can fall below the loan during the term** (no liquidation until maturity).
-  Lenders mitigate by over-collateralising and keeping terms short. This is the lender's risk.
+- **The market rate can drift from the agreed rate during the term** (no liquidation until maturity).
+  A lender leans safe by agreeing a conservative rate (or taking the whole pledge) and keeping terms
+  short. This is the lender's risk.
 - **On default the borrower forfeits collateral.** With a `settlementValue` set they recover any
   surplus beyond `principal + repaymentFee`; with it unset (`0`) they forfeit the whole collateral,
   which can be worth more than the loan — show this clearly before they post or take an offer.
 - Smart-contract risk, token risk (malicious/rug tokens chosen by a counterparty).
+
+### Default economics — who wins if the rate moves
+
+Nothing on-chain floats, so the only variable is the *real* market rate at the deadline, which drives
+the borrower's repay-vs-default choice. For a loan with debt `D = principal + repaymentFee`, collateral
+`C` and agreed rate `a` (loan-token per collateral-token):
+
+- **Surplus-return mode** (`settlementValue = a·C > D`): on default the lender keeps `D/a` of the
+  collateral and returns `C − D/a`. The borrower repays iff the market rate `m > a` (the algebra:
+  `mC − D > m(C − D/a)` ⟺ `m > a`, independent of `D` and `C`). **So the agreed rate `a` is the
+  lender's break-even.** Above it the borrower repays and the lender just earns the fee; below it the
+  borrower walks and the lender absorbs the shortfall (they returned the cushion). This is effectively
+  a put for the borrower struck at `a` — borrower-friendly, so a lender offering it should set `a`
+  conservatively (a lower rate keeps more collateral).
+- **Plain pledge** (`settlementValue = 0`): the borrower repays iff `m > D/C` (a much lower bar), so
+  the over-pledge itself cushions the lender on the way down. Blunt but lender-protective.
 
 ## Deployed playground (Sepolia testnet — no real value)
 

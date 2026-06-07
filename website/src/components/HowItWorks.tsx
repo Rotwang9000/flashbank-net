@@ -4,6 +4,7 @@ import {
 	Coins, Rocket, ShieldCheck, FlaskConical, Code2, FileCheck2, AlertTriangle, ExternalLink,
 	Scale, Ban, Timer
 } from 'lucide-react';
+import CollateralSplitDiagram from './CollateralSplitDiagram';
 
 // Standalone, presentational "How it works" panel: the lifecycle, the timeline, the fee model
 // and the transparency "proofs". Everything it needs is passed in (no module-level state), so it
@@ -59,6 +60,23 @@ export default function HowItWorks({ explorer, contractAddress, isPlayground, pr
 						time-accruing interest — keeps it simple and avoids riba.
 					</p>
 				</div>
+			</section>
+
+			{/* Collateral on default — the surplus question */}
+			<section>
+				<Heading eyebrow="When a deadline is missed" title="Where the collateral goes on default" />
+				<p className="text-sm text-gray-600 mb-4 max-w-3xl">
+					Every figure is locked when the loan is created — there&apos;s no oracle and nothing floats — so the result of a
+					default is known up front. The only decision is <em>how much</em> of the pledge the lender may keep. &ldquo;Surplus&rdquo;
+					here isn&apos;t a market gain; it&apos;s simply the slice of a chunky pledge that <strong>isn&apos;t needed</strong> to cover
+					the debt at the value both sides agreed.
+				</p>
+				<CollateralSplitDiagram />
+				<p className="text-xs text-gray-500 mt-4 max-w-3xl">
+					Leave the agreed value at zero for a classic, pawn-style pledge (the default). Set it, and a defaulting borrower
+					gets the excess back instead of losing a whole asset over a missed hour. It&apos;s opt-in per offer — and it&apos;s the
+					same switch that makes a loan <a href="/lorrow" className="text-emerald-700 hover:text-emerald-900 font-medium">Lorrow-compatible</a>.
+				</p>
 			</section>
 
 			{/* The model */}

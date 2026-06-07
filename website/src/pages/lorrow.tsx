@@ -2,6 +2,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { ArrowLeft, ExternalLink, ShieldCheck, Scale, Clock, FileText, CheckCircle2, GitCompareArrows } from 'lucide-react';
 import SiteFooter from '../components/SiteFooter';
+import CollateralSplitDiagram from '../components/CollateralSplitDiagram';
 
 // Standalone, content-only page (no wallet wiring) presenting how FlashBank P2P relates to the
 // Lorrow Framework Specification. The tables mirror docs/design/LORROW_COMPATIBILITY.md — keep the
@@ -201,6 +202,16 @@ export default function LorrowCompatibility() {
 							returns to the borrower. Left at <Mono>0</Mono>, the original full-forfeit pledge still applies. No live price is ever read.
 						</p>
 					</div>
+
+					{/* What the split looks like */}
+					<section>
+						<h2 className="text-xl font-bold text-gray-900 mb-1 flex items-center gap-2"><GitCompareArrows className="h-5 w-5 text-emerald-600" /> What the split looks like</h2>
+						<p className="text-sm text-gray-600 mb-3 max-w-3xl">
+							Because the <Mono>settlementValue</Mono> is frozen at origination, the default outcome is fully determined on day one —
+							no price discovery, no keepers. The lender is made whole at the agreed value and the over-pledged remainder returns to the borrower.
+						</p>
+						<CollateralSplitDiagram />
+					</section>
 
 					{/* Align */}
 					<section>

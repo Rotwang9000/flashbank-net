@@ -226,9 +226,12 @@ export default function Audit() {
 							</div>
 
 							<div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-900">
-								<strong>Tested:</strong> 57 passing tests with 21 pending (skipped) — covering reentrancy, failed-repayment reverts,
-								max-borrow guards, overflow on unlimited commitments, and the dual-control flows. The pending tests are a coverage
-								gap we are honest about. Deeper router-specific analysis lives on the <Link href="/security" className="underline">security deep-dive</Link>.
+								<strong>Tested:</strong> 57 passing tests covering reentrancy, failed-repayment reverts, max-borrow guards, overflow on
+								unlimited commitments, and the dual-control flows. The 21 <em>pending</em> tests are a skipped suite for an
+								experimental contract (<Mono>FlashBankRevolutionary</Mono>) that is <strong>not deployed</strong> — they are not a gap in
+								the live router. We are honest that the router has known centralisation trade-offs (below); a prioritised
+								<a href={`${GITHUB}/blob/master/docs/design/ROUTER_IMPROVEMENTS.md`} target="_blank" rel="noopener noreferrer" className="underline"> improvement plan</a> is
+								published. Deeper analysis lives on the <Link href="/security" className="underline">security deep-dive</Link>.
 							</div>
 						</div>
 					</section>
@@ -314,9 +317,9 @@ export default function Audit() {
 						<div className="bg-white rounded-2xl border border-gray-200 p-5">
 							<h3 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5 mb-2"><ShieldCheck className="h-4 w-4 text-gray-400" /> Responsible disclosure</h3>
 							<p className="text-sm text-gray-600 leading-relaxed">
-								Found something we missed? Please tell us before telling the world. Open an issue or PR on{' '}
-								<a href={GITHUB} target="_blank" rel="noopener noreferrer" className="underline">GitHub</a>, or email{' '}
-								<a href="mailto:security@flashbank.net" className="underline">security@flashbank.net</a>. We read the code with you.
+								Found something we missed? Please tell us before telling the world. Open a{' '}
+								<a href={`${GITHUB}/security/advisories/new`} target="_blank" rel="noopener noreferrer" className="underline">private security advisory</a>{' '}
+								or an <a href={`${GITHUB}/issues`} target="_blank" rel="noopener noreferrer" className="underline">issue</a> on GitHub. We read the code with you.
 							</p>
 						</div>
 					</section>

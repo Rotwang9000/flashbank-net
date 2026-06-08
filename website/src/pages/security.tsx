@@ -678,7 +678,7 @@ if (amount > maxBorrow)
 							<div className="border border-blue-200 bg-blue-50 rounded-lg p-6">
 								<h3 className="font-semibold text-blue-900 mb-3">Automated Coverage</h3>
 								<ul className="space-y-2 text-sm text-blue-800">
-									<li>✓ 57 passing tests (21 pending)</li>
+									<li>✓ 57 passing tests (21 pending are a skipped experimental-contract suite, not the live router)</li>
 									<li>✓ Dedicated failure-path tests (FlashLoanFailed, paused router)</li>
 									<li>✓ Demo borrower integration tests</li>
 									<li>✓ Concurrent loan tests (same block)</li>
@@ -771,19 +771,22 @@ if (amount > maxBorrow)
 							
 							<div className="flex flex-wrap gap-3">
 								<a 
-									href="mailto:security@flashbank.net" 
+									href="https://github.com/Rotwang9000/flashbank-net/security/advisories/new" 
+									target="_blank" 
+									rel="noopener noreferrer" 
 									className="inline-flex items-center px-5 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold"
 								>
-									Report Vulnerability
+									<ExternalLink className="h-4 w-4 mr-2" />
+									Report a vulnerability
 								</a>
 								<a 
-									href="https://github.com/flashbank-net/flashbank/security" 
+									href="https://github.com/Rotwang9000/flashbank-net/security" 
 									target="_blank" 
 									rel="noopener noreferrer" 
 									className="inline-flex items-center px-5 py-3 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50"
 								>
 									<ExternalLink className="h-4 w-4 mr-2" />
-									Security Policy
+									Security policy
 								</a>
 							</div>
 						</div>

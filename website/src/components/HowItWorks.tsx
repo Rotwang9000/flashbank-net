@@ -16,9 +16,12 @@ export type HowItWorksProps = {
 	isPlayground: boolean;
 	protocolBps: number;
 	interfaceFeePct: number;
+	// When false, the surplus / agreed-rate sections are omitted so they can live on their own
+	// shareable page (/how-it-works/surplus). Defaults to true to keep the full guide intact.
+	showSurplus?: boolean;
 };
 
-export default function HowItWorks({ explorer, contractAddress, isPlayground, protocolBps, interfaceFeePct }: HowItWorksProps) {
+export default function HowItWorks({ explorer, contractAddress, isPlayground, protocolBps, interfaceFeePct, showSurplus = true }: HowItWorksProps) {
 	const codeLink = contractAddress ? `${explorer}/address/${contractAddress}#code` : '';
 	return (
 		<div className="space-y-8">
@@ -64,37 +67,7 @@ export default function HowItWorks({ explorer, contractAddress, isPlayground, pr
 			</section>
 
 			{/* Collateral on default — where surplus comes from */}
-			<section>
-				<Heading eyebrow="When a deadline is missed" title="Where does the &ldquo;surplus&rdquo; come from?" />
-				<p className="text-sm text-gray-600 mb-4 max-w-3xl">
-					Forget price feeds. A loan here is just two tokens swapped at a rate you both agree — say
-					<strong> 1 fpETH = 500 fpUSD</strong> — plus a flat fee. Every figure is fixed when the loan is created, so a default&apos;s
-					outcome is known on day one. &ldquo;Surplus&rdquo; isn&apos;t a market gain: it&apos;s simply collateral you pledged
-					<em> beyond</em> what you borrowed at that agreed rate. So it depends entirely on how much you pledge:
-				</p>
-				<div className="grid lg:grid-cols-2 gap-4">
-					<CollateralSplitDiagram title="Borrow the full value (repo-style)" tag="≈ no surplus"
-						principal={1450} fee={50} collateral={3} agreedRate={500} />
-					<CollateralSplitDiagram title="Borrow less than the value (pawn-style)" tag="surplus exists"
-						principal={500} fee={18} collateral={3} agreedRate={500} />
-				</div>
-				<p className="text-xs text-gray-500 mt-4 max-w-3xl">
-					Borrow right up to the collateral&apos;s agreed value and there&apos;s nothing extra — default just completes the swap.
-					Pledge <em>more</em> than you borrow and a surplus appears; the only question is who keeps it. Leave the agreed rate
-					unset for a plain pledge (lender keeps everything); set it and the borrower reclaims the over-pledge. It&apos;s opt-in per
-					offer — and the same switch that makes a loan <a href="/lorrow" className="text-emerald-700 hover:text-emerald-900 font-medium">Lorrow-compatible</a>.
-				</p>
-			</section>
-
-			{/* Case studies */}
-			<section>
-				<Heading eyebrow="Why bother, and who wins" title="Case studies: the agreed rate is the whole story" />
-				<p className="text-sm text-gray-600 mb-4 max-w-3xl">
-					Since nothing on-chain floats, the only thing that can change is the <em>real</em> market rate during the term.
-					Here&apos;s why someone picks each setting, and who comes out ahead when that rate drifts from the one they agreed.
-				</p>
-				<SurplusCaseStudies />
-			</section>
+			{showSurplus && <SurplusExplainer />}
 
 			{/* The model */}
 			<section>
@@ -165,6 +138,50 @@ export default function HowItWorks({ explorer, contractAddress, isPlayground, pr
 				</div>
 			</section>
 		</div>
+	);
+}
+
+// The surplus / agreed-rate explainer, exported so it can stand alone on /how-it-works/surplus
+// as a focused, shareable page as well as appear inline in the full guide.
+export function SurplusExplainer() {
+	return (
+		<>
+			<section>
+				<Heading eyebrow="When a deadline is missed" title="Where does the &ldquo;surplus&rdquo; come from?" />
+				<p className="text-sm text-gray-600 mb-4 max-w-3xl">
+					Forget price feeds. A loan here is just two tokens swapped at a rate you both agree — say
+					<strong> 1 fpETH = 500 fpUSD</strong> — plus a flat fee. Every figure is fixed when the loan is created, so a default&apos;s
+					outcome is known on day one. &ldquo;Surplus&rdquo; isn&apos;t a market gain: it&apos;s simply collateral you pledged
+					<em> beyond</em> what you borrowed at that agreed rate. So it depends entirely on how much you pledge:
+				</p>
+				<div className="grid lg:grid-cols-2 gap-4">
+					<CollateralSplitDiagram title="Borrow the full value (repo-style)" tag="≈ no surplus"
+						principal={1450} fee={50} collateral={3} agreedRate={500} />
+					<CollateralSplitDiagram title="Borrow less than the value (pawn-style)" tag="surplus exists"
+						principal={500} fee={18} collateral={3} agreedRate={500} />
+				</div>
+				<p className="text-xs text-gray-500 mt-4 max-w-3xl">
+					Borrow right up to the collateral&apos;s agreed value and there&apos;s nothing extra — default just completes the swap.
+					Pledge <em>more</em> than you borrow and a surplus appears; the only question is who keeps it. Leave the agreed rate
+					unset for a plain pledge (lender keeps everything); set it and the borrower reclaims the over-pledge. It&apos;s opt-in per
+					offer — and the same switch that makes a loan <a href="/lorrow" className="text-emerald-700 hover:text-emerald-900 font-medium">Lorrow-compatible</a>.
+				</p>
+			</section>
+
+			<section className="mt-8">
+				<Heading eyebrow="Why bother, and who wins" title="Case studies: the agreed rate is the whole story" />
+				<p className="text-sm text-gray-600 mb-4 max-w-3xl">
+					Since nothing on-chain floats, the only thing that can change is the <em>real</em> market rate during the term.
+					Here&apos;s why someone picks each setting, and who comes out ahead when that rate drifts from the one they agreed.
+				</p>
+				<SurplusCaseStudies />
+				<p className="text-sm text-gray-600 mt-4 max-w-3xl">
+					Want to try your own numbers? The <a href="/calculator" className="text-emerald-700 hover:text-emerald-900 font-medium">scenario calculator</a> lets
+					you drag the principal, pledge, fee, agreed rate and market rate and watch the split — and the repay-vs-default
+					decision — update live.
+				</p>
+			</section>
+		</>
 	);
 }
 

@@ -53,16 +53,19 @@ export default function SiteFooter() {
 						<FooterLink href="/flashbank-loan"><Coins className="h-3.5 w-3.5 text-emerald-600" /> P2P Loans</FooterLink>
 					</Col>
 
-					<Col title="Resources">
-						<FooterLink href="/audit">Honest audit</FooterLink>
+					<Col title="Learn">
+						<FooterLink href="/how-it-works">How it works</FooterLink>
+						<FooterLink href="/calculator">Scenario calculator</FooterLink>
+						<FooterLink href="/taxes">Tax treatment</FooterLink>
 						<FooterLink href="/guides/lend">Lender guide</FooterLink>
 						<FooterLink href="/guides/borrow">Borrower guide</FooterLink>
+					</Col>
+
+					<Col title="Trust &amp; code">
+						<FooterLink href="/audit">Honest audit</FooterLink>
 						<FooterLink href="/security">Router security</FooterLink>
 						<FooterLink href="/lorrow">Lorrow compatibility</FooterLink>
 						<FooterLink href="/gas-study">Gas study</FooterLink>
-					</Col>
-
-					<Col title="Project">
 						<FooterLink href={GITHUB_URL} external>GitHub</FooterLink>
 						<FooterLink href={`${GITHUB_URL}/tree/master/docs`} external>Documentation</FooterLink>
 					</Col>

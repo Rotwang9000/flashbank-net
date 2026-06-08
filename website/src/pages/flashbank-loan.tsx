@@ -7,10 +7,10 @@ import toast, { Toaster } from 'react-hot-toast';
 import {
 	Coins, Clock, ShieldCheck, ArrowLeftRight, ExternalLink, Plus, Wallet, Search,
 	ChevronDown, SlidersHorizontal, Check, ArrowRight, Droplets, Timer, Lock, RefreshCw,
-	Layers, AlertTriangle, ArrowDown, Sparkles, ListFilter, BookOpen, Rocket, Star, Pencil, X
+	Layers, AlertTriangle, ArrowDown, Sparkles, ListFilter, BookOpen, Rocket, Star, Pencil, X,
+	Calculator, Scale, FileText, GitCompareArrows
 } from 'lucide-react';
 import { useIsMounted } from '../hooks/useIsMounted';
-import HowItWorks from '../components/HowItWorks';
 import Nav from '../components/Nav';
 import SiteFooter from '../components/SiteFooter';
 
@@ -262,6 +262,7 @@ export default function FlashbankLoan() {
 	const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
 	const [browseFilter, setBrowseFilter] = useState<'all' | 'lend' | 'borrow'>('all');
 	const [editing, setEditing] = useState<LoanView | null>(null);
+	const [confirming, setConfirming] = useState<LoanView | null>(null);
 
 	const pickKind = (kind: string) => registry.find((t) => t.kind === kind)?.address;
 	const defPrincipal = pickKind('usd') || registry[0]?.address || networkConfig.weth;
@@ -487,6 +488,7 @@ export default function FlashbankLoan() {
 	const handleTake = async (loan: LoanView) => {
 		if (!publicClient) return;
 		if (!isConnected) { toast.error('Connect a wallet first'); return; }
+		setConfirming(null);
 		try {
 			await toast.promise((async () => {
 				const [token, amount] = await publicClient.readContract({
@@ -719,7 +721,7 @@ export default function FlashbankLoan() {
 								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 									{browseOffers.map((l) => (
 										<OfferCard key={l.id} loan={l} mine={l.creator.toLowerCase() === me} pInfo={tokenInfo(l.principalToken)} cInfo={tokenInfo(l.collateralToken)}
-											fmt={fmt} isConnected={isConnected} onTake={() => handleTake(l)} onCancel={() => handleSimpleAction(l, 'cancel')} onEdit={() => setEditing(l)} />
+											fmt={fmt} isConnected={isConnected} onTake={() => setConfirming(l)} onCancel={() => handleSimpleAction(l, 'cancel')} onEdit={() => setEditing(l)} />
 									))}
 								</div>
 							)}
@@ -916,7 +918,7 @@ export default function FlashbankLoan() {
 											<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 												{myOpenOffers.map((l) => (
 													<OfferCard key={l.id} loan={l} mine pInfo={tokenInfo(l.principalToken)} cInfo={tokenInfo(l.collateralToken)}
-														fmt={fmt} isConnected={isConnected} onTake={() => handleTake(l)} onCancel={() => handleSimpleAction(l, 'cancel')} onEdit={() => setEditing(l)} />
+														fmt={fmt} isConnected={isConnected} onTake={() => setConfirming(l)} onCancel={() => handleSimpleAction(l, 'cancel')} onEdit={() => setEditing(l)} />
 												))}
 											</div>
 										)}
@@ -939,11 +941,30 @@ export default function FlashbankLoan() {
 						</div>
 					)}
 
-					{/* ---- HOW IT WORKS ---- */}
+					{/* ---- HOW IT WORKS (launcher to the dedicated, shareable pages) ---- */}
 					{tab === 'how' && (
 						<div key="how" className="fb-fade">
-							<HowItWorks explorer={networkConfig.explorer} contractAddress={contractAddress}
-								isPlayground={networkConfig.isPlayground} protocolBps={protocolBps} interfaceFeePct={INTERFACE_FEE_PCT} />
+							<div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-6">
+								<h2 className="text-xl font-bold text-gray-900">How it works</h2>
+								<p className="text-sm text-gray-500 mt-1 max-w-2xl">
+									The full explainer now lives on its own pages — clearer to read, and easy to link or share. Start with the
+									guide, or jump straight to a topic.
+								</p>
+							</div>
+							<div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+								<HowLink href="/how-it-works" icon={<BookOpen className="h-4 w-4" />} title="The full guide" accent
+									body="The lifecycle, time-based settlement, the fee model and the transparency proofs." />
+								<HowLink href="/how-it-works/surplus" icon={<Scale className="h-4 w-4" />} title="Surplus & the agreed rate"
+									body="Why a default can return collateral — and who wins if the market moves." />
+								<HowLink href="/calculator" icon={<Calculator className="h-4 w-4" />} title="Scenario calculator"
+									body="Drag the numbers and watch the outcome update live." />
+								<HowLink href="/taxes" icon={<FileText className="h-4 w-4" />} title="Tax treatment"
+									body="When taking a loan is (and isn't) a taxable event. Not tax advice." />
+								<HowLink href="/lorrow" icon={<GitCompareArrows className="h-4 w-4" />} title="Lorrow compatibility"
+									body="How this escrow maps to the Lorrow lending standard." />
+								<HowLink href="/audit" icon={<ShieldCheck className="h-4 w-4" />} title="Honest audit"
+									body="Trust assumptions, what's tested and known limits — for both features." />
+							</div>
 						</div>
 					)}
 
@@ -960,6 +981,19 @@ export default function FlashbankLoan() {
 						cInfo={tokenInfo(editing.collateralToken)}
 						onClose={() => setEditing(null)}
 						onSubmit={(update, termsChanged, topUp) => handleUpdateOffer(editing, update, termsChanged, topUp)}
+					/>
+				)}
+
+				{confirming && (
+					<TakeConfirmModal
+						loan={confirming}
+						pInfo={tokenInfo(confirming.principalToken)}
+						cInfo={tokenInfo(confirming.collateralToken)}
+						publicClient={publicClient}
+						contractAddress={contractAddress as `0x${string}`}
+						fmt={fmt}
+						onClose={() => setConfirming(null)}
+						onConfirm={() => handleTake(confirming)}
 					/>
 				)}
 
@@ -1216,6 +1250,21 @@ function SummaryRow({ label, value, strong }: { label: string; value: string; st
 	);
 }
 
+// Card linking out to one of the dedicated "How it works" pages. A plain anchor (not next/link) is fine
+// here — these are content pages and a full navigation keeps the wallet-heavy app state from leaking in.
+function HowLink({ href, icon, title, body, accent }: { href: string; icon: React.ReactNode; title: string; body: string; accent?: boolean }) {
+	return (
+		<a href={href} className={`group bg-white rounded-2xl border shadow-sm p-4 hover:shadow-md transition-all flex flex-col ${accent ? 'border-emerald-300 ring-1 ring-emerald-100' : 'border-gray-200 hover:border-emerald-200'}`}>
+			<div className="flex items-center gap-2 mb-1">
+				<span className="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-emerald-100 text-emerald-700">{icon}</span>
+				<h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+			</div>
+			<p className="text-xs text-gray-500 mt-1 leading-relaxed flex-1">{body}</p>
+			<span className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700 group-hover:text-emerald-900">Open <ArrowRight className="h-3.5 w-3.5" /></span>
+		</a>
+	);
+}
+
 // Compact collateral-split bar: red = the share the lender keeps on default, green = the surplus that
 // returns to the borrower. With no agreed rate (full forfeit) it renders as a single red bar.
 function MiniSplitBar({ lenderPct, lenderLabel, borrowerLabel }: { lenderPct: number; lenderLabel: string; borrowerLabel?: string }) {
@@ -1380,6 +1429,107 @@ function ActiveLoanCard({ loan, now, me, fmt, onRepay, onClaim }: {
 						</p>
 					);
 				})()}
+			</div>
+		</div>
+	);
+}
+
+// A taker must read and confirm the exact deal before it executes, so a loaner gets what they expect.
+// Shows what they deposit (read straight from quoteTake), what they receive, the repay window, the
+// on-default split, and the version that takeChecked pins. The deal only fires on an explicit, opt-in
+// acknowledgement — never on a single accidental click.
+function TakeConfirmModal({ loan, pInfo, cInfo, publicClient, contractAddress, fmt, onClose, onConfirm }: {
+	loan: LoanView; pInfo: TokenInfo; cInfo: TokenInfo;
+	publicClient: any; contractAddress: `0x${string}`;
+	fmt: (a: bigint, t: string) => string;
+	onClose: () => void; onConfirm: () => void;
+}) {
+	const iAmBorrower = loan.creatorIsLender; // creator lends → the taker is the borrower
+	const [deposit, setDeposit] = useState<{ token: string; amount: bigint } | null>(null);
+	const [ack, setAck] = useState(false);
+
+	useEffect(() => {
+		let alive = true;
+		(async () => {
+			try {
+				const res = await publicClient.readContract({
+					address: contractAddress, abi: P2P_ABI, functionName: 'quoteTake', args: [BigInt(loan.id)]
+				}) as [string, bigint];
+				if (alive) setDeposit({ token: res[0], amount: res[1] });
+			} catch { /* keep null — the rest of the summary still renders */ }
+		})();
+		return () => { alive = false; };
+	}, [loan.id, contractAddress, publicClient]);
+
+	const debt = loan.principal + loan.repaymentFee;
+	const { toLender, toBorrower } = splitOnDefault(loan.collateral, debt, loan.settlementValue);
+	const surplus = loan.settlementValue > 0n && toBorrower > 0n;
+	const lenderPct = surplus && loan.collateral > 0n ? Number((toLender * 10000n) / loan.collateral) / 100 : 100;
+	const disbursed = loan.principal - loan.serviceFee; // a borrower receives principal minus any service fee
+
+	return (
+		<div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 sm:p-4" onClick={onClose}>
+			<div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+				<div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
+					<div>
+						<h3 className="text-base font-semibold text-gray-900">Confirm — {iAmBorrower ? 'borrow this' : 'fund this'}</h3>
+						<p className="text-xs text-gray-400">Offer #{loan.id} · you are the {iAmBorrower ? 'borrower' : 'lender'}</p>
+					</div>
+					<button onClick={onClose} className="text-gray-400 hover:text-gray-700" aria-label="Close"><X className="h-5 w-5" /></button>
+				</div>
+
+				<div className="p-5 space-y-4">
+					<dl className="rounded-xl border border-gray-200 p-4 space-y-1.5 text-sm">
+						<SummaryRow label="You deposit now" value={deposit ? fmt(deposit.amount, deposit.token) : '…'} strong />
+						{iAmBorrower
+							? <SummaryRow label="You receive now" value={fmt(disbursed, loan.principalToken)} />
+							: <SummaryRow label="You're owed at repayment" value={fmt(debt, loan.principalToken)} />}
+						<SummaryRow label={iAmBorrower ? 'You repay to redeem' : 'Borrower repays'} value={fmt(debt, loan.principalToken)} />
+						<SummaryRow label="Repay window" value={`${formatDuration(loan.duration)} (+${formatDuration(loan.gracePeriod)} grace)`} />
+						{loan.serviceFee > 0n && <SummaryRow label="Service fee" value={`${fmt(loan.serviceFee, loan.principalToken)} → ${formatAddress(loan.serviceFeeRecipient)}`} />}
+					</dl>
+
+					<div>
+						<div className="text-xs font-semibold text-gray-700 mb-1.5">If the deadline is missed</div>
+						<DefaultSplit surplus={surplus} lenderPct={lenderPct}
+							lenderLabel={surplus ? `Lender ${fmt(toLender, loan.collateralToken)}` : `Lender keeps all ${cInfo.symbol}`}
+							borrowerLabel={`Borrower ${fmt(toBorrower, loan.collateralToken)}`} />
+						<p className="text-[11px] text-gray-500 mt-1.5">
+							{iAmBorrower
+								? (surplus
+									? `Miss the deadline and you forfeit ${fmt(toLender, loan.collateralToken)}; the surplus ${fmt(toBorrower, loan.collateralToken)} returns to you.`
+									: `Miss the deadline and you forfeit the whole ${fmt(loan.collateral, loan.collateralToken)} pledge.`)
+								: (surplus
+									? `On default you claim ${fmt(toLender, loan.collateralToken)}; the borrower keeps the ${fmt(toBorrower, loan.collateralToken)} surplus.`
+									: `On default you claim the whole ${fmt(loan.collateral, loan.collateralToken)} pledge.`)}
+						</p>
+					</div>
+
+					<div className="flex items-start gap-2 text-[11px] text-gray-500 bg-gray-50 rounded-lg p-3">
+						<ShieldCheck className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" />
+						<span>These exact terms are pinned (version {loan.version.toString()}). If the poster re-prices before your transaction lands, it reverts rather than executing on different terms.</span>
+					</div>
+
+					<p className="text-[11px] text-gray-400">
+						Tax note: repaying reclaims the <em>same</em> collateral (often not a disposal); a default is. <a href="/taxes" className="underline hover:text-gray-600">Details</a> — not tax advice.
+					</p>
+
+					{loan.allowedTaker !== ZERO && (
+						<div className="flex items-center gap-1.5 text-[11px] text-amber-600"><Lock className="h-3 w-3" /> This is a private offer, restricted to {formatAddress(loan.allowedTaker)}.</div>
+					)}
+
+					<label className="flex items-start gap-2 cursor-pointer">
+						<input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+						<span className="text-sm text-gray-700">I&apos;ve reviewed these terms and want to proceed.</span>
+					</label>
+				</div>
+
+				<div className="flex gap-2 px-5 py-4 border-t border-gray-100 sticky bottom-0 bg-white">
+					<button onClick={onClose} className="flex-1 text-sm bg-gray-100 text-gray-700 px-4 py-2.5 rounded-lg hover:bg-gray-200 font-medium">Cancel</button>
+					<button onClick={onConfirm} disabled={!ack} className="flex-1 inline-flex items-center justify-center gap-1.5 text-sm bg-emerald-600 text-white px-4 py-2.5 rounded-lg hover:bg-emerald-700 disabled:opacity-50 font-medium">
+						<Check className="h-4 w-4" /> {iAmBorrower ? 'Borrow' : 'Fund'} offer
+					</button>
+				</div>
 			</div>
 		</div>
 	);

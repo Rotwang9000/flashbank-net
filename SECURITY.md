@@ -97,14 +97,17 @@ We appreciate security researchers who help keep FlashBank.net secure. Please fo
 
 ### How to Report
 
-1. **Email**: Send details to `security@flashbank.net`
-2. **PGP Encryption**: Use our public key for sensitive information
-3. **Include**:
+1. **GitHub Security Advisory** (preferred): open a private report at
+   [github.com/Rotwang9000/flashbank-net/security/advisories/new](https://github.com/Rotwang9000/flashbank-net/security/advisories/new).
+   This keeps the report private until a fix is ready.
+2. **Include**:
    - Detailed description of the vulnerability
    - Steps to reproduce the issue
    - Potential impact assessment
    - Suggested fix (if available)
-   - Your contact information for follow-up
+   - A way to follow up with you
+
+> A dedicated security mailbox is not yet set up — please use a private GitHub advisory for now.
 
 ### What to Expect
 
@@ -212,9 +215,8 @@ Before each deployment:
 
 ## 📞 Contact Information
 
-- **Security Email**: security@flashbank.net
-- **General Contact**: team@flashbank.net
-- **Discord**: [discord.gg/flashbank](https://discord.gg/flashbank) (for general discussion only)
+- **Security reports**: [private GitHub advisory](https://github.com/Rotwang9000/flashbank-net/security/advisories/new) (email is not set up yet)
+- **General / code**: [GitHub issues & discussions](https://github.com/Rotwang9000/flashbank-net)
 
 ---
 

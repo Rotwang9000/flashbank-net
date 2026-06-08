@@ -159,7 +159,7 @@ All contracts are verified with source code on their respective block explorers:
 - **Total Deployment Cost:** ~0.08 ETH
 - **Contract Version:** v2.1 (Dual Control + Rescue)
 - **Security Model:** 2-of-2 Multi-Signature
-- **Audit Status:** Self-audited, 62+ automated tests
+- **Audit Status:** Self-reviewed, no external audit — 57 passing + 21 pending tests (see the [honest audit](https://flashbank.net/audit) and [improvement plan](../design/ROUTER_IMPROVEMENTS.md))
 - **Launch Date:** 2025-11-26
 
 ---
@@ -195,9 +195,9 @@ All contracts are verified with source code on their respective block explorers:
 ## 📞 Support
 
 - **Website:** https://flashbank.net
-- **Security:** security@flashbank.net
-- **GitHub:** https://github.com/flashbank-net/flashbank
-- **Documentation:** See `/DUAL_CONTROL.md`, `/SECURITY_SUMMARY.md`
+- **Security:** [private GitHub advisory](https://github.com/Rotwang9000/flashbank-net/security/advisories/new) (email not set up yet)
+- **GitHub:** https://github.com/Rotwang9000/flashbank-net
+- **Documentation:** See `docs/security/DUAL_CONTROL.md` and the [honest audit](https://flashbank.net/audit)
 
 ---
 

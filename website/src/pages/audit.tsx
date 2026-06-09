@@ -196,7 +196,9 @@ export default function Audit() {
 									<Finding sev="trust" title="A live allowance is a standing exposure">
 										To earn fees you grant the router an ERC-20 allowance. While that allowance is live, a bug in the (immutable)
 										router could in principle move up to the approved amount. Mitigations: the code is small and reentrancy-guarded,
-										every loan must round-trip in one transaction, and you can pause or set your allowance to zero at any time.
+										every loan must round-trip in one transaction, and you can pause or set your allowance to zero at any time. The
+										provider UI now approves the <em>exact</em> amount for a bounded commitment (unlimited is opt-in) and has a one-click
+										&ldquo;revoke (set to 0)&rdquo;.
 									</Finding>
 									<Finding sev="medium" title="The owner can take up to 100% of the fee">
 										<Mono>ownerFeeBps</Mono> is capped at 100% <em>of the fee</em> (not of the loan). A misconfiguration or hostile
@@ -226,12 +228,18 @@ export default function Audit() {
 							</div>
 
 							<div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-900">
-								<strong>Tested:</strong> 57 passing tests covering reentrancy, failed-repayment reverts, max-borrow guards, overflow on
-								unlimited commitments, and the dual-control flows. The 21 <em>pending</em> tests are a skipped suite for an
-								experimental contract (<Mono>FlashBankRevolutionary</Mono>) that is <strong>not deployed</strong> — they are not a gap in
-								the live router. We are honest that the router has known centralisation trade-offs (below); a prioritised
-								<a href={`${GITHUB}/blob/master/docs/design/ROUTER_IMPROVEMENTS.md`} target="_blank" rel="noopener noreferrer" className="underline"> improvement plan</a> is
-								published. Deeper analysis lives on the <Link href="/security" className="underline">security deep-dive</Link>.
+								<strong>Tested:</strong> the live v2.1 router has 57 passing tests covering reentrancy, failed-repayment reverts,
+								max-borrow guards, overflow on unlimited commitments, and the dual-control flows. The 21 <em>pending</em> tests are
+								a skipped suite for an experimental contract (<Mono>FlashBankRevolutionary</Mono>) that is <strong>not deployed</strong> —
+								they are not a gap in the live router. We are honest that v2.1 has known centralisation trade-offs (below).
+								<br /><br />
+								<strong>Coming — v3 (built &amp; tested, rollout pending):</strong> a hardened router that caps the owner&apos;s cut at
+								20% of the fee, removes every single-signature path, adds a 2-day timelock on config/rescue, fixes an expired-commitment
+								drift bug, and lets borrowers pin a <Mono>maxFee</Mono> on-chain. It adds 27 dedicated tests (84 passing in the suite)
+								and is validated end-to-end on a local node; the only thing left is the on-chain rollout (Sepolia → mainnets). See the
+								<a href={`${GITHUB}/blob/master/docs/design/ROUTER_IMPROVEMENTS.md`} target="_blank" rel="noopener noreferrer" className="underline"> improvement plan</a> and
+								<a href={`${GITHUB}/blob/master/docs/deployment/V3_DEPLOYMENT.md`} target="_blank" rel="noopener noreferrer" className="underline"> deployment runbook</a>.
+								Deeper analysis lives on the <Link href="/security" className="underline">security deep-dive</Link>.
 							</div>
 						</div>
 					</section>

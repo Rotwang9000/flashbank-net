@@ -161,6 +161,7 @@ All contracts are verified with source code on their respective block explorers:
 - **Security Model:** 2-of-2 Multi-Signature
 - **Audit Status:** Self-reviewed, no external audit — 57 passing + 21 pending tests (see the [honest audit](https://flashbank.net/audit) and [improvement plan](../design/ROUTER_IMPROVEMENTS.md))
 - **Launch Date:** 2025-11-26
+- **v3 (built &amp; tested, rollout pending):** capped owner fee, dual-sig-only, 2-day config/rescue timelock, expiry-drift fix, on-chain borrower `maxFee` pin. 84 passing tests; validated on a local node. Rollout (Sepolia → mainnets) is gated on deployer gas — see the [v3 deployment runbook](./V3_DEPLOYMENT.md).
 
 ---
 

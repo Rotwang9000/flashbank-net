@@ -1,0 +1,14 @@
+{
+	"contract": "FlashBankP2PLoan",
+	"network": "ethereum",
+	"chainId": "1",
+	"address": "0x131C8545b28bca9063B364380956Df33A70018A0",
+	"owner": "0x4F0B3C7fdf5D7C3C7179E1E180b28D23a16fd036",
+	"protocolFeeRecipient": "0xC021a233A427627aE1BB5765e925Ab6E0c4319e7",
+	"protocolFeeBps": 0,
+	"verified": true,
+	"explorer": "https://etherscan.io/address/0x131C8545b28bca9063B364380956Df33A70018A0#code",
+	"constructorArgs": ["0xC021a233A427627aE1BB5765e925Ab6E0c4319e7", 0],
+	"note": "Live mainnet P2P term-loan escrow. Fixed-fee, time-based liquidation, no oracle. Fee recipient is the Vultisig vault; 0 bps introductory (only ever charged on offers that opt in via `listed`). Owner can later raise the listing fee up to the on-chain hard cap of 100 bps (1%).",
+	"deployedAt": "2026-06-09T13:20:00.000Z"
+}

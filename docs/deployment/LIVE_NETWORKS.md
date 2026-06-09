@@ -34,7 +34,8 @@
 - **Demo Borrower:** `0xFD0a29b84533d9CEF69e63311bb766236f09a454`
 - **Status:** ✅ Live & Verified (with demo contracts)
 - **Explorer:** https://sepolia.etherscan.io/address/0x9a4FbC70b30f32006A3fe834173D16b7A0e4E7D4#code
-- **Router (v3, now the playground default):** `0x468255e347F5563c9dcF78d41EDca75391Cc846e` — ✅ verified + integration-tested 2026-06-09 ([code](https://sepolia.etherscan.io/address/0x468255e347F5563c9dcF78d41EDca75391Cc846e#code)). Demo borrower `0xCc1Af59adAB7b235698f193E34B3328213c86e7A` (v3-wired, shared proof/counter).
+- **Router (v3, current playground default):** `0x6770d3e75F45a2080973c0021F184AEFE6f5CA67` — ✅ verified 2026-06-09 ([code](https://sepolia.etherscan.io/address/0x6770d3e75F45a2080973c0021F184AEFE6f5CA67#code)). Configured with **both WETH and fpETH** at construction; admin = deployer (single-operator playground) so play tokens can be added without the 2-day timelock. fpETH (`0xB9CCa9CfE38e583CF1cf456F03946ac6376396F5`) is a freely-mintable PlaygroundToken seeded with a 5,000,000 commitment so visitors can faucet + provide big numbers. Demo borrower (WETH, native) `0x60aFe52EC2e786ed3d9dB519E6f3299DAc405272`.
+- **Prior v3 (WETH-only):** `0x468255e347F5563c9dcF78d41EDca75391Cc846e` (superseded by the WETH+fpETH router above).
 
 ---
 
@@ -50,11 +51,30 @@ on-chain: `totalCommitted(WETH)=0` on all three mainnet routers), so the site cu
 | Ethereum | `0x7791f3A7D82db7186f085BfFa3Fd46898EEaAE35` | [✅](https://etherscan.io/address/0x7791f3A7D82db7186f085BfFa3Fd46898EEaAE35#code) | ✅ v3 (live) |
 | Base | `0xDd6D0dC7AA7Be44E4F44d15D34851f3eDc7610AA` | [✅](https://basescan.org/address/0xDd6D0dC7AA7Be44E4F44d15D34851f3eDc7610AA#code) | ✅ v3 (live) |
 | Arbitrum | `0x34DcDBCCf9cC5753F709723Fa00DDe7eCd549A17` | [✅](https://arbiscan.io/address/0x34DcDBCCf9cC5753F709723Fa00DDe7eCd549A17#code) | ✅ v3 (live) |
-| Sepolia | `0x468255e347F5563c9dcF78d41EDca75391Cc846e` | [✅](https://sepolia.etherscan.io/address/0x468255e347F5563c9dcF78d41EDca75391Cc846e#code) | ✅ v3 (playground) |
+| Sepolia | `0x6770d3e75F45a2080973c0021F184AEFE6f5CA67` | [✅](https://sepolia.etherscan.io/address/0x6770d3e75F45a2080973c0021F184AEFE6f5CA67#code) | ✅ v3 (playground · WETH + fpETH) |
 
 Admin (mainnets) = Vultisig vault `0xC021…19e7`; owner = `0x4F0B…d036`; config identical to v2.1 (fee 2 bps,
 owner cut 2% of fee, maxBorrow 50%, maxLoan 1000 WETH). Per-chain records in `flashloans/deployments/*-v3.json`.
 See the [v3 runbook](./V3_DEPLOYMENT.md) and [security notes](../design/V3_SECURITY_NOTES.md).
+
+---
+
+## 🤝 FlashBankP2PLoan — live on mainnet (2026-06-09)
+
+The peer-to-peer, fixed-term, collateral-backed escrow (time-based liquidation, single flat fee, **no oracle**).
+Judged solid enough by the [self-audit](https://flashbank.net/audit) to go to mainnet while ETH gas was cheap.
+Same bytecode on every chain; `Ownable` (owner = deployer), fee recipient = Vultisig vault, **0 bps introductory**
+(a listing fee only ever applies to offers that opt in via `listed`, and is hard-capped on-chain at 100 bps / 1%).
+
+| Chain | P2P escrow | Verified | Fee |
+|-------|-----------|----------|-----|
+| Ethereum | `0x131C8545b28bca9063B364380956Df33A70018A0` | [✅](https://etherscan.io/address/0x131C8545b28bca9063B364380956Df33A70018A0#code) | 0 bps |
+| Base | `0x86FbF8e03f8A6f3eF52062E3f81627F64aa5FcbB` | [✅](https://basescan.org/address/0x86FbF8e03f8A6f3eF52062E3f81627F64aa5FcbB#code) | 0 bps |
+| Sepolia (playground) | `0x3Ce4B6DC383d3105A6D35a6816BC10D395Aa1017` | ✅ | 0 bps |
+
+Per-chain records in `loans/deployments/*-p2p.json`. Tokens on the mainnet UI are real WETH/USDC; the Sepolia
+playground uses the freely-mintable fpUSD/fpETH faucet tokens. (Arbitrum P2P not deployed — deployer balance too thin;
+add later with `MAX_FEE_GWEI` pinned low.)
 
 ---
 

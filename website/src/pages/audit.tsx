@@ -115,7 +115,7 @@ export default function Audit() {
 						<AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
 						<div className="text-sm text-amber-900 space-y-1.5">
 							<p><strong>No external audit.</strong> Neither contract has been reviewed by a professional auditing firm. Everything below is our own reading of our own code. The severities are our judgement, not an independent rating.</p>
-							<p><strong>The P2P loans are a Sepolia playground.</strong> They run on a testnet with play-money only — no real value. Never send real assets to the playground contracts.</p>
+							<p><strong>The P2P loans are now live on Ethereum and Base</strong> (mainnet, real assets), alongside a Sepolia play-money playground. They carry no external audit — only this self-review — so weigh real-money use accordingly. The Sepolia playground uses valueless test tokens (fpUSD/fpETH from the on-page faucet); never confuse the two.</p>
 							<p><strong>Open by default.</strong> Source for both contracts is verified on Etherscan and public on <a href={GITHUB} target="_blank" rel="noopener noreferrer" className="underline">GitHub</a>. Please read it, and tell us what we missed.</p>
 						</div>
 					</div>
@@ -145,7 +145,7 @@ export default function Audit() {
 								{ k: 'Tests', v: '45 passing' },
 								{ k: 'Owner powers', v: 'Interface fee only (≤ 1%)' },
 								{ k: 'External audit', v: 'None' },
-								{ k: 'Network', v: 'Sepolia playground' }
+								{ k: 'Network', v: 'Ethereum + Base · Sepolia demo' }
 							]}
 						/>
 					</div>

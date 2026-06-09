@@ -1,17 +1,33 @@
 {
-  "chainId": "11155111",
-  "network": "sepolia",
-  "address": "0x468255e347F5563c9dcF78d41EDca75391Cc846e",
-  "weth": "0xdd13E55209Fd76AfE204dBda4007C227904f0a81",
-  "admin": "0x3CD6BbF16599Af7FDe6F4b7C8b6FD6Bea4EDc191",
-  "owner": "0x4F0B3C7fdf5D7C3C7179E1E180b28D23a16fd036",
-  "verified": true,
-  "integration": true,
-  "explorer": "https://sepolia.etherscan.io/address/0x468255e347F5563c9dcF78d41EDca75391Cc846e#code",
-  "demoBorrower": "0xCc1Af59adAB7b235698f193E34B3328213c86e7A",
-  "proofSink": "0x0cE5514Cf655ce859B1FdDb412FaFcb3Fb921169",
-  "demoCounter": "0x1E202CD9a97392f6E74F70dc29b5404A00eD8561",
-  "uiDefault": true,
-  "note": "Playground fully cut over to v3 (router + v3-wired demo borrower reusing shared proof/counter).",
-  "deployedAt": "2026-06-09"
+	"contract": "FlashBankRouterV3",
+	"network": "sepolia",
+	"chainId": "11155111",
+	"address": "0x6770d3e75F45a2080973c0021F184AEFE6f5CA67",
+	"admin": "0x4F0B3C7fdf5D7C3C7179E1E180b28D23a16fd036",
+	"owner": "0x4F0B3C7fdf5D7C3C7179E1E180b28D23a16fd036",
+	"weth": "0xdd13E55209Fd76AfE204dBda4007C227904f0a81",
+	"fpeth": "0xB9CCa9CfE38e583CF1cf456F03946ac6376396F5",
+	"demoBorrower": "0x60aFe52EC2e786ed3d9dB519E6f3299DAc405272",
+	"proofSink": "0x0cE5514Cf655ce859B1FdDb412FaFcb3Fb921169",
+	"demoCounter": "0x1E202CD9a97392f6E74F70dc29b5404A00eD8561",
+	"tokens": {
+		"WETH": {
+			"address": "0xdd13E55209Fd76AfE204dBda4007C227904f0a81",
+			"committed": "8999664500000000",
+			"maxFlashLoan": "1000000000000000000000",
+			"supportsPermit": true
+		},
+		"fpETH": {
+			"address": "0xB9CCa9CfE38e583CF1cf456F03946ac6376396F5",
+			"committed": "5000000000000000000000000",
+			"maxFlashLoan": "10000000000000000000000000",
+			"supportsPermit": false
+		}
+	},
+	"feeBps": 2,
+	"maxBorrowBps": 5000,
+	"ownerFeeBps": 200,
+	"uiDefault": true,
+	"note": "Sepolia playground router with both WETH and fpETH enabled at construction. admin = deployer (single operator). fpETH is a freely-mintable PlaygroundToken so visitors can faucet + commit big numbers. The native-ETH demo borrower runs on WETH; fpETH is for the faucet + provider-commit flow.",
+	"deployedAt": "2026-06-09T13:46:37.217Z"
 }

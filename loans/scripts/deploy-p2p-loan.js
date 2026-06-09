@@ -24,8 +24,18 @@ async function main() {
 	console.log("Protocol/listing fee recipient:", feeRecipient);
 	console.log(`Protocol/listing fee: ${feeBps} bps (${feeBps / 100}% of principal, only on listed offers)`);
 
+	// Optional explicit EIP-1559 fee overrides (gwei). A wallet must be able to *hold* gasLimit ×
+	// maxFeePerGas, so on a thin mainnet balance in a low-base-fee window the default (which doubles
+	// base and adds a ~1.5 gwei tip) can price us out. Pin them low instead.
+	const feeOverrides = {};
+	if (process.env.MAX_FEE_GWEI) feeOverrides.maxFeePerGas = ethers.parseUnits(process.env.MAX_FEE_GWEI, "gwei");
+	if (process.env.PRIORITY_FEE_GWEI) feeOverrides.maxPriorityFeePerGas = ethers.parseUnits(process.env.PRIORITY_FEE_GWEI, "gwei");
+	if (Object.keys(feeOverrides).length > 0) {
+		console.log("Fee overrides (wei):", JSON.stringify(Object.fromEntries(Object.entries(feeOverrides).map(([k, v]) => [k, v.toString()]))));
+	}
+
 	const P2P = await ethers.getContractFactory("FlashBankP2PLoan");
-	const p2p = await P2P.deploy(feeRecipient, feeBps);
+	const p2p = await P2P.deploy(feeRecipient, feeBps, feeOverrides);
 	await p2p.waitForDeployment();
 
 	const address = await p2p.getAddress();

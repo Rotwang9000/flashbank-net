@@ -8,6 +8,7 @@ import { Zap, Repeat, Shield, ShieldOff, PauseCircle, PlayCircle, ArrowRightCirc
 import { useIsMounted } from '../hooks/useIsMounted';
 import Nav from '../components/Nav';
 import SiteFooter from '../components/SiteFooter';
+import FaucetCard from '../components/FaucetCard';
 
 const NETWORKS = {
 	1: {
@@ -23,7 +24,9 @@ const NETWORKS = {
 				symbol: 'WETH',
 				address: process.env.NEXT_PUBLIC_MAINNET_WETH_ADDRESS || '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
 				decimals: 18,
-				supportsPermit: true
+				supportsPermit: true,
+				native: true,
+				faucet: false
 			}
 		],
 		demoBorrower: process.env.NEXT_PUBLIC_MAINNET_DEMO_BORROWER_ADDRESS || '',
@@ -43,7 +46,9 @@ const NETWORKS = {
 				symbol: 'WETH',
 				address: process.env.NEXT_PUBLIC_BASE_WETH_ADDRESS || '0x4200000000000000000000000000000000000006',
 				decimals: 18,
-				supportsPermit: true
+				supportsPermit: true,
+				native: true,
+				faucet: false
 			}
 		],
 		demoBorrower: process.env.NEXT_PUBLIC_BASE_DEMO_BORROWER_ADDRESS || '',
@@ -63,7 +68,9 @@ const NETWORKS = {
 				symbol: 'WETH',
 				address: process.env.NEXT_PUBLIC_ARBITRUM_WETH_ADDRESS || '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
 				decimals: 18,
-				supportsPermit: true
+				supportsPermit: true,
+				native: true,
+				faucet: false
 			}
 		],
 		demoBorrower: process.env.NEXT_PUBLIC_ARBITRUM_DEMO_BORROWER_ADDRESS || '',
@@ -83,7 +90,20 @@ const NETWORKS = {
 				symbol: 'WETH',
 				address: process.env.NEXT_PUBLIC_SEPOLIA_WETH_ADDRESS || '0xdd13E55209Fd76AfE204dBda4007C227904f0a81',
 				decimals: 18,
-				supportsPermit: false
+				supportsPermit: false,
+				native: true,
+				faucet: false
+			},
+			{
+				// Our own freely-mintable PlaygroundToken — borrow/commit huge numbers for free.
+				key: 'fpeth',
+				name: 'Flashbank Playground ETH',
+				symbol: 'fpETH',
+				address: process.env.NEXT_PUBLIC_SEPOLIA_FPETH_ADDRESS || '0xB9CCa9CfE38e583CF1cf456F03946ac6376396F5',
+				decimals: 18,
+				supportsPermit: false,
+				native: false,
+				faucet: true
 			}
 		],
 		demoBorrower: process.env.NEXT_PUBLIC_SEPOLIA_DEMO_BORROWER_ADDRESS || '',
@@ -175,7 +195,8 @@ const ERC20_ABI = [
 	{ inputs: [{ internalType: 'uint256', name: 'amount', type: 'uint256' }], name: 'withdraw', outputs: [], stateMutability: 'nonpayable', type: 'function' },
 	{ inputs: [{ internalType: 'address', name: 'spender', type: 'address' }, { internalType: 'uint256', name: 'amount', type: 'uint256' }], name: 'approve', outputs: [{ internalType: 'bool', name: '', type: 'bool' }], stateMutability: 'nonpayable', type: 'function' },
 	{ inputs: [{ internalType: 'address', name: 'owner', type: 'address' }, { internalType: 'address', name: 'spender', type: 'address' }], name: 'allowance', outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }], stateMutability: 'view', type: 'function' },
-	{ inputs: [{ internalType: 'address', name: 'account', type: 'address' }], name: 'balanceOf', outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }], stateMutability: 'view', type: 'function' }
+	{ inputs: [{ internalType: 'address', name: 'account', type: 'address' }], name: 'balanceOf', outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }], stateMutability: 'view', type: 'function' },
+	{ inputs: [], name: 'faucet', outputs: [], stateMutability: 'nonpayable', type: 'function' }
 ] as const;
 
 const DEMO_BORROWER_ABI = [
@@ -652,6 +673,23 @@ export default function Home() {
 		} catch { /* toast.promise already handles user-facing errors */ }
 	};
 
+	// Mint a batch of a freely-mintable PlaygroundToken (Sepolia fpETH). Reused by the faucet card.
+	const mintFaucet = async (tokenAddress: string, symbol: string) => {
+		if (!publicClient) return;
+		if (!isConnected) { toast.error('Connect a wallet first'); return; }
+		try {
+			await toast.promise(
+				(async () => {
+					const hash = await safeWrite(tokenAddress as `0x${string}`, ERC20_ABI, 'faucet', []);
+					await publicClient.waitForTransactionReceipt({ hash });
+					await loadAccountState();
+					await refreshPoolStats();
+				})(),
+				{ loading: `Minting ${symbol}…`, success: `Minted 10,000 ${symbol}`, error: 'Faucet failed' }
+			);
+		} catch { /* toast.promise handles user-facing errors */ }
+	};
+
 	const handleRunDemo = async (failModeOverride: boolean) => {
 		setDemoFailMode(failModeOverride);
 		setDemoOutcome('none');
@@ -839,6 +877,14 @@ export default function Home() {
 						</div>
 					</div>
 
+					{/* Faucet — Sepolia playground only (self-hides when a chain has no faucet tokens). */}
+					<FaucetCard
+						tokens={networkConfig.tokens.filter((token) => token.faucet)}
+						onMint={mintFaucet}
+						isConnected={isConnected}
+						explorer={networkConfig.explorer}
+					/>
+
 					{/* Wallet + provide liquidity */}
 					<div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
 						<div className="flex flex-wrap gap-3 mb-6">
@@ -858,27 +904,35 @@ export default function Home() {
 								<h4 className="text-sm font-semibold text-gray-900">Wallet balances</h4>
 								<div className="bg-gray-50 rounded-lg p-4 space-y-0.5">
 									<p className="text-sm text-gray-500">ETH: {ethBalance}</p>
-									<p className="text-sm text-gray-500">WETH: {wethBalance}</p>
-									<p className="text-sm text-gray-500">Allowance: {allowance === 'Unlimited' ? 'Unlimited' : `${allowance} WETH`}</p>
+									<p className="text-sm text-gray-500">{selectedToken.symbol}: {wethBalance}</p>
+									<p className="text-sm text-gray-500">Allowance: {allowance === 'Unlimited' ? 'Unlimited' : `${allowance} ${selectedToken.symbol}`}</p>
 								</div>
-								<div className="flex gap-4">
-									<div className="flex-1">
-										<label className="text-sm text-gray-600">Wrap amount (ETH)</label>
-										<input value={wrapAmount} onChange={(e) => setWrapAmount(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 mt-1" />
+								{selectedToken.native ? (
+									<>
+										<div className="flex gap-4">
+											<div className="flex-1">
+												<label className="text-sm text-gray-600">Wrap amount (ETH)</label>
+												<input value={wrapAmount} onChange={(e) => setWrapAmount(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 mt-1" />
+											</div>
+											<button onClick={handleWrap} className="self-end bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors">
+												<Repeat className="h-4 w-4" /> Wrap
+											</button>
+										</div>
+										<div className="flex gap-4">
+											<div className="flex-1">
+												<label className="text-sm text-gray-600">Unwrap amount (WETH)</label>
+												<input value={unwrapAmount} onChange={(e) => setUnwrapAmount(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 mt-1" />
+											</div>
+											<button onClick={handleUnwrap} className="self-end bg-gray-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-900 transition-colors">
+												<Repeat className="h-4 w-4" /> Unwrap
+											</button>
+										</div>
+									</>
+								) : (
+									<div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm text-emerald-800">
+										{selectedToken.symbol} is a free faucet token — no wrapping needed. Mint a batch from the faucet above, then commit any amount below to provide liquidity with big numbers.
 									</div>
-									<button onClick={handleWrap} className="self-end bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors">
-										<Repeat className="h-4 w-4" /> Wrap
-									</button>
-								</div>
-								<div className="flex gap-4">
-									<div className="flex-1">
-										<label className="text-sm text-gray-600">Unwrap amount (WETH)</label>
-										<input value={unwrapAmount} onChange={(e) => setUnwrapAmount(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 mt-1" />
-									</div>
-									<button onClick={handleUnwrap} className="self-end bg-gray-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-900 transition-colors">
-										<Repeat className="h-4 w-4" /> Unwrap
-									</button>
-								</div>
+								)}
 							</div>
 
 							<div className="space-y-4">
@@ -896,7 +950,7 @@ export default function Home() {
 												? 'Unlimited'
 												: providerLimit === 'Not set'
 													? 'Not set (set a limit to start lending)'
-													: `${providerLimit} WETH`}
+													: `${providerLimit} ${selectedToken.symbol}`}
 										</p>
 										<p className="text-sm text-gray-500">
 											Status:{' '}
@@ -920,7 +974,7 @@ export default function Home() {
 									<label htmlFor="unlimited-checkbox" className="text-sm text-gray-700 cursor-pointer">Unlimited commitment</label>
 								</div>
 								<div>
-									<label className="text-sm text-gray-600">Commitment limit (WETH)</label>
+									<label className="text-sm text-gray-600">Commitment limit ({selectedToken.symbol})</label>
 									<input
 										value={limitInput}
 										onChange={(e) => {
@@ -988,7 +1042,8 @@ export default function Home() {
 						</div>
 					</div>
 
-					{/* Demo */}
+					{/* Demo — the one-click borrower borrows native ETH (via WETH), so it only runs on a native token. */}
+					{selectedToken.native ? (
 					<div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
 						<h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
 							<ArrowRightCircle className="h-5 w-5 text-purple-500" />
@@ -1150,6 +1205,18 @@ export default function Home() {
 							</div>
 						)}
 					</div>
+					) : (
+					<div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
+						<h3 className="text-base font-semibold text-gray-900 mb-2 flex items-center gap-2">
+							<ArrowRightCircle className="h-5 w-5 text-purple-500" />
+							Demo flash loan
+						</h3>
+						<p className="text-sm text-gray-600 leading-relaxed">
+							The one-click demo borrows native ETH (unwrapped from WETH), so it runs on <strong>WETH</strong> — select WETH above to try it.
+							{' '}<strong>{selectedToken.symbol}</strong> is here for the big-numbers play: mint a free batch from the faucet, then commit any amount as a liquidity provider. Any contract that implements the flash-loan interface can borrow the committed {selectedToken.symbol}.
+						</p>
+					</div>
+					)}
 				</main>
 
 				<SiteFooter />

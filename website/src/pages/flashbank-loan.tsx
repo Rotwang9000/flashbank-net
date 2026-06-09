@@ -13,6 +13,7 @@ import {
 import { useIsMounted } from '../hooks/useIsMounted';
 import Nav from '../components/Nav';
 import SiteFooter from '../components/SiteFooter';
+import FaucetCard from '../components/FaucetCard';
 
 // "flashbank" is used here only as a VERB (you *flashbank* a loan). This product is a neutral
 // peer-to-peer escrow; it is not a bank and takes no custody as a financial institution.
@@ -640,8 +641,19 @@ export default function FlashbankLoan() {
 					{networkConfig.isPlayground && (
 						<div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-amber-900 flex items-start gap-2.5">
 							<Sparkles className="h-4 w-4 mt-0.5 flex-shrink-0 text-amber-500" />
-							<p className="text-sm"><strong>Playground</strong> on the Sepolia testnet — free play-money, <strong>no real value</strong>. Mint tokens from the faucet, then try the whole flow. Unaudited demo; never send real assets.</p>
+							<p className="text-sm"><strong>Playground</strong> on the Sepolia testnet — free play-money, <strong>no real value</strong>. Mint tokens from the faucet below, then try the whole flow. Unaudited demo; never send real assets.</p>
 						</div>
+					)}
+
+					{/* Faucet — prominent on the playground so visitors can grab valueless test tokens up front. */}
+					{networkConfig.isPlayground && (
+						<FaucetCard
+							tokens={registry}
+							onMint={(addr, sym) => handleFaucet(addr, sym)}
+							isConnected={isConnected}
+							explorer={networkConfig.explorer}
+							balanceOf={(addr) => balanceNum(addr)}
+						/>
 					)}
 
 					{/* Hero */}
@@ -885,17 +897,9 @@ export default function FlashbankLoan() {
 									{createDisabledReason && <p className="text-xs text-center text-gray-400 -mt-1">{createDisabledReason}</p>}
 
 									{networkConfig.isPlayground && (
-										<Card title="Need test tokens?">
-											<div className="flex flex-col gap-2">
-												{registry.map((t) => (
-													<button key={t.address} onClick={() => handleFaucet(t.address, t.symbol)} disabled={!isConnected}
-														className="flex items-center justify-between gap-2 text-sm bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-2 rounded-lg hover:bg-emerald-100 disabled:opacity-50">
-														<span className="inline-flex items-center gap-2"><Droplets className="h-4 w-4" /> Get 10,000 {t.symbol}</span>
-														<span className="text-xs text-emerald-600">{balanceNum(t.address) != null ? `bal ${trimAmount(String(balanceNum(t.address)))}` : ''}</span>
-													</button>
-												))}
-											</div>
-										</Card>
+										<p className="text-xs text-center text-gray-400">
+											Need {registry.map((t) => t.symbol).join(' or ')}? Use the faucet at the top of the page.
+										</p>
 									)}
 								</div>
 							</div>

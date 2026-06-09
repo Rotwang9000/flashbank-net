@@ -67,6 +67,21 @@ from `NEXT_PUBLIC_*` env vars by the website.
 
 Lives in [`loans/`](loans). Full design: [docs/design/P2P_LENDING_DESIGN.md](docs/design/P2P_LENDING_DESIGN.md).
 
+### Live on mainnet (Ethereum + Base)
+
+`FlashBankP2PLoan` is deployed and **verified** on mainnet — judged solid by the [self-audit](https://flashbank.net/audit)
+and shipped while ETH gas was cheap. Same bytecode on each chain; `Ownable`, fee recipient = Vultisig vault,
+**0 bps introductory** (a listing fee only ever applies to offers that opt in via `listed`, hard-capped on-chain at 1%).
+**No external audit — use real assets at your own risk.**
+
+| Chain | `FlashBankP2PLoan` (verified) |
+| --- | --- |
+| Ethereum | [`0x131C…18A0`](https://etherscan.io/address/0x131C8545b28bca9063B364380956Df33A70018A0#code) |
+| Base | [`0x86Fb…FcbB`](https://basescan.org/address/0x86FbF8e03f8A6f3eF52062E3f81627F64aa5FcbB#code) |
+
+The mainnet UI uses real WETH/USDC. (Arbitrum pending — deployer balance too thin to deploy yet; add later
+with `MAX_FEE_GWEI` pinned low.) Per-chain records in `loans/deployments/*-p2p.json`.
+
 ### Live on Sepolia (playground — testnet only, no real value)
 
 A self-serve playground is deployed on **Sepolia** so anyone can try the whole flow end-to-end. All

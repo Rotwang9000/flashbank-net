@@ -1,0 +1,8 @@
+{
+  "chainId": "11155111",
+  "address": "0x468255e347F5563c9dcF78d41EDca75391Cc846e",
+  "weth": "0xdd13E55209Fd76AfE204dBda4007C227904f0a81",
+  "verified": true,
+  "integration": true,
+  "deployedAt": "2026-06-09 10:20:49"
+}

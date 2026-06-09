@@ -34,6 +34,7 @@
 - **Demo Borrower:** `0xFD0a29b84533d9CEF69e63311bb766236f09a454`
 - **Status:** ✅ Live & Verified (with demo contracts)
 - **Explorer:** https://sepolia.etherscan.io/address/0x9a4FbC70b30f32006A3fe834173D16b7A0e4E7D4#code
+- **Router (v3, NEW):** `0x468255e347F5563c9dcF78d41EDca75391Cc846e` — ✅ verified + integration-tested 2026-06-09 ([code](https://sepolia.etherscan.io/address/0x468255e347F5563c9dcF78d41EDca75391Cc846e#code)). The UI still runs v2.1 until a deliberate cutover (demo contracts are v2.1-wired).
 
 ---
 
@@ -161,7 +162,7 @@ All contracts are verified with source code on their respective block explorers:
 - **Security Model:** 2-of-2 Multi-Signature
 - **Audit Status:** Self-reviewed, no external audit — 57 passing + 21 pending tests (see the [honest audit](https://flashbank.net/audit) and [improvement plan](../design/ROUTER_IMPROVEMENTS.md))
 - **Launch Date:** 2025-11-26
-- **v3 (built &amp; tested, rollout pending):** capped owner fee, dual-sig-only, 2-day config/rescue timelock, expiry-drift fix, on-chain borrower `maxFee` pin. 84 passing tests; validated on a local node. Rollout (Sepolia → mainnets) is gated on deployer gas — see the [v3 deployment runbook](./V3_DEPLOYMENT.md).
+- **v3 — ✅ LIVE on Sepolia (verified + integration-tested 2026-06-09):** capped owner fee, dual-sig-only, 2-day config/rescue timelock, expiry-drift fix, on-chain borrower `maxFee` pin. 84 passing tests; deployed at `0x468255e347F5563c9dcF78d41EDca75391Cc846e`. Mainnets next (gated on deployer gas) — see the [v3 deployment runbook](./V3_DEPLOYMENT.md).
 
 ---
 

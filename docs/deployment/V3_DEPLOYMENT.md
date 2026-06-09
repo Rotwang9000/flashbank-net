@@ -1,7 +1,7 @@
 # FlashBankRouterV3 — deployment runbook
 
-`FlashBankRouterV3` is built, tested and locally validated. This is the exact rollout: Sepolia first,
-then the mainnets. Everything here is gated only on the **deployer wallet having gas** — there is no
+`FlashBankRouterV3` is **live and verified on Sepolia** (2026-06-09) and integration-tested on-chain.
+This is the exact rollout: Sepolia (✅ done) → mainnets (gated on deployer gas + go-ahead). There is no
 remaining code work to deploy.
 
 ## Roles
@@ -20,7 +20,7 @@ remaining code work to deploy.
 
 | Chain | Deployer balance | Needed (estimate) | Status |
 |-------|------------------|-------------------|--------|
-| Sepolia | ~0.0525 ETH | deploy ~3.8M gas ≈ 0.011 ETH @ 3 gwei (but ~0.087 ETH to *submit* at the ~22 gwei spikes seen 2026-06-09) | ⏳ funded; waiting for a low-gas window |
+| Sepolia | funded | deploy + verify + integration done at ~3 gwei | ✅ **deployed 2026-06-09** at `0x4682…846e`, verified + integration-tested |
 | Ethereum | unfunded | ~0.3–0.5 ETH (real) | ❌ fund before mainnet |
 | Base | ~0.00005 ETH | ~0.01 ETH | ❌ fund before mainnet |
 | Arbitrum | unfunded | ~0.01 ETH | ❌ fund before mainnet |
@@ -32,6 +32,13 @@ Check any chain: `npx hardhat run scripts/check-balance.js --network <sepolia|et
 > even though the *actual* charge would be ~half. Rather than force a tight-max-fee deploy, we watch for a dip.
 
 ## Step 1 — Sepolia (automated, low-gas)
+
+> **✅ Done 2026-06-09.** v3 is live at [`0x468255e347F5563c9dcF78d41EDca75391Cc846e`](https://sepolia.etherscan.io/address/0x468255e347F5563c9dcF78d41EDca75391Cc846e#code),
+> verified, and integration-tested on-chain — a real native flash loan
+> ([tx](https://sepolia.etherscan.io/tx/0xf20c2d77cf0cc97a7c7ac7035ef0170c6690e771e05505a9a42fc06ac63fd716)), the `maxFee`
+> pin (passes at the ceiling, reverts one wei under), and `reconcile`. Triggered automatically when the base fee
+> dipped to ~3 gwei. Record: `flashloans/deployments/sepolia-v3.json`. The live UI deliberately stays on v2.1
+> until a full cutover (the playground's demo contracts are v2.1-wired) — see the cutover note below.
 
 Preferred path — poll the base fee and deploy + verify + integration-test automatically once gas is cheap:
 
@@ -68,8 +75,10 @@ V3_DEMO_COUNTER=0x1E202CD9a97392f6E74F70dc29b5404A00eD8561 \
 npx hardhat run scripts/test-v3-integration.js --network sepolia
 ```
 
-Then set `NEXT_PUBLIC_SEPOLIA_ROUTER_ADDRESS=<ROUTER_ADDRESS>` (v3) in `website/.env.local` and rebuild.
-The old v2.1 router (`0x9a4F…E7D4`) stays live; existing atomic loans are unaffected.
+**Sepolia cutover (when ready):** set `NEXT_PUBLIC_SEPOLIA_ROUTER_ADDRESS=0x468255e347F5563c9dcF78d41EDca75391Cc846e`
+in `website/.env.local` **and** redeploy the demo borrower against v3 (reuse the shared `ProofOfFunds`/`DemoCounter`
+at `0x0cE5…1169` / `0x1E20…8561`), updating `NEXT_PUBLIC_SEPOLIA_DEMO_BORROWER_ADDRESS` so the live demo and the
+provider flow share the same router. The old v2.1 router (`0x9a4F…E7D4`) stays live; existing atomic loans are unaffected.
 
 ## Step 2 — mainnets (after Sepolia review)
 

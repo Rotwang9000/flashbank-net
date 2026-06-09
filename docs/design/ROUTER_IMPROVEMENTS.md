@@ -1,65 +1,49 @@
-# FlashBankRouter — improvement plan
+# FlashBankRouter — hardening (v3)
 
-This is an honest, prioritised plan for hardening the flash-loan router. It exists because the
-[honest audit](https://flashbank.net/audit) flags real centralisation trade-offs on the router that the
-P2P loan contract does not have.
+This tracks the hardening of the flash-loan router against the trade-offs flagged in the
+[honest audit](https://flashbank.net/audit). **v3 is now built, tested and validated** —
+`flashloans/contracts/FlashBankRouterV3.sol`, covered by `flashloans/test/FlashBankRouterV3.test.js`
+(27 tests; 84 passing in the flashloans suite). What remains is purely the on-chain rollout
+(Sepolia → mainnets), which is gated on deployer gas.
 
 ## Constraints (read first)
 
-- **The router is live and immutable.** v2.1 is deployed and verified on Ethereum mainnet, Base and
-  Arbitrum (see `docs/deployment/LIVE_NETWORKS.md`). There is no proxy and no upgrade path.
-- **Therefore none of the contract changes below can patch the deployed bytecode.** They describe a
-  **v3** that would be a *new* deployment. Adopting it means liquidity providers re-approve the new
-  router (a migration), so it is a deliberate operational decision, not a silent upgrade.
-- The *current configuration* is conservative: loan fee `2 bps`, owner cut `DEFAULT_OWNER_FEE_BPS = 200`
-  (2% of the fee ≈ 0.0004% of the loan). The findings below are about **maximums and trust vectors the
-  code permits**, not what is set today.
+- **The live v2.1 router is immutable.** It is deployed and verified on Ethereum mainnet, Base and
+  Arbitrum (see `docs/deployment/LIVE_NETWORKS.md`). There is no proxy and no upgrade path, so v3 is a
+  **new deployment**: liquidity providers must re-approve the v3 address (a migration), never a silent upgrade.
+- v2.1's *current configuration* is conservative: loan fee `2 bps`, owner cut `200` (2% of the fee ≈
+  0.0004% of the loan). The findings below were about **maximums the code permits**, not what is set today.
 
-## Findings → concrete fixes
+## Findings → v3 (implemented)
 
-| # | Finding (severity) | Today (v2.1) | Proposed v3 fix |
-|---|--------------------|--------------|-----------------|
-| 1 | Owner can take up to 100% of the fee (**medium**) | `ownerFeeBps` is validated only `<= FEE_DENOMINATOR` (10000 = 100% of fee) | Add `MAX_OWNER_FEE_BPS` (e.g. `2000` = 20% of fee) and validate against it in every config path |
-| 2 | Single-signature emergency paths (**medium**) | `setTokenConfig` and `withdrawOwnerProfits` are callable by `onlyOwnerOrAdmin` (one key) | Remove the single-sig variants; route **all** config + withdrawals through the existing propose/execute dual-sig flow |
-| 3 | Config changes are instant (**trust**) | A dual-sig `executeTokenConfig` applies immediately | Add a **timelock** (e.g. 24–48h) between propose and execute so providers can zero their allowance or pause before new fees/limits land |
-| 4 | Admin rescue can move the contract's balance (**trust**) | `proposeRescue{Token,ETH}` (dual-sig) can sweep any balance the contract holds | Keep dual-sig; add a `RescueProposed` event + a mandatory timelock so rescues are observable in advance. Provider funds remain in their own wallets regardless. |
-| 5 | `totalCommitted` can drift from real balances (**low**) | Loans re-check the real balance, so no funds are at risk; the figure can overstate | Add a permissionless `reconcile(token)` that re-syncs `totalCommitted` to summed live balances |
-| 6 | Live allowance is a standing exposure (**trust**, inherent) | Providers grant an ERC-20 allowance | Document/encourage `permit`-scoped or exact-amount allowances and one-click "set allowance to 0"; surface this in the UI |
+| # | Finding (severity) | v2.1 | v3 (`FlashBankRouterV3.sol`) |
+|---|--------------------|------|------------------------------|
+| 1 | Owner could take up to 100% of the fee (**medium**) | `ownerFeeBps` validated only `<= 10000` | ✅ `MAX_OWNER_FEE_BPS = 2000` (20% of fee), enforced in the constructor and every config path |
+| 2 | Single-signature emergency paths (**medium**) | `setTokenConfig` / `withdrawOwnerProfits` callable by one key | ✅ **Removed.** All config, rescue, ownership and withdrawals go through propose → execute (dual signature) |
+| 3 | Config changes were instant (**trust**) | dual-sig `executeTokenConfig` applied immediately | ✅ `CONFIG_TIMELOCK = 2 days` between propose and execute; `ChangeProposed` now carries the `eta`, plus `isChangeReady()` and owner `cancelChange()` |
+| 4 | Admin rescue can move the contract's balance (**trust**) | dual-sig, instant | ✅ Rescues are dual-sig **and** timelocked (same 2-day window), observable in advance. Provider funds stay in their own wallets regardless |
+| 5 | `totalCommitted` could drift (**low**) | expired commitments were never de-counted — and, worse, `_autoDeactivate` was dead code, so they could still be **pulled from** | ✅ Fixed `_autoDeactivate` (pauses + de-counts on expiry) **and** added permissionless `reconcile(token)` that re-derives `totalCommitted` and pauses anything expired |
+| 6 | Live allowance is a standing exposure (**trust**, inherent) | providers grant an ERC-20 allowance | ⏳ UI work: show current allowance + one-click "set to 0", prefer exact-amount / `permit`. Lands with the website wiring |
+| 7 | Borrower had no on-chain protection against a fee change (**new in v3**) | fee read from config at execution | ✅ `flashLoan(token, amount, toNative, data, maxFee)` overload reverts with `FeeExceedsMax` if the fee exceeds the ceiling the borrower signed — the same on-chain "pin the details" idea used by the P2P `takeChecked` |
 
-Out of scope by design (do **not** change): non-custodial pull model, balance-delta repayment check,
+Out of scope by design (unchanged in v3): non-custodial pull model, balance-delta repayment check,
 `nonReentrant`, the 1%/0.01% loan-fee band, rejecting fee-on-transfer/rebasing tokens.
 
-## What we can do now (no redeploy)
+## Status
 
-These are safe and shipped/queued without touching the live contract:
+- [x] **v3 contract** — `FlashBankRouterV3.sol` (15.7 KB, well under the 24 KB limit).
+- [x] **Tests** — 27 dedicated v3 tests (caps, timelock windows, removed single-sig, ownership/withdrawal,
+  `maxFee` pin, reentrancy, `reconcile`, and an expiry-drift regression). Full flashloans suite: **84 passing**.
+- [x] **Deploy tooling** — `scripts/deploy-router-v3.js` (bootstraps the WETH config in the constructor and
+  writes Etherscan verify args) and `scripts/test-v3-integration.js` (live flash loan + `maxFee` + `reconcile`).
+  Both validated end-to-end against a local node.
+- [x] **Honest test framing / contactable docs** — the "21 pending" are the experimental
+  `FlashBankRevolutionary` suite, not the router; disclosure points at a private GitHub advisory.
+- [ ] **Sepolia deploy + verify + live integration** — gated on deployer gas (see runbook).
+- [ ] **Website wiring** — point the router UI at v3 (Sepolia) behind the env var; add allowance hygiene.
+- [ ] **Mainnet/Base/Arbitrum migration** — after Sepolia review; providers re-approve v3, v2.1 deprecated
+  in the UI with a banner. Old v2.1 loans are unaffected (each loan is atomic and self-contained).
 
-- [x] **Honest test framing.** The "21 pending" tests are a `describe.skip` suite for the *experimental*
-  `FlashBankRevolutionary` contract, **not** the deployed router. The audit and security pages now say so.
-- [x] **Correct, contactable docs.** Removed the not-yet-live security email; point disclosure at a private
-  GitHub advisory. Fixed stale repo URLs and the "62+ tests" claim (actual: 57 passing).
-- [ ] **UI: allowance hygiene.** Add a visible "current allowance" + one-click "revoke / set to 0" on the
-  provider flow, and prefer exact-amount / `permit` approvals over unlimited.
-- [ ] **Provider playbook.** A short doc on reacting to a config change (pause, zero allowance) — mitigates #3/#6 operationally until a timelocked v3 exists.
+## Rollout runbook
 
-## What needs a v3 (new deployment + migration)
-
-Items 1–5 above. A v3 would:
-
-1. Add `MAX_OWNER_FEE_BPS`, delete the `onlyOwnerOrAdmin` emergency variants, add a config/rescue timelock,
-   add `reconcile`.
-2. Ship with its **own** test suite covering the new caps, the timelock windows and the removed single-sig
-   paths (target: no skipped suites presented as router coverage).
-3. Deploy to Sepolia first, run a full playground migration, then mainnet/Base/Arbitrum.
-4. Migrate providers: new approvals to the v3 address; deprecate v2.1 in the UI with a banner. Old loans on
-   v2.1 are unaffected (each loan is atomic and self-contained).
-
-## Recommended sequencing
-
-1. **Now:** finish the no-redeploy items (allowance UI + provider playbook).
-2. **Next:** write v3 + tests in the repo and deploy to **Sepolia only** for review. No mainnet change.
-3. **Then (your call):** schedule the mainnet/Base/Arbitrum migration once v3 has had eyes on it — ideally
-   the first thing an external audit looks at.
-
-> Decision needed: how far to take this now — (a) no-redeploy items only, (b) also build v3 + tests in the
-> repo and deploy to Sepolia for review, or (c) also plan the mainnet migration. This doc assumes we stop at
-> (a) until you say otherwise, because (b)/(c) change live, real-money infrastructure.
+See `docs/deployment/V3_DEPLOYMENT.md` for the exact commands, gas estimates and per-chain funding needs.

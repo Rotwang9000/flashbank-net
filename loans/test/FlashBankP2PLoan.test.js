@@ -590,6 +590,55 @@ describe("FlashBankP2PLoan", () => {
 			});
 		});
 
+		describe("takeWithTerms (full terms pin)", () => {
+			// Replicates the contract's two-level encoding so integrators/UIs can compute it off-chain.
+			function computeTermsHash(loan) {
+				const coder = ethers.AbiCoder.defaultAbiCoder();
+				const halfA = ethers.keccak256(coder.encode(
+					["address", "bool", "address", "address", "address", "uint256", "uint256", "uint256"],
+					[loan.creator, loan.creatorIsLender, loan.allowedTaker, loan.principalToken, loan.collateralToken, loan.principal, loan.collateral, loan.repaymentFee]
+				));
+				const halfB = ethers.keccak256(coder.encode(
+					["uint256", "address", "uint256", "uint64", "uint64", "uint64", "uint256", "bool"],
+					[loan.protocolFee, loan.serviceFeeRecipient, loan.serviceFee, loan.duration, loan.gracePeriod, loan.offerExpiry, loan.settlementValue, loan.listed]
+				));
+				return ethers.keccak256(coder.encode(["bytes32", "bytes32"], [halfA, halfB]));
+			}
+
+			it("termsHash matches a client-side recomputation of the documented encoding", async () => {
+				await p2p.connect(lender).createLoan(buildParams({ listed: true, settlementValue: ethers.parseEther("80") }));
+				const loan = await p2p.getLoan(0);
+				expect(await p2p.termsHash(0)).to.equal(computeTermsHash(loan));
+			});
+
+			it("takes at the pinned terms and rejects after any re-price", async () => {
+				await p2p.connect(lender).createLoan(buildParams());
+				const pinned = await p2p.termsHash(0);
+
+				// A re-price lands before the taker's transaction does.
+				await p2p.connect(lender).updateOffer(0, buildUpdate({ repaymentFee: ethers.parseEther("9") }));
+				await expect(p2p.connect(borrower).takeWithTerms(0, pinned)).to.be.revertedWithCustomError(p2p, "OfferTermsMismatch");
+
+				const current = await p2p.termsHash(0);
+				await expect(p2p.connect(borrower).takeWithTerms(0, current)).to.emit(p2p, "LoanActivated");
+				expect((await p2p.getLoan(0)).status).to.equal(Status.Active);
+			});
+
+			it("holds against an edit-then-edit-back that the version counter would miss", async () => {
+				await p2p.connect(lender).createLoan(buildParams());
+				const pinned = await p2p.termsHash(0);
+
+				// Edit away and back: terms are identical again, but version has advanced twice.
+				await p2p.connect(lender).updateOffer(0, buildUpdate({ repaymentFee: ethers.parseEther("9") }));
+				await p2p.connect(lender).updateOffer(0, buildUpdate({ repaymentFee: REPAY_FEE }));
+
+				// takeChecked at the original version 0 would revert here; the terms hash is unchanged, so this passes.
+				expect(await p2p.termsHash(0)).to.equal(pinned);
+				expect((await p2p.getLoan(0)).version).to.equal(2n);
+				await expect(p2p.connect(borrower).takeWithTerms(0, pinned)).to.emit(p2p, "LoanActivated");
+			});
+		});
+
 		describe("boostOffer (top up featured placement)", () => {
 			const BOOST = ethers.parseEther("12");
 			const TOPUP = ethers.parseEther("8");

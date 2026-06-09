@@ -139,6 +139,7 @@ contract FlashBankP2PLoan is Ownable, ReentrancyGuard {
 	error NotYetDefaultable();
 	error UnexpectedTokenBalance();
 	error OfferVersionMismatch();
+	error OfferTermsMismatch();
 
 	event ProtocolFeeRecipientUpdated(address indexed oldRecipient, address indexed newRecipient);
 	event ProtocolFeeBpsUpdated(uint16 oldBps, uint16 newBps);
@@ -282,6 +283,59 @@ contract FlashBankP2PLoan is Ownable, ReentrancyGuard {
 	function takeChecked(uint256 id, uint64 expectedVersion) external nonReentrant {
 		if (loans[id].version != expectedVersion) revert OfferVersionMismatch();
 		_take(id);
+	}
+
+	/**
+	 * @notice Accept an open offer only if its full economic terms still hash to `expectedTermsHash`.
+	 * @dev The strongest on-chain "pin the details" guard. Where {takeChecked} pins the version counter,
+	 *      this pins the exact terms you reviewed, so it holds even against an edit-then-edit-back. Read
+	 *      it from {termsHash} (or recompute it client-side, see {_termsHash} for the scheme). Reverts
+	 *      with {OfferTermsMismatch} on any drift.
+	 */
+	function takeWithTerms(uint256 id, bytes32 expectedTermsHash) external nonReentrant {
+		if (_termsHash(loans[id]) != expectedTermsHash) revert OfferTermsMismatch();
+		_take(id);
+	}
+
+	/// @notice The current terms hash of offer `id`. Pin this with {takeWithTerms}.
+	function termsHash(uint256 id) external view returns (bytes32) {
+		return _termsHash(loans[id]);
+	}
+
+	/// @dev Canonical hash of the economic terms a taker agrees to. Computed as
+	///      keccak256(abi.encode(halfA, halfB)) where each half is keccak256(abi.encode(...)) — split in
+	///      two to keep the stack shallow (and replicable client-side):
+	///        halfA = creator, creatorIsLender, allowedTaker, principalToken, collateralToken,
+	///                principal, collateral, repaymentFee
+	///        halfB = protocolFee, serviceFeeRecipient, serviceFee, duration, gracePeriod, offerExpiry,
+	///                settlementValue, listed
+	///      Excludes mutable bookkeeping (taker, status, startTime, version) and the non-economic `boost`.
+	function _termsHash(Loan storage loan) internal view returns (bytes32) {
+		bytes32 halfA = keccak256(
+			abi.encode(
+				loan.creator,
+				loan.creatorIsLender,
+				loan.allowedTaker,
+				loan.principalToken,
+				loan.collateralToken,
+				loan.principal,
+				loan.collateral,
+				loan.repaymentFee
+			)
+		);
+		bytes32 halfB = keccak256(
+			abi.encode(
+				loan.protocolFee,
+				loan.serviceFeeRecipient,
+				loan.serviceFee,
+				loan.duration,
+				loan.gracePeriod,
+				loan.offerExpiry,
+				loan.settlementValue,
+				loan.listed
+			)
+		);
+		return keccak256(abi.encode(halfA, halfB));
 	}
 
 	function _take(uint256 id) internal {

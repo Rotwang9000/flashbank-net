@@ -64,8 +64,18 @@ async function main() {
 
 	console.log("  Admin (dual-control):", adminAddress);
 
+	// Optional explicit EIP-1559 fee overrides (gwei). A wallet must be able to *hold* gasLimit ×
+	// maxFeePerGas for a tx to be accepted, so on a thin mainnet balance in a low-base-fee window the
+	// default (which doubles base and adds a ~1.5 gwei tip) can price us out. Pin them low instead.
+	const feeOverrides = {};
+	if (process.env.MAX_FEE_GWEI) feeOverrides.maxFeePerGas = ethers.parseUnits(process.env.MAX_FEE_GWEI, "gwei");
+	if (process.env.PRIORITY_FEE_GWEI) feeOverrides.maxPriorityFeePerGas = ethers.parseUnits(process.env.PRIORITY_FEE_GWEI, "gwei");
+	if (Object.keys(feeOverrides).length > 0) {
+		console.log("  Fee overrides (wei):", JSON.stringify(Object.fromEntries(Object.entries(feeOverrides).map(([k, v]) => [k, v.toString()]))));
+	}
+
 	const Router = await ethers.getContractFactory("FlashBankRouterV3");
-	const router = await Router.deploy(adminAddress, tokens, configs);
+	const router = await Router.deploy(adminAddress, tokens, configs, feeOverrides);
 	await router.waitForDeployment();
 	const routerAddress = await router.getAddress();
 

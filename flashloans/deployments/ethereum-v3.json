@@ -1,0 +1,13 @@
+{
+  "chainId": "1",
+  "network": "ethereum",
+  "address": "0x7791f3A7D82db7186f085BfFa3Fd46898EEaAE35",
+  "weth": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+  "admin": "0xC021a233A427627aE1BB5765e925Ab6E0c4319e7",
+  "owner": "0x4F0B3C7fdf5D7C3C7179E1E180b28D23a16fd036",
+  "verified": true,
+  "explorer": "https://etherscan.io/address/0x7791f3A7D82db7186f085BfFa3Fd46898EEaAE35#code",
+  "uiDefault": false,
+  "note": "Deployed in a ~0.2 gwei window. Live + verified. UI still defaults to v2.1 until providers migrate.",
+  "deployedAt": "2026-06-09"
+}

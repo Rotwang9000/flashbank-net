@@ -233,10 +233,12 @@ export default function Audit() {
 								a skipped suite for an experimental contract (<Mono>FlashBankRevolutionary</Mono>) that is <strong>not deployed</strong> —
 								they are not a gap in the live router. We are honest that v2.1 has known centralisation trade-offs (below).
 								<br /><br />
-								<strong>Live on Sepolia — v3 (verified &amp; integration-tested):</strong> a hardened router that caps the owner&apos;s cut at
+								<strong>Live &amp; verified on every chain — v3:</strong> a hardened router that caps the owner&apos;s cut at
 								20% of the fee, removes every single-signature path, adds a 2-day timelock on config/rescue, fixes an expired-commitment
-								drift bug, and lets borrowers pin a <Mono>maxFee</Mono> on-chain. It adds 27 dedicated tests (84 passing in the suite)
-								and is now deployed and verified on Sepolia, with the live integration checks (flash loan, the <Mono>maxFee</Mono> pin, and reconcile) passing on-chain; mainnets are next, gated on gas. See the
+								drift bug, and lets borrowers pin a <Mono>maxFee</Mono> on-chain. It adds 27 dedicated tests (84 passing in the suite),
+								was integration-tested on-chain (flash loan, the <Mono>maxFee</Mono> pin, and reconcile), and is now deployed and verified on
+								Ethereum, Base, Arbitrum and Sepolia. The Sepolia playground already runs it; the mainnet UIs stay on v2.1 until liquidity
+								providers migrate their allowances. See the
 								<a href={`${GITHUB}/blob/master/docs/design/ROUTER_IMPROVEMENTS.md`} target="_blank" rel="noopener noreferrer" className="underline"> improvement plan</a> and
 								<a href={`${GITHUB}/blob/master/docs/deployment/V3_DEPLOYMENT.md`} target="_blank" rel="noopener noreferrer" className="underline"> deployment runbook</a>.
 								Deeper analysis lives on the <Link href="/security" className="underline">security deep-dive</Link>.

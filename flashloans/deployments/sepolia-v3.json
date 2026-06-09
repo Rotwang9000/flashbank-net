@@ -1,8 +1,17 @@
 {
   "chainId": "11155111",
+  "network": "sepolia",
   "address": "0x468255e347F5563c9dcF78d41EDca75391Cc846e",
   "weth": "0xdd13E55209Fd76AfE204dBda4007C227904f0a81",
+  "admin": "0x3CD6BbF16599Af7FDe6F4b7C8b6FD6Bea4EDc191",
+  "owner": "0x4F0B3C7fdf5D7C3C7179E1E180b28D23a16fd036",
   "verified": true,
   "integration": true,
-  "deployedAt": "2026-06-09 10:20:49"
+  "explorer": "https://sepolia.etherscan.io/address/0x468255e347F5563c9dcF78d41EDca75391Cc846e#code",
+  "demoBorrower": "0xCc1Af59adAB7b235698f193E34B3328213c86e7A",
+  "proofSink": "0x0cE5514Cf655ce859B1FdDb412FaFcb3Fb921169",
+  "demoCounter": "0x1E202CD9a97392f6E74F70dc29b5404A00eD8561",
+  "uiDefault": true,
+  "note": "Playground fully cut over to v3 (router + v3-wired demo borrower reusing shared proof/counter).",
+  "deployedAt": "2026-06-09"
 }

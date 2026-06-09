@@ -21,9 +21,9 @@ remaining code work to deploy.
 | Chain | Deployer balance | Needed (estimate) | Status |
 |-------|------------------|-------------------|--------|
 | Sepolia | funded | deploy + verify + integration done at ~3 gwei | ✅ **deployed 2026-06-09** at `0x4682…846e`, verified + integration-tested |
-| Ethereum | unfunded | ~0.3–0.5 ETH (real) | ❌ fund before mainnet |
-| Base | ~0.00005 ETH | ~0.01 ETH | ❌ fund before mainnet |
-| Arbitrum | unfunded | ~0.01 ETH | ❌ fund before mainnet |
+| Ethereum | ~0.0073 ETH | deployed @ ~0.2 gwei ≈ 0.0012 ETH | ✅ **deployed 2026-06-09** `0x7791…AE35` |
+| Base | ~0.00015 ETH | ~0.00003 ETH | ✅ **deployed 2026-06-09** `0xDd6D…10AA` |
+| Arbitrum | ~0.00033 ETH | ~0.0001 ETH | ✅ **deployed 2026-06-09** `0x34Dc…9A17` |
 
 Check any chain: `npx hardhat run scripts/check-balance.js --network <sepolia|ethereum|base|arbitrum>`.
 
@@ -81,6 +81,13 @@ at `0x0cE5…1169` / `0x1E20…8561`), updating `NEXT_PUBLIC_SEPOLIA_DEMO_BORROW
 provider flow share the same router. The old v2.1 router (`0x9a4F…E7D4`) stays live; existing atomic loans are unaffected.
 
 ## Step 2 — mainnets (after Sepolia review)
+
+> **✅ Done 2026-06-09.** v3 is live + verified on all three mainnets, deployed in a low-gas window with pinned
+> fees (`MAX_FEE_GWEI`/`PRIORITY_FEE_GWEI`, added to the deploy script for thin balances): Ethereum
+> [`0x7791…AE35`](https://etherscan.io/address/0x7791f3A7D82db7186f085BfFa3Fd46898EEaAE35#code), Base
+> [`0xDd6D…10AA`](https://basescan.org/address/0xDd6D0dC7AA7Be44E4F44d15D34851f3eDc7610AA#code), Arbitrum
+> [`0x34Dc…9A17`](https://arbiscan.io/address/0x34DcDBCCf9cC5753F709723Fa00DDe7eCd549A17#code). Admin = Vultisig
+> vault `0xC021…19e7`. **The remaining step is the UI cutover (provider migration)** — mainnet UIs still default to v2.1.
 
 Tunable via env (defaults shown): `FLASHBANK_FEE_BPS=2`, `FLASHBANK_OWNER_FEE_BPS=200`
 (must be ≤ `2000` = the v3 cap), `FLASHBANK_MAX_BORROW_BPS=5000`, `FLASHBANK_MAX_LOAN=1000`.

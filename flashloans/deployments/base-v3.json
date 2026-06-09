@@ -1,0 +1,13 @@
+{
+  "chainId": "8453",
+  "network": "base",
+  "address": "0xDd6D0dC7AA7Be44E4F44d15D34851f3eDc7610AA",
+  "weth": "0x4200000000000000000000000000000000000006",
+  "admin": "0xC021a233A427627aE1BB5765e925Ab6E0c4319e7",
+  "owner": "0x4F0B3C7fdf5D7C3C7179E1E180b28D23a16fd036",
+  "verified": true,
+  "explorer": "https://basescan.org/address/0xDd6D0dC7AA7Be44E4F44d15D34851f3eDc7610AA#code",
+  "uiDefault": false,
+  "note": "Live + verified. UI still defaults to v2.1 until providers migrate.",
+  "deployedAt": "2026-06-09"
+}

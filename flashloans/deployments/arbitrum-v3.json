@@ -1,0 +1,13 @@
+{
+  "chainId": "42161",
+  "network": "arbitrum",
+  "address": "0x34DcDBCCf9cC5753F709723Fa00DDe7eCd549A17",
+  "weth": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+  "admin": "0xC021a233A427627aE1BB5765e925Ab6E0c4319e7",
+  "owner": "0x4F0B3C7fdf5D7C3C7179E1E180b28D23a16fd036",
+  "verified": true,
+  "explorer": "https://arbiscan.io/address/0x34DcDBCCf9cC5753F709723Fa00DDe7eCd549A17#code",
+  "uiDefault": false,
+  "note": "Live + verified. UI still defaults to v2.1 until providers migrate.",
+  "deployedAt": "2026-06-09"
+}

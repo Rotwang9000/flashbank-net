@@ -747,8 +747,8 @@ if (amount > maxBorrow)
 							<div>
 								<div className="text-sm text-gray-600 mb-1">Current Sepolia Deployment</div>
 								<div className="text-sm bg-gray-50 p-3 rounded space-y-1 break-words font-mono">
-									<div>Router (v2.1, live UI): 0x9a4FbC70b30f32006A3fe834173D16b7A0e4E7D4</div>
-									<div>Router (v3, verified): 0x468255e347F5563c9dcF78d41EDca75391Cc846e</div>
+									<div>Router (v3, live UI): 0x468255e347F5563c9dcF78d41EDca75391Cc846e</div>
+									<div>Router (v2.1, retired here): 0x9a4FbC70b30f32006A3fe834173D16b7A0e4E7D4</div>
 									<div>Admin: 0x3CD6BbF16599Af7FDe6F4b7C8b6FD6Bea4EDc191</div>
 									<div>Owner: 0x4F0B3C7fdf5D7C3C7179E1E180b28D23a16fd036</div>
 									<div>Demo Borrower: 0xFD0a29b84533d9CEF69e63311bb766236f09a454</div>

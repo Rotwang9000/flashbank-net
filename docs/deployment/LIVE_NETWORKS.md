@@ -42,14 +42,14 @@
 
 The hardened router: owner cut capped at 20% of the fee, every path dual-signature with a 2-day config/rescue
 timelock, the expired-commitment drift bug fixed, and an on-chain borrower `maxFee` pin. Deployed and verified
-on every chain. **Mainnet UIs still default to v2.1** until providers migrate their allowances/commitments; the
-**Sepolia playground already runs v3**.
+on every chain, and **the live UI now runs v3 on every chain** — v2.1 held zero committed liquidity (verified
+on-chain: `totalCommitted(WETH)=0` on all three mainnet routers), so the site cut straight over with no provider migration.
 
 | Chain | v3 Router | Verified | UI default |
 |-------|-----------|----------|------------|
-| Ethereum | `0x7791f3A7D82db7186f085BfFa3Fd46898EEaAE35` | [✅](https://etherscan.io/address/0x7791f3A7D82db7186f085BfFa3Fd46898EEaAE35#code) | v2.1 (migration pending) |
-| Base | `0xDd6D0dC7AA7Be44E4F44d15D34851f3eDc7610AA` | [✅](https://basescan.org/address/0xDd6D0dC7AA7Be44E4F44d15D34851f3eDc7610AA#code) | v2.1 (migration pending) |
-| Arbitrum | `0x34DcDBCCf9cC5753F709723Fa00DDe7eCd549A17` | [✅](https://arbiscan.io/address/0x34DcDBCCf9cC5753F709723Fa00DDe7eCd549A17#code) | v2.1 (migration pending) |
+| Ethereum | `0x7791f3A7D82db7186f085BfFa3Fd46898EEaAE35` | [✅](https://etherscan.io/address/0x7791f3A7D82db7186f085BfFa3Fd46898EEaAE35#code) | ✅ v3 (live) |
+| Base | `0xDd6D0dC7AA7Be44E4F44d15D34851f3eDc7610AA` | [✅](https://basescan.org/address/0xDd6D0dC7AA7Be44E4F44d15D34851f3eDc7610AA#code) | ✅ v3 (live) |
+| Arbitrum | `0x34DcDBCCf9cC5753F709723Fa00DDe7eCd549A17` | [✅](https://arbiscan.io/address/0x34DcDBCCf9cC5753F709723Fa00DDe7eCd549A17#code) | ✅ v3 (live) |
 | Sepolia | `0x468255e347F5563c9dcF78d41EDca75391Cc846e` | [✅](https://sepolia.etherscan.io/address/0x468255e347F5563c9dcF78d41EDca75391Cc846e#code) | ✅ v3 (playground) |
 
 Admin (mainnets) = Vultisig vault `0xC021…19e7`; owner = `0x4F0B…d036`; config identical to v2.1 (fee 2 bps,
@@ -182,7 +182,7 @@ All contracts are verified with source code on their respective block explorers:
 - **Security Model:** 2-of-2 Multi-Signature
 - **Audit Status:** Self-reviewed, no external audit — 57 passing + 21 pending tests (see the [honest audit](https://flashbank.net/audit) and [improvement plan](../design/ROUTER_IMPROVEMENTS.md))
 - **Launch Date:** 2025-11-26
-- **v3 — ✅ LIVE + verified on all chains (2026-06-09):** capped owner fee, dual-sig-only, 2-day config/rescue timelock, expiry-drift fix, on-chain borrower `maxFee` pin. 84 passing tests. Ethereum `0x7791…AE35`, Base `0xDd6D…10AA`, Arbitrum `0x34Dc…9A17`, Sepolia `0x4682…846e`. The Sepolia playground runs v3; mainnet UIs stay on v2.1 until providers migrate — see the [v3 runbook](./V3_DEPLOYMENT.md).
+- **v3 — ✅ LIVE + verified on all chains (2026-06-09):** capped owner fee, dual-sig-only, 2-day config/rescue timelock, expiry-drift fix, on-chain borrower `maxFee` pin. 84 passing tests. Ethereum `0x7791…AE35`, Base `0xDd6D…10AA`, Arbitrum `0x34Dc…9A17`, Sepolia `0x4682…846e`. The live UI now runs v3 on every chain (v2.1 had zero committed liquidity, so no migration was needed) — see the [v3 runbook](./V3_DEPLOYMENT.md).
 
 ---
 

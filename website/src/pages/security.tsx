@@ -827,7 +827,7 @@ if (amount > maxBorrow)
 						<h2 className="text-2xl font-bold text-gray-900 mb-6">Additional Resources</h2>
 						
 						<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-							<a href="https://etherscan.io/address/0x8b6c52E68185b07D6ebf451E790Fee2E81F9B334#code" target="_blank" rel="noopener noreferrer" className="block p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 transition-colors">
+							<a href="https://etherscan.io/address/0x7791f3A7D82db7186f085BfFa3Fd46898EEaAE35#code" target="_blank" rel="noopener noreferrer" className="block p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 transition-colors">
 								<div className="font-semibold text-gray-900 mb-1">Smart Contracts</div>
 								<div className="text-sm text-gray-600">View verified contracts on Etherscan</div>
 							</a>

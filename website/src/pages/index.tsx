@@ -4,7 +4,7 @@ import { ethers } from 'ethers';
 import { useAppKitAccount } from '@reown/appkit/library/react';
 import { useChainId, useSwitchChain, usePublicClient, useWalletClient, useDisconnect } from 'wagmi';
 import toast, { Toaster } from 'react-hot-toast';
-import { Zap, Repeat, Shield, PauseCircle, PlayCircle, ArrowRightCircle, ArrowRight, Coins, ExternalLink } from 'lucide-react';
+import { Zap, Repeat, Shield, ShieldOff, PauseCircle, PlayCircle, ArrowRightCircle, ArrowRight, Coins, ExternalLink } from 'lucide-react';
 import { useIsMounted } from '../hooks/useIsMounted';
 import Nav from '../components/Nav';
 import SiteFooter from '../components/SiteFooter';
@@ -515,12 +515,24 @@ export default function Home() {
 			return;
 		}
 		if (!selectedToken || !publicClient) return;
+
+		let limitWei: bigint;
 		try {
-			// If not approved yet, approve first
-			if (allowanceWei === 0n) {
+			limitWei = isUnlimitedCommitment ? ethers.MaxUint256 : ethers.parseEther(limitInput || '0');
+		} catch {
+			toast.error('Enter a valid limit amount');
+			return;
+		}
+
+		try {
+			// Allowance hygiene: approve exactly what a bounded commitment needs (only unlimited
+			// commitments get an unlimited approval), and only when the current allowance is short.
+			const desiredAllowance = isUnlimitedCommitment ? ethers.MaxUint256 : limitWei;
+			const needsApproval = allowanceWei < desiredAllowance;
+			if (needsApproval) {
 				await toast.promise(
 					(async () => {
-						const hash = await safeWrite(selectedToken.address as `0x${string}`, ERC20_ABI, 'approve', [networkConfig.router, ethers.MaxUint256]);
+						const hash = await safeWrite(selectedToken.address as `0x${string}`, ERC20_ABI, 'approve', [networkConfig.router, desiredAllowance]);
 						await publicClient.waitForTransactionReceipt({ hash });
 						await loadAccountState();
 					})(),
@@ -532,14 +544,6 @@ export default function Home() {
 				);
 			}
 
-			// Then set commitment
-			let limitWei: bigint;
-			try {
-				limitWei = isUnlimitedCommitment ? ethers.MaxUint256 : ethers.parseEther(limitInput || '0');
-			} catch {
-				toast.error('Enter a valid limit amount');
-				return;
-			}
 			const expirySeconds = 0n;
 			await toast.promise(
 				(async () => {
@@ -550,9 +554,34 @@ export default function Home() {
 					setLimitDirty(false);
 				})(),
 				{
-					loading: allowanceWei === 0n ? 'Step 2/2: Setting commitment...' : 'Setting commitment...',
+					loading: needsApproval ? 'Step 2/2: Setting commitment...' : 'Setting commitment...',
 					success: 'Commitment active!',
 					error: 'Commitment failed'
+				}
+			);
+		} catch { /* toast.promise already handles user-facing errors */ }
+	};
+
+	// One-click allowance revoke: sets the router's allowance to 0 without moving any funds, so it can
+	// no longer pull this token. The safest way for a provider to step back from a live router.
+	const handleRevokeApproval = async () => {
+		if (!routerReady) {
+			toast.error('Router address not configured for this network');
+			return;
+		}
+		if (!selectedToken || !publicClient) return;
+		try {
+			await toast.promise(
+				(async () => {
+					const hash = await safeWrite(selectedToken.address as `0x${string}`, ERC20_ABI, 'approve', [networkConfig.router, 0n]);
+					await publicClient.waitForTransactionReceipt({ hash });
+					await loadAccountState();
+					await refreshPoolStats();
+				})(),
+				{
+					loading: 'Revoking router approval...',
+					success: 'Allowance set to 0 — the router can no longer pull this token',
+					error: 'Revoke failed'
 				}
 			);
 		} catch { /* toast.promise already handles user-facing errors */ }
@@ -913,6 +942,14 @@ export default function Home() {
 										{providerPaused ? (<><PlayCircle className="h-5 w-5" /> Resume</>) : (<><PauseCircle className="h-5 w-5" /> Pause</>)}
 									</button>
 								)}
+								{allowanceWei > 0n && (
+									<button onClick={handleRevokeApproval} className="w-full border border-red-200 text-red-700 py-2 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors flex items-center justify-center gap-2">
+										<ShieldOff className="h-4 w-4" /> Revoke approval (set allowance to 0)
+									</button>
+								)}
+								<p className="text-xs text-gray-400">
+									Approvals are scoped to your commitment — a bounded limit approves that exact amount, not unlimited. Your WETH never leaves your wallet; revoke any time to fully step back.
+								</p>
 							</div>
 						</div>
 					</div>
@@ -928,7 +965,7 @@ export default function Home() {
 									<li className="flex gap-2"><span className="font-semibold text-blue-600">2.</span><span>Approve the FlashBankRouter to access your WETH.</span></li>
 									<li className="flex gap-2"><span className="font-semibold text-blue-600">3.</span><span>Set a commitment limit (or unlimited) — <strong>WETH stays in your wallet</strong>.</span></li>
 									<li className="flex gap-2"><span className="font-semibold text-blue-600">4.</span><span>Earn a fee every time borrowers use your liquidity.</span></li>
-									<li className="flex gap-2"><span className="font-semibold text-blue-600">5.</span><span>Pause or change limits anytime — instant effect.</span></li>
+									<li className="flex gap-2"><span className="font-semibold text-blue-600">5.</span><span>Pause, change limits, or revoke approval anytime — instant effect.</span></li>
 								</ol>
 							</div>
 							<div>

@@ -40,7 +40,7 @@ export default function HowItWorksHub() {
 			</Head>
 
 			<div className="min-h-screen bg-gradient-to-b from-slate-50 to-emerald-50/40">
-				<ContentHeader back={{ href: '/flashbank-loan', label: 'Back to P2P Loans' }} />
+				<ContentHeader back={{ href: '/p2p', label: 'Back to P2P Loans' }} />
 
 				<main className="container mx-auto px-4 sm:px-6 py-8 max-w-5xl space-y-8">
 					<div className="flex items-start gap-4">

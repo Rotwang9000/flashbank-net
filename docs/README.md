@@ -21,6 +21,7 @@ feature is self-contained and has its own README: [`flashloans/`](../flashloans/
 ## P2P term lending
 
 - [P2P lending design](design/P2P_LENDING_DESIGN.md)
+- [P2P v2 — token validation & cooling-off rebate](design/P2P_V2_COOLING_OFF.md) (prepared, not deployed)
 - [Lorrow standard compatibility](design/LORROW_COMPATIBILITY.md)
 
 ## Security

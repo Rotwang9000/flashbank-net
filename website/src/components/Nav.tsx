@@ -51,7 +51,7 @@ export default function Nav({ active, networks, chainId, onSelectNetwork, isConn
 	return (
 		<header className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-gray-200">
 			<div className="container mx-auto px-4 sm:px-6 py-3 flex flex-wrap gap-x-4 gap-y-3 justify-between items-center">
-				<a href="/" className="flex items-center gap-2.5 shrink-0">
+				<a href="/flash" className="flex items-center gap-2.5 shrink-0">
 					<div className="w-9 h-9 bg-gray-900 rounded-xl flex items-center justify-center shadow-sm">
 						<Zap className="h-5 w-5 text-white" />
 					</div>
@@ -62,8 +62,8 @@ export default function Nav({ active, networks, chainId, onSelectNetwork, isConn
 
 				<nav className="order-last w-full sm:order-none sm:w-auto flex justify-center">
 					<div className="inline-flex bg-gray-100 rounded-xl p-1">
-						<ProductLink href="/" label="Flash Loans" icon={<Zap className="h-4 w-4" />} current={active === 'flash'} accent="blue" />
-						<ProductLink href="/flashbank-loan" label="P2P Loans" icon={<Coins className="h-4 w-4" />} current={active === 'loans'} accent="emerald" />
+						<ProductLink href="/flash" label="Flash Loans" icon={<Zap className="h-4 w-4" />} current={active === 'flash'} accent="blue" />
+						<ProductLink href="/p2p" label="P2P Loans" icon={<Coins className="h-4 w-4" />} current={active === 'loans'} accent="emerald" />
 					</div>
 				</nav>
 

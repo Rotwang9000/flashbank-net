@@ -6,7 +6,7 @@ FlashBank is two complementary products that share that principle:
 | Product | What it is | Contract | Page |
 | --- | --- | --- | --- |
 | **Flash Loans** | Atomic, same-transaction liquidity for arbitrage, liquidations and MEV. Lenders approve and commit WETH from their own wallet — no deposits — and earn a fee on every loan. | [`flashloans/`](flashloans) · [`FlashBankRouter.sol`](flashloans/contracts/FlashBankRouter.sol) | [`/`](https://flashbank.net) |
-| **P2P Term Loans** | Fixed-term, collateral-backed loans agreed directly between two people. One flat fee instead of interest, settled purely on time — no pools, no price oracle, no liquidations to watch. | [`loans/`](loans) · [`FlashBankP2PLoan.sol`](loans/contracts/FlashBankP2PLoan.sol) | [`/flashbank-loan`](https://flashbank.net/flashbank-loan) |
+| **P2P Term Loans** | Fixed-term, collateral-backed loans agreed directly between two people. One flat fee instead of interest, settled purely on time — no pools, no price oracle, no liquidations to watch. | [`loans/`](loans) · [`FlashBankP2PLoan.sol`](loans/contracts/FlashBankP2PLoan.sol) | [`/p2p`](https://flashbank.net/p2p) |
 
 > **Branding rule:** "flashbank" is only ever used as a **verb** (you *flashbank* a loan). FlashBank is
 > not a bank, does not hold deposits and takes no custody as a financial institution.
@@ -82,6 +82,16 @@ and shipped while ETH gas was cheap. Same bytecode on each chain; `Ownable`, fee
 The mainnet UI uses real WETH/USDC. (Arbitrum pending — deployer balance too thin to deploy yet; add later
 with `MAX_FEE_GWEI` pinned low.) Per-chain records in `loans/deployments/*-p2p.json`.
 
+**Mainnet interface is restricted to ETH and USDC for now** — custom-token entry is testnet-only — so the
+front end never invites an unknown/fake token (the contract itself stays permissionless for anyone calling
+it directly).
+
+**Next version (prepared, not deployed).** [`FlashBankP2PLoanV2`](loans/contracts/FlashBankP2PLoanV2.sol)
+adds on-chain token sanity-validation and a **graduated cooling-off rebate**: the flat fee vests from ~0 over
+a short window so a near-instant return costs almost nothing (killing fake-token fee-farming), with a
+same-block guard so it cannot be used as a free flash loan. Written and unit-tested (17 cases), awaiting
+review before deploy — see [docs/design/P2P_V2_COOLING_OFF.md](docs/design/P2P_V2_COOLING_OFF.md).
+
 ### Live on Sepolia (playground — testnet only, no real value)
 
 A self-serve playground is deployed on **Sepolia** so anyone can try the whole flow end-to-end. All
@@ -94,7 +104,7 @@ never send real assets.**
 | `PlaygroundToken` fpUSD (6d) | [`0x4aBb…760c`](https://sepolia.etherscan.io/address/0x4aBb056aA5aB39b55039ACAf795Ff9403Fa9760c#code) |
 | `PlaygroundToken` fpETH (18d) | [`0xB9CC…96F5`](https://sepolia.etherscan.io/address/0xB9CCa9CfE38e583CF1cf456F03946ac6376396F5#code) |
 
-Try it: open [`/flashbank-loan`](https://flashbank.net/flashbank-loan), switch to Sepolia, hit the
+Try it: open [`/p2p`](https://flashbank.net/p2p), switch to Sepolia, hit the
 faucet to mint test tokens, then post or take an offer (a few offers are pre-seeded, including boosted
 ones to show ranking). Redeploy with `cd loans && npx hardhat run scripts/deploy-playground.js --network sepolia`
 (addresses recorded in `loans/deployments/sepolia-playground.json`).
@@ -126,7 +136,7 @@ rm -rf loans        # keep just the flash-loan router
 
 `common/` is shared by both and must stay. The `website/` is a combined shopfront; if you drop a
 feature, also remove its page (`website/src/pages/index.tsx` for flash loans,
-`website/src/pages/flashbank-loan.tsx` for P2P) and its link in `website/src/components/Nav.tsx`.
+`website/src/pages/p2p.tsx` for P2P) and its link in `website/src/components/Nav.tsx`.
 
 > A previous deposit-based design, `FlashBankRevolutionary`, predates the no-deposit Router. Its
 > contracts and notes live under `flashloans/` for historical context; the Router and P2P escrow are

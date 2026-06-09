@@ -1,5 +1,29 @@
 # FlashBank Changelog
 
+## v3.1 - Mainnet P2P, faucets, cleaner URLs + v2 prep (2026-06-09)
+
+### 🚀 P2P live on mainnet
+- **Deployed + verified** `FlashBankP2PLoan` on **Ethereum** (`0x131C…18A0`) and **Base** (`0x86Fb…FcbB`) —
+  same bytecode, `Ownable`, 0 bps introductory listing fee (opt-in only, on-chain hard cap 1%). Added
+  EIP-1559 `MAX_FEE_GWEI`/`PRIORITY_FEE_GWEI` overrides to `deploy-p2p-loan.js` for low-gas, thin-balance deploys.
+- **Restricted the mainnet interface to ETH and USDC** — custom-token entry is now testnet-only, so the UI
+  never invites an unknown/fake token (the underlying contract stays permissionless).
+
+### 💧 Faucets
+- **Added** a reusable `FaucetCard` and wired free `fpUSD`/`fpETH` minting onto both the P2P and flash-loan
+  pages (Sepolia), with a plain note that they are valueless play-money. Redeployed the Sepolia flash router
+  with WETH **and** fpETH at construction so visitors can flash-borrow big numbers on a free token.
+
+### 🔗 URLs
+- **Changed** the route scheme to `/flash` (flash loans) and `/p2p` (P2P loans); `/` and `/flashbank-loan`
+  now client-side redirect to them (Next's static export ignores config redirects), so old links keep working.
+
+### 🧰 v2 prepared (NOT deployed)
+- **Added** `FlashBankP2PLoanV2.sol` + 17 unit tests: on-chain token sanity-validation and a **graduated
+  cooling-off rebate** — the flat fee vests from ~0 over a short, term-scaled window so a near-instant return
+  costs almost nothing (killing fake-token fee-farming), while a same-block round-trip pays the full fee so it
+  cannot be used as a free flash loan. Design + trade-offs: `docs/design/P2P_V2_COOLING_OFF.md`.
+
 ## v3.0 - P2P Term Loans (2026-06-07)
 
 A second, independent product alongside the flash-loan Router: `FlashBankP2PLoan`, a neutral escrow for

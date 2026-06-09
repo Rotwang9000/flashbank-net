@@ -197,7 +197,7 @@ via `NEXT_PUBLIC_SEPOLIA_P2P_LOAN_ADDRESS` / `_FPUSD_ADDRESS` / `_FPETH_ADDRESS`
 
 ## Next steps (not in this pass)
 
-- ~~Marketplace UI on the website~~ — shipped at `website/src/pages/flashbank-loan.tsx`.
+- ~~Marketplace UI on the website~~ — shipped at `website/src/pages/p2p.tsx`.
 - ~~Deploy script~~ — shipped (`deploy-p2p-loan.js`, plus `deploy-playground.js` for testnets).
 - ~~Editable offers (re-price / amend / boost top-up without losing placement)~~ — shipped
   (`updateOffer` / `boostOffer` / `takeChecked`, with an in-app edit modal).
@@ -214,7 +214,7 @@ via `NEXT_PUBLIC_SEPOLIA_P2P_LOAN_ADDRESS` / `_FPUSD_ADDRESS` / `_FPETH_ADDRESS`
 - `loans/scripts/deploy-p2p-loan.js` — generic deploy script.
 - `loans/scripts/deploy-playground.js` — Sepolia playground deploy (P2P + reused faucet tokens + a
   spread of seeded offers, including boosted ones to show ranking).
-- `website/src/pages/flashbank-loan.tsx` — the marketplace UI (Browse / Flashbank a loan / Your
+- `website/src/pages/p2p.tsx` — the marketplace UI (Browse / Flashbank a loan / Your
   loans / How it works) with the Sepolia playground.
 - `website/src/components/HowItWorks.tsx` — the "How it works" panel: lifecycle + timeline
   diagrams, the fee model, and the transparency "proofs".

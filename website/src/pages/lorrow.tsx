@@ -158,7 +158,7 @@ export default function LorrowCompatibility() {
 				<main className="container mx-auto px-4 sm:px-6 py-8 max-w-5xl space-y-8">
 					{/* Header */}
 					<div>
-						<Link href="/flashbank-loan" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-4">
+						<Link href="/p2p" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-4">
 							<ArrowLeft className="h-4 w-4" /> Back to P2P Loans
 						</Link>
 						<div className="flex items-start gap-4">

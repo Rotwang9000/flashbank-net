@@ -215,7 +215,7 @@ export default function CalculatorPage() {
 						</div>
 					</section>
 
-					<Link href="/flashbank-loan" className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700 hover:text-emerald-900">
+					<Link href="/p2p" className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700 hover:text-emerald-900">
 						Post or take a real offer on the playground <ArrowRight className="h-4 w-4" />
 					</Link>
 				</main>

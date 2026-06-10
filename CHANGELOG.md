@@ -1,5 +1,31 @@
 # FlashBank Changelog
 
+## v3.3 - P2P v2 live on the Sepolia playground (2026-06-10)
+
+### 🚀 FlashBankP2PLoanV2 deployed (testnet first)
+- **Deployed + verified** `FlashBankP2PLoanV2` (`VERSION() = 2.0.0`) as the new Sepolia playground at
+  [`0x536f…1E76`](https://sepolia.etherscan.io/address/0x536f4C17C18854943a45841Fef4b3054ED281E76#code),
+  reusing the existing fpUSD/fpETH faucet tokens and seeding four offers (incl. a creator-set 2-day
+  cooling window). Mainnets stay on v1 until v2 graduates; the v1 playground is retired in place.
+- **Proven live** with a two-agent MCP drill (15/15 steps): faucet → create → browse → terms-hash
+  pinned take → **early repay paying 0.602 of the agreed 6 fpUSD fee** (cooling-off rebate working
+  on-chain) → withdraw-unclaimed probe → cancel → ETH sweep. `cd mcp && npm run drill`.
+
+### 🌐 Website (`/p2p`) is contract-version aware
+- **Added** `src/lib/p2pContracts.ts`: version-keyed ABIs (v1 mainnets / v2 Sepolia) + client-side
+  mirrors of the v2 cooling-off maths; the page picks the ABI via `p2pVersion` per network.
+- **Added** v2 UI: cooling-off control on the offer form (blank = automatic minimum), "early-exit
+  rebate" rows on offer cards and the take-confirm modal, a live "repaying now costs ≈ …" line on
+  active loans, an unclaimed-payouts banner backed by `withdrawUnclaimed`, and offer edits that
+  preserve a still-valid custom cooling window.
+
+### 🤖 MCP
+- **Version-aware ABIs** per chain; v2 tools: `quoteRepaymentNow` in loan detail, rebate reporting on
+  `p2p_repay` (parsed from the `LoanRepaid` event), optional `coolingOffHours` on `p2p_create_offer`,
+  and a new `p2p_withdraw_unclaimed` tool (now 15 tools).
+- **Added** a reusable stdio MCP client (`scripts/mcp-client.js`) shared by the protocol test and the
+  live drill; suite now 16 tests + live smoke (which asserts the v2 surface on Sepolia).
+
 ## v3.2 - v2 hardening, landing page + MCP server for agents (2026-06-10)
 
 ### 🛡️ P2P v2 hardened after an adversarial review (still NOT deployed)

@@ -17,7 +17,7 @@ import { ethers } from 'ethers';
 import { chainKeys, getChain, playgroundKey } from './chains.js';
 import {
 	getProvider, getP2P, getRouter, getErc20, getSigner, hasSigner,
-	assertWritesAllowed, resolveToken, ensureAllowance, txLink,
+	assertWritesAllowed, resolveToken, ensureAllowance, txLink, p2pVersion,
 } from './clients.js';
 import {
 	describeLoan, formatAmount, parseAmount, statusName, secondsToHuman, tsToIso,
@@ -55,6 +55,11 @@ const EXPLAINER = `FlashBank ("flashbank" is a verb, not a bank) has two indepen
    - Fees: direct use is commission-free; offers posted "listed" opt into an interface fee
      (currently 0 bps, hard-capped at 1%); "boost" is an optional, non-refundable featured-
      placement spend paid to the protocol.
+   - The Sepolia playground runs FlashBankP2PLoanV2, which additionally validates tokens at offer
+     creation and vests the flat fee over a "cooling-off" window: repay early and the fee is
+     rebated down to a 10% floor (a same-block round-trip still pays in full). If a payout to you
+     ever fails (e.g. a blocklisting token), it queues for withdraw_unclaimed instead of bricking
+     the other party's settlement.
 
 2) FLASH LOANS (FlashBankRouterV3 — live on Ethereum, Base, Arbitrum and Sepolia).
    Atomic borrow-use-repay within one transaction, sourced from providers' OWN wallets via
@@ -264,6 +269,12 @@ function buildServer() {
 				collateralToLender: `${formatAmount(toLender, collateralInfo.decimals)} ${collateralInfo.symbol}`,
 				surplusToBorrower: `${formatAmount(toBorrower, collateralInfo.decimals)} ${collateralInfo.symbol}`,
 			};
+			// v2: the vested (cooling-off) figure — what repaying RIGHT NOW actually costs.
+			if (p2pVersion(chain) === 2) {
+				const [owedNow, feeNow] = await Promise.all([p2p.quoteRepaymentNow(id), p2p.effectiveFee(id)]);
+				detail.toRepayNow = `${formatAmount(owedNow, principalInfo.decimals)} ${principalInfo.symbol} ` +
+					`(vested fee so far: ${formatAmount(feeNow, principalInfo.decimals)} of ${formatAmount(loan.repaymentFee, principalInfo.decimals)} ${principalInfo.symbol})`;
+			}
 		}
 		detail.explorer = `${getChain(chain).explorer}/address/${getChain(chain).p2pLoan}`;
 		return jsonContent(detail);
@@ -380,11 +391,16 @@ function buildServer() {
 			durationDays: z.number().min(0.01).max(365).describe('Loan term in days'),
 			graceDays: z.number().min(0).max(90).optional().describe('Grace period after maturity (days, default 1)'),
 			offerExpiryHours: z.number().min(0).optional().describe('Hours until the un-taken offer expires (default: never)'),
+			coolingOffHours: z.number().min(0).optional().describe('v2 chains (Sepolia) only: cooling-off window in hours over which the fee vests. Omit or 0 = the protocol minimum for the term; longer is allowed, shorter rejects.'),
 			settlementValue: z.string().optional().describe('Agreed value of ALL the collateral in principal-token units; surplus above the debt returns to the borrower on default. Omit for full forfeit.'),
 			allowedTaker: z.string().optional().describe('Restrict who may take (address). Omit for open market.'),
 		},
-	}, safe(async ({ chain, side, principalToken, collateralToken, principal, collateral, flatFee, durationDays, graceDays, offerExpiryHours, settlementValue, allowedTaker }) => {
+	}, safe(async ({ chain, side, principalToken, collateralToken, principal, collateral, flatFee, durationDays, graceDays, offerExpiryHours, coolingOffHours, settlementValue, allowedTaker }) => {
 		assertWritesAllowed(chain);
+		const version = p2pVersion(chain);
+		if (coolingOffHours && version !== 2) {
+			throw new Error(`coolingOffHours is a v2 feature; ${getChain(chain).name} runs the v1 contract (no cooling-off).`);
+		}
 		const pInfo = await resolveToken(chain, principalToken);
 		const cInfo = await resolveToken(chain, collateralToken);
 		if (allowedTaker && !ethers.isAddress(allowedTaker)) {
@@ -410,6 +426,8 @@ function buildServer() {
 			duration,
 			grace,
 			expiry,
+			// v2 inserts coolingOff here (0 = protocol minimum for the term).
+			...(version === 2 ? [Math.round((coolingOffHours ?? 0) * SECONDS_PER_HOUR)] : []),
 			false, // listed: direct/agent offers pay no interface fee
 			ethers.ZeroAddress,
 			0n, // service fee
@@ -487,7 +505,7 @@ function buildServer() {
 
 	server.registerTool('p2p_repay', {
 		title: 'Repay a P2P loan',
-		description: 'Repay principal + the flat fee on an active loan you borrowed, redeeming your collateral. Requires the signing wallet to be the borrower (mainnet gated).',
+		description: 'Repay an active loan you borrowed, redeeming your collateral. On v2 chains (Sepolia) the fee is the VESTED amount — repaying inside the cooling-off window is rebated down to a 10% floor. Requires the signing wallet to be the borrower (mainnet gated).',
 		inputSchema: { chain: CHAIN_ENUM, id: z.number().int().nonnegative() },
 	}, safe(async ({ chain, id }) => {
 		assertWritesAllowed(chain);
@@ -496,19 +514,36 @@ function buildServer() {
 		if (statusName(loan.status) !== 'Active') {
 			throw new Error(`Loan ${id} is ${statusName(loan.status)}, not Active.`);
 		}
-		const owed = await p2p.quoteRepayment(id);
+		const maxOwed = await p2p.quoteRepayment(id);
 		const pInfo = await resolveToken(chain, loan.principalToken);
-		const approvalTx = await ensureAllowance(chain, loan.principalToken, await p2p.getAddress(), owed);
+		// Approve the maximum (principal + full fee): on v2 the contract pulls only the vested
+		// figure at execution time, so the allowance always suffices and nothing overdraws.
+		const approvalTx = await ensureAllowance(chain, loan.principalToken, await p2p.getAddress(), maxOwed);
 		const tx = await p2p.repay(id);
-		await tx.wait();
-		return jsonContent({
+		const receipt = await tx.wait();
+		const result = {
 			repaid: true,
 			loanId: id,
-			paid: `${formatAmount(owed, pInfo.decimals)} ${pInfo.symbol}`,
 			approvalTx,
 			tx: txLink(chain, tx.hash),
 			note: 'Collateral has been returned to the borrower wallet.',
-		});
+		};
+		const repaidEvent = receipt.logs
+			.map((log) => { try { return p2p.interface.parseLog(log); } catch { return null; } })
+			.find((parsed) => parsed && parsed.name === 'LoanRepaid');
+		if (repaidEvent) {
+			result.paid = `${formatAmount(repaidEvent.args.amountRepaid, pInfo.decimals)} ${pInfo.symbol}`;
+			if (repaidEvent.args.feePaid !== undefined) {
+				const rebate = BigInt(loan.repaymentFee) - BigInt(repaidEvent.args.feePaid);
+				result.feePaid = `${formatAmount(repaidEvent.args.feePaid, pInfo.decimals)} ${pInfo.symbol}`;
+				if (rebate > 0n) {
+					result.coolingOffRebate = `${formatAmount(rebate, pInfo.decimals)} ${pInfo.symbol} of the agreed ${formatAmount(loan.repaymentFee, pInfo.decimals)} ${pInfo.symbol} fee was rebated (early exit)`;
+				}
+			}
+		} else {
+			result.paid = `${formatAmount(maxOwed, pInfo.decimals)} ${pInfo.symbol} (maximum; v1 charges the full flat fee)`;
+		}
+		return jsonContent(result);
 	}));
 
 	server.registerTool('p2p_claim_default', {
@@ -546,6 +581,30 @@ function buildServer() {
 		const tx = await p2p.cancel(id);
 		await tx.wait();
 		return jsonContent({ cancelled: true, loanId: id, tx: txLink(chain, tx.hash), note: 'Escrow returned to the creator wallet.' });
+	}));
+
+	server.registerTool('p2p_withdraw_unclaimed', {
+		title: 'Withdraw queued payouts (v2)',
+		description: 'v2 chains (Sepolia) only: if a settlement payout to you could not be delivered (e.g. a blocklisting token), it queues on-chain — this checks your queued balance for a token and withdraws it.',
+		inputSchema: {
+			chain: CHAIN_ENUM,
+			token: z.string().describe('Token symbol or 0x address the payout was in'),
+		},
+	}, safe(async ({ chain, token }) => {
+		if (p2pVersion(chain) !== 2) {
+			throw new Error(`${getChain(chain).name} runs the v1 contract, which has no pull-payout queue.`);
+		}
+		assertWritesAllowed(chain);
+		const info = await resolveToken(chain, token);
+		const p2p = getP2P(chain, true);
+		const me = await getSigner(chain).getAddress();
+		const queued = await p2p.unclaimed(info.address, me);
+		if (queued === 0n) {
+			return jsonContent({ withdrawn: false, queued: `0 ${info.symbol}`, note: 'Nothing queued for this wallet in that token.' });
+		}
+		const tx = await p2p.withdrawUnclaimed(info.address);
+		await tx.wait();
+		return jsonContent({ withdrawn: true, amount: `${formatAmount(queued, info.decimals)} ${info.symbol}`, tx: txLink(chain, tx.hash) });
 	}));
 
 	server.registerTool('faucet_mint', {

@@ -86,30 +86,34 @@ with `MAX_FEE_GWEI` pinned low.) Per-chain records in `loans/deployments/*-p2p.j
 front end never invites an unknown/fake token (the contract itself stays permissionless for anyone calling
 it directly).
 
-**Next version (prepared, not deployed).** [`FlashBankP2PLoanV2`](loans/contracts/FlashBankP2PLoanV2.sol)
+**v2 — live on the Sepolia playground.** [`FlashBankP2PLoanV2`](loans/contracts/FlashBankP2PLoanV2.sol)
 adds on-chain token sanity-validation, a **graduated cooling-off rebate** (the flat fee vests from a 10%
 floor so a near-instant return is cheap — killing fake-token fee-farming — while consuming a listing is
 never free, and a same-block guard stops free flash loans), and **pull-payout fallbacks** so a
 blocklisted recipient can never brick the other party's repayment or default claim. Adversarially
-reviewed and unit-tested (22 cases), awaiting final review before deploy — full pitfall analysis in
+reviewed, unit-tested (22 cases) and **deployed to Sepolia** (verified, seeded) where it has passed a
+live two-agent lifecycle drill; mainnets stay on v1 until it graduates. Full pitfall analysis in
 [docs/design/P2P_V2_COOLING_OFF.md](docs/design/P2P_V2_COOLING_OFF.md).
 
 ### Live on Sepolia (playground — testnet only, no real value)
 
-A self-serve playground is deployed on **Sepolia** so anyone can try the whole flow end-to-end. All
-source is **verified on Etherscan**; only key material stays in the untracked `.env`. **Unaudited demo —
+A self-serve playground is deployed on **Sepolia** so anyone can try the whole flow end-to-end — it
+runs the **v2 escrow**, so the cooling-off rebate and pull-payouts are live there first. All source
+is **verified on Etherscan**; only key material stays in the untracked `.env`. **Unaudited demo —
 never send real assets.**
 
 | Contract | Address (verified) |
 | --- | --- |
-| `FlashBankP2PLoan` (boost + surplus-return + editable offers) | [`0x3Ce4…1017`](https://sepolia.etherscan.io/address/0x3Ce4B6DC383d3105A6D35a6816BC10D395Aa1017#code) |
+| `FlashBankP2PLoanV2` (cooling-off rebate + token checks + pull-payouts) | [`0x536f…1E76`](https://sepolia.etherscan.io/address/0x536f4C17C18854943a45841Fef4b3054ED281E76#code) |
 | `PlaygroundToken` fpUSD (6d) | [`0x4aBb…760c`](https://sepolia.etherscan.io/address/0x4aBb056aA5aB39b55039ACAf795Ff9403Fa9760c#code) |
 | `PlaygroundToken` fpETH (18d) | [`0xB9CC…96F5`](https://sepolia.etherscan.io/address/0xB9CCa9CfE38e583CF1cf456F03946ac6376396F5#code) |
 
 Try it: open [`/p2p`](https://flashbank.net/p2p), switch to Sepolia, hit the
 faucet to mint test tokens, then post or take an offer (a few offers are pre-seeded, including boosted
-ones to show ranking). Redeploy with `cd loans && npx hardhat run scripts/deploy-playground.js --network sepolia`
-(addresses recorded in `loans/deployments/sepolia-playground.json`).
+ones to show ranking and one with a creator-set 2-day cooling window). Redeploy with
+`cd loans && npx hardhat run scripts/deploy-playground-v2.js --network sepolia`
+(addresses recorded in `loans/deployments/sepolia-playground-v2.json`; the retired v1 playground
+`0x3Ce4…1017` stays on-chain).
 
 ---
 
@@ -119,8 +123,11 @@ The repo ships a self-contained **Model Context Protocol server** ([`mcp/`](mcp)
 flashbank too: browse open P2P offers, get quotes, check flash-loan liquidity and fees — and, with
 an explicitly configured throwaway key, post/take/repay loans and use the Sepolia faucet. Reads need
 no configuration; **mainnet writes are double-gated** behind `FLASHBANK_MCP_PRIVATE_KEY` *and*
-`FLASHBANK_MCP_ALLOW_MAINNET=true`. Takes always pin the exact reviewed terms on-chain. Details and
-the tool catalogue: [`mcp/README.md`](mcp/README.md).
+`FLASHBANK_MCP_ALLOW_MAINNET=true`. Takes always pin the exact reviewed terms on-chain, and on v2
+chains the tools quote vested fees and report cooling-off rebates. The whole lifecycle is proven by
+a **live two-agent drill** (`npm run drill`) that walks faucet → create → take → early repay (rebate
+verified) → cancel through two real MCP server instances on Sepolia. Details and the tool catalogue:
+[`mcp/README.md`](mcp/README.md).
 
 ---
 

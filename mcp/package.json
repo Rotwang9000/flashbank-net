@@ -11,7 +11,8 @@
 	"scripts": {
 		"start": "node src/server.js",
 		"test": "node --test test/",
-		"smoke": "node scripts/smoke.js"
+		"smoke": "node scripts/smoke.js",
+		"drill": "node scripts/drill.js"
 	},
 	"keywords": [
 		"mcp",

@@ -31,6 +31,14 @@ test('P2P is live on ethereum, base and sepolia; pending on arbitrum', () => {
 	assert.equal(getChain('arbitrum').p2pLoan, null);
 });
 
+test('contract versions: mainnets run v1, the Sepolia playground runs v2', () => {
+	assert.equal(getChain('ethereum').p2pVersion, 1);
+	assert.equal(getChain('base').p2pVersion, 1);
+	assert.equal(getChain('arbitrum').p2pVersion, 1);
+	assert.equal(getChain('sepolia').p2pVersion, 2);
+	assert.equal(getChain('sepolia').p2pLoan, '0x536f4C17C18854943a45841Fef4b3054ED281E76');
+});
+
 test('only the playground carries faucet tokens', () => {
 	for (const key of chainKeys()) {
 		const chain = getChain(key);
@@ -72,4 +80,23 @@ test('the MCP server builds with all tools registered', async () => {
 	const server = buildServer();
 	assert.ok(server, 'buildServer should return a server');
 	assert.equal(typeof server.connect, 'function');
+});
+
+test('both P2P ABI versions parse and decode the right tuple widths', async () => {
+	const { p2pAbi, loanParamsOrder } = await import('../src/abi.js');
+	const v1 = new ethers.Interface(p2pAbi(1));
+	const v2 = new ethers.Interface(p2pAbi(2));
+	assert.equal(v1.getFunction('getLoan').outputs[0].components.length, 21);
+	assert.equal(v2.getFunction('getLoan').outputs[0].components.length, 23);
+	assert.equal(v1.getFunction('createLoan').inputs[0].components.length, 15);
+	assert.equal(v2.getFunction('createLoan').inputs[0].components.length, 16);
+	// v2-only surface present, absent on v1 (ethers v6 returns null for unknown names).
+	assert.ok(v2.getFunction('quoteRepaymentNow'));
+	assert.ok(v2.getFunction('withdrawUnclaimed'));
+	assert.equal(v1.getFunction('quoteRepaymentNow'), null);
+	// Params order mirrors the tuples.
+	assert.equal(loanParamsOrder(1).length, 15);
+	assert.equal(loanParamsOrder(2).length, 16);
+	assert.equal(loanParamsOrder(2)[10], 'coolingOff');
+	assert.throws(() => p2pAbi(3), /Unsupported P2P contract version/);
 });

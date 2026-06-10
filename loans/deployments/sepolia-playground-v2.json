@@ -1,0 +1,53 @@
+{
+	"network": "sepolia",
+	"chainId": 11155111,
+	"deployer": "0x4F0B3C7fdf5D7C3C7179E1E180b28D23a16fd036",
+	"flashBankP2PLoanV2": "0x536f4C17C18854943a45841Fef4b3054ED281E76",
+	"contractVersion": "2.0.0",
+	"protocolFeeBps": 0,
+	"tokens": {
+		"fpUSD": {
+			"address": "0x4aBb056aA5aB39b55039ACAf795Ff9403Fa9760c",
+			"decimals": 6
+		},
+		"fpETH": {
+			"address": "0xB9CCa9CfE38e583CF1cf456F03946ac6376396F5",
+			"decimals": 18
+		}
+	},
+	"seededOffers": [
+		{
+			"id": 0,
+			"kind": "lend",
+			"boost": "50",
+			"coolingOffStored": 86400,
+			"settlementValue": "1500",
+			"note": "featured · top boost · surplus returned · min cooling (1 day)"
+		},
+		{
+			"id": 1,
+			"kind": "lend",
+			"boost": "15",
+			"coolingOffStored": 172800,
+			"settlementValue": "0",
+			"note": "featured · smaller boost · creator-set 2-day cooling"
+		},
+		{
+			"id": 2,
+			"kind": "lend",
+			"boost": "0",
+			"coolingOffStored": 60480,
+			"settlementValue": "500",
+			"note": "plain lend offer · surplus returned"
+		},
+		{
+			"id": 3,
+			"kind": "borrow",
+			"boost": "0",
+			"coolingOffStored": 86400,
+			"settlementValue": "0",
+			"note": "plain borrow request · full pledge"
+		}
+	],
+	"deployedAt": "2026-06-10T17:51:25.358Z"
+}

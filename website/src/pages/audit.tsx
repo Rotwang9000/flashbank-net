@@ -116,7 +116,7 @@ export default function Audit() {
 						<div className="text-sm text-amber-900 space-y-1.5">
 							<p><strong>No external audit.</strong> Neither contract has been reviewed by a professional auditing firm. Everything below is our own reading of our own code. The severities are our judgement, not an independent rating.</p>
 							<p><strong>The P2P loans are now live on Ethereum and Base</strong> (mainnet, real assets), alongside a Sepolia play-money playground. They carry no external audit — only this self-review — so weigh real-money use accordingly. The Sepolia playground uses valueless test tokens (fpUSD/fpETH from the on-page faucet); never confuse the two.</p>
-							<p><strong>Custom tokens are testnet-only for now.</strong> On mainnet the interface offers only <strong>ETH and USDC</strong>; the contract itself stays fully permissionless. A next version (<code className="text-xs bg-amber-100 px-1 py-0.5 rounded">FlashBankP2PLoanV2</code>) is written, adversarially reviewed and unit-tested but <strong>not deployed</strong>: token sanity-checks, a graduated <em>cooling-off</em> fee rebate (a near-instant return costs only a 10% floor — blocking fake-token fee farming without making listing-griefing free), and pull-payout fallbacks so a blocklisted recipient can never brick the other party&rsquo;s repayment or default claim. See <a href={`${GITHUB}/blob/master/docs/design/P2P_V2_COOLING_OFF.md`} target="_blank" rel="noopener noreferrer" className="underline">the v2 design notes</a>.</p>
+							<p><strong>Custom tokens are testnet-only for now.</strong> On mainnet the interface offers only <strong>ETH and USDC</strong>; the contract itself stays fully permissionless. The next version (<code className="text-xs bg-amber-100 px-1 py-0.5 rounded">FlashBankP2PLoanV2</code>) is adversarially reviewed, unit-tested and <strong>live on the Sepolia playground</strong> (<a href="https://sepolia.etherscan.io/address/0x536f4C17C18854943a45841Fef4b3054ED281E76#code" target="_blank" rel="noopener noreferrer" className="underline">verified source</a>) — mainnets stay on v1 until it graduates. v2 adds token sanity-checks, a graduated <em>cooling-off</em> fee rebate (a near-instant return costs only a 10% floor — blocking fake-token fee farming without making listing-griefing free), and pull-payout fallbacks so a blocklisted recipient can never brick the other party&rsquo;s repayment or default claim. See <a href={`${GITHUB}/blob/master/docs/design/P2P_V2_COOLING_OFF.md`} target="_blank" rel="noopener noreferrer" className="underline">the v2 design notes</a>.</p>
 							<p><strong>Open by default.</strong> Source for both contracts is verified on Etherscan and public on <a href={GITHUB} target="_blank" rel="noopener noreferrer" className="underline">GitHub</a>. Please read it, and tell us what we missed.</p>
 						</div>
 					</div>
@@ -143,7 +143,7 @@ export default function Audit() {
 							rows={[
 								{ k: 'Custody', v: 'Escrow between create & settle' },
 								{ k: 'Pricing', v: 'No oracle · time-based only' },
-								{ k: 'Tests', v: '48 live + 22 staged (v2)' },
+								{ k: 'Tests', v: '48 (v1) + 22 (v2) + live drill' },
 								{ k: 'Owner powers', v: 'Interface fee only (≤ 1%)' },
 								{ k: 'External audit', v: 'None' },
 								{ k: 'Network', v: 'Ethereum + Base · Sepolia demo' }

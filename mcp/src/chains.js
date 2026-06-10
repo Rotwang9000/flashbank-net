@@ -1,8 +1,11 @@
 // Chain registry for the FlashBank MCP server.
 //
 // Static, public on-chain addresses (nothing here is a secret) for every network the live
-// products are deployed to. Sourced from loans/deployments/*-p2p.json and
+// products are deployed to. Sourced from loans/deployments/*-p2p*.json and
 // flashloans/deployments/*-v3.json — update BOTH when redeploying.
+//
+// `p2pVersion` selects the ABI: 1 = FlashBankP2PLoan (Ethereum, Base); 2 = FlashBankP2PLoanV2
+// (Sepolia playground — cooling-off rebate, token validation, pull-payouts).
 //
 // Per the project rules nothing mutable is exported: consumers go through the accessor
 // functions below, which hand out frozen data.
@@ -17,6 +20,7 @@ const CHAIN_DATA = Object.freeze({
 		rpc: 'https://ethereum-rpc.publicnode.com',
 		explorer: 'https://etherscan.io',
 		p2pLoan: '0x131C8545b28bca9063B364380956Df33A70018A0',
+		p2pVersion: 1,
 		flashRouter: '0x7791f3A7D82db7186f085BfFa3Fd46898EEaAE35',
 		isPlayground: false,
 		tokens: Object.freeze([
@@ -31,6 +35,7 @@ const CHAIN_DATA = Object.freeze({
 		rpc: 'https://mainnet.base.org',
 		explorer: 'https://basescan.org',
 		p2pLoan: '0x86FbF8e03f8A6f3eF52062E3f81627F64aa5FcbB',
+		p2pVersion: 1,
 		flashRouter: '0xDd6D0dC7AA7Be44E4F44d15D34851f3eDc7610AA',
 		isPlayground: false,
 		tokens: Object.freeze([
@@ -45,6 +50,7 @@ const CHAIN_DATA = Object.freeze({
 		rpc: 'https://arbitrum-one-rpc.publicnode.com',
 		explorer: 'https://arbiscan.io',
 		p2pLoan: null, // not deployed yet (thin deployer balance) — see docs/deployment/LIVE_NETWORKS.md
+		p2pVersion: 1,
 		flashRouter: '0x34DcDBCCf9cC5753F709723Fa00DDe7eCd549A17',
 		isPlayground: false,
 		tokens: Object.freeze([
@@ -58,7 +64,10 @@ const CHAIN_DATA = Object.freeze({
 		name: 'Sepolia (testnet playground)',
 		rpc: 'https://ethereum-sepolia-rpc.publicnode.com',
 		explorer: 'https://sepolia.etherscan.io',
-		p2pLoan: '0x3Ce4B6DC383d3105A6D35a6816BC10D395Aa1017',
+		// FlashBankP2PLoanV2 playground (cooling-off rebate live here first). The old v1 playground
+		// remains on-chain at 0x3Ce4B6DC383d3105A6D35a6816BC10D395Aa1017 but is no longer pointed at.
+		p2pLoan: '0x536f4C17C18854943a45841Fef4b3054ED281E76',
+		p2pVersion: 2,
 		flashRouter: '0x6770d3e75F45a2080973c0021F184AEFE6f5CA67',
 		isPlayground: true,
 		tokens: Object.freeze([

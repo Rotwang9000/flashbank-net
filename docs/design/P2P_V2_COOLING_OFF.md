@@ -1,10 +1,13 @@
 # P2P loans v2 — token validation, cooling-off rebate & settlement hardening
 
-> **Status: prepared, NOT deployed.** The live contract is `FlashBankP2PLoan` (v1), deployed and
-> verified on Ethereum + Base. v1 is immutable and left untouched. This note describes
-> `loans/contracts/FlashBankP2PLoanV2.sol`, a staging contract (compiled + unit-tested in
-> `loans/test/FlashBankP2PLoanV2.test.js`, 22 cases) that adds **contract-level** features which
-> cannot be retrofitted onto v1. Deploy only after review.
+> **Status: LIVE on the Sepolia playground (2026-06-10)** at
+> [`0x536f4C17C18854943a45841Fef4b3054ED281E76`](https://sepolia.etherscan.io/address/0x536f4C17C18854943a45841Fef4b3054ED281E76#code)
+> (verified, `VERSION() = 2.0.0`, 0 bps introductory fee). Mainnets stay on `FlashBankP2PLoan`
+> (v1, Ethereum + Base) until v2 graduates; v1 is immutable and left untouched. Source:
+> `loans/contracts/FlashBankP2PLoanV2.sol`, unit-tested in `loans/test/FlashBankP2PLoanV2.test.js`
+> (22 cases) and proven live by the two-agent MCP drill (`mcp/scripts/drill.js`): an early repay
+> of a 6 fpUSD agreed fee cost **0.602 fpUSD** — the 10% floor plus seconds of vesting — with the
+> rebate reported end-to-end through the MCP tools.
 
 ## Why v2 exists
 
@@ -160,9 +163,9 @@ Every pitfall considered before go-live, and what was decided:
 - **Offer auto-expiry sweeper** — `cancel` after expiry already reclaims escrow; a keeper adds
   surface for little gain.
 
-## What ships now vs. with v2
+## What ships where
 
-| Concern | Now (v1 live) | v2 (prepared) |
+| Concern | Mainnets (v1 live) | v2 (live on the Sepolia playground) |
 | --- | --- | --- |
 | Fake-token value fraud | UI restricted to ETH/USDC on mainnet | + cooling-off rebate (escape ≈ 10% of fee) |
 | Free short-term borrowing | n/a | graduated fee + same-block full-fee guard |
@@ -171,7 +174,7 @@ Every pitfall considered before go-live, and what was decided:
 | Broken/garbage token addresses | UI allow-list | + on-chain `_validateToken` |
 | Fee model | flat fee | flat fee that **vests** (rebate only) |
 
-## Open questions / tunables (for review before deploy)
+## Open questions / tunables (for review before a MAINNET deploy)
 
 - **`MIN_VESTED_FEE_BPS` = 10%.** Higher deters griefing more but punishes victims more. 10% felt
   like the balance point; revisit with real fee sizes.
@@ -190,13 +193,28 @@ EOA, non-ERC-20, absurd decimals, valid), default with full fee, and the pull-pa
 nothing-to-withdraw). The blocklist scenarios use the test-only `BlocklistToken` mock.
 Run with `cd loans && npx hardhat test test/FlashBankP2PLoanV2.test.js`.
 
-## If/when deploying
+**Live drill (Sepolia, 2026-06-10):** `cd mcp && npm run drill` spawns a lender agent and a fresh
+borrower agent as two real MCP server instances and exercises faucet → create → browse → pinned
+take (terms hash) → early repay → withdraw-unclaimed probe → cancel against the deployed contract.
+Observed: vested fee `0.602142` of an agreed `6` fpUSD (rebate `5.397858`), terms-hash pinning, and
+clean settlement (nothing queued). 15/15 steps passed.
 
-1. Re-review the constants and the adversarial table above.
-2. Adapt `loans/scripts/deploy-p2p-loan.js` (constructor unchanged: `(feeRecipient, feeBps)`).
-3. Verify on Etherscan/Basescan; record in `loans/deployments/*-p2p-v2.json`.
-4. Update the website: new `coolingOff`/`startBlock` fields in `LOAN_COMPONENTS`, the terms-hash
-   builder, a cooling-off control on the offer form, a "you owe now vs. at maturity" display
-   (`quoteRepaymentNow`/`effectiveFee`), and an **unclaimed-payouts banner** that checks
-   `unclaimed(token, account)` and offers `withdrawUnclaimed`.
-5. Update the MCP server's P2P ABI + tools for the same fields.
+## Sepolia playground deployment (done)
+
+- Deployed with `loans/scripts/deploy-playground-v2.js` (reuses the fpUSD/fpETH faucet tokens so
+  existing faucet links stay valid); recorded in `loans/deployments/sepolia-playground-v2.json`.
+- Verified on Etherscan; seeded with four offers, incl. one with a creator-set 2-day window.
+- Website `/p2p` selects the v2 ABI on Sepolia (`p2pVersion` in the network registry,
+  `src/lib/p2pContracts.ts`): cooling-off control on the form, early-exit rebate rows on offer
+  cards and the take-confirm modal, a live "repaying now costs ≈ …" line on active loans, and an
+  unclaimed-payouts banner backed by `withdrawUnclaimed`.
+- MCP serves both versions (`p2pVersion` per chain): v2 quotes (`quoteRepaymentNow`), rebate
+  reporting on `p2p_repay`, optional `coolingOffHours` on `p2p_create_offer`, and a
+  `p2p_withdraw_unclaimed` tool.
+
+## Before any MAINNET deploy
+
+1. Re-review the constants, the adversarial table and the open questions above.
+2. Let the playground soak — watch for surprising vesting/griefing behaviour with real users.
+3. Deploy with `(feeRecipient, feeBps)`, verify, record in `loans/deployments/*-p2p-v2.json`,
+   flip the site's `p2pVersion` per chain and the MCP chain registry.

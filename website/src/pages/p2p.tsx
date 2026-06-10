@@ -14,6 +14,7 @@ import { useIsMounted } from '../hooks/useIsMounted';
 import Nav from '../components/Nav';
 import SiteFooter from '../components/SiteFooter';
 import FaucetCard from '../components/FaucetCard';
+import { p2pAbiFor, erc20Abi, minCoolingSecs, vestedFeeNow } from '../lib/p2pContracts';
 
 // "flashbank" is used here only as a VERB (you *flashbank* a loan). This product is a neutral
 // peer-to-peer escrow; it is not a bank and takes no custody as a financial institution.
@@ -25,6 +26,7 @@ const NETWORKS = {
 		name: 'Ethereum',
 		explorer: 'https://etherscan.io',
 		p2pLoan: process.env.NEXT_PUBLIC_MAINNET_P2P_LOAN_ADDRESS || '',
+		p2pVersion: 1,
 		weth: process.env.NEXT_PUBLIC_MAINNET_WETH_ADDRESS || '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
 		isPlayground: false,
 		tokens: [
@@ -36,6 +38,7 @@ const NETWORKS = {
 		name: 'Base',
 		explorer: 'https://basescan.org',
 		p2pLoan: process.env.NEXT_PUBLIC_BASE_P2P_LOAN_ADDRESS || '',
+		p2pVersion: 1,
 		weth: process.env.NEXT_PUBLIC_BASE_WETH_ADDRESS || '0x4200000000000000000000000000000000000006',
 		isPlayground: false,
 		tokens: [
@@ -47,6 +50,7 @@ const NETWORKS = {
 		name: 'Arbitrum',
 		explorer: 'https://arbiscan.io',
 		p2pLoan: process.env.NEXT_PUBLIC_ARBITRUM_P2P_LOAN_ADDRESS || '',
+		p2pVersion: 1,
 		weth: process.env.NEXT_PUBLIC_ARBITRUM_WETH_ADDRESS || '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
 		isPlayground: false,
 		tokens: [
@@ -58,7 +62,9 @@ const NETWORKS = {
 		name: 'Sepolia',
 		explorer: 'https://sepolia.etherscan.io',
 		// Public testnet playground — addresses are not secrets. Override via env if redeployed.
-		p2pLoan: process.env.NEXT_PUBLIC_SEPOLIA_P2P_LOAN_ADDRESS || '0x3Ce4B6DC383d3105A6D35a6816BC10D395Aa1017',
+		// Runs FlashBankP2PLoanV2 (cooling-off rebate + token validation + pull-payouts).
+		p2pLoan: process.env.NEXT_PUBLIC_SEPOLIA_P2P_LOAN_ADDRESS || '0x536f4C17C18854943a45841Fef4b3054ED281E76',
+		p2pVersion: 2,
 		weth: process.env.NEXT_PUBLIC_SEPOLIA_WETH_ADDRESS || '0xdd13E55209Fd76AfE204dBda4007C227904f0a81',
 		isPlayground: true,
 		tokens: [
@@ -91,99 +97,9 @@ const BOOST_PRESETS = [1, 3, 5];
 // introductory period (the deployed contract runs at 0 bps until we switch it on).
 const INTERFACE_FEE_PCT = 0.01;
 
-const LOAN_COMPONENTS = [
-	{ internalType: 'address', name: 'creator', type: 'address' },
-	{ internalType: 'address', name: 'taker', type: 'address' },
-	{ internalType: 'address', name: 'allowedTaker', type: 'address' },
-	{ internalType: 'bool', name: 'creatorIsLender', type: 'bool' },
-	{ internalType: 'uint8', name: 'status', type: 'uint8' },
-	{ internalType: 'address', name: 'principalToken', type: 'address' },
-	{ internalType: 'address', name: 'collateralToken', type: 'address' },
-	{ internalType: 'uint256', name: 'principal', type: 'uint256' },
-	{ internalType: 'uint256', name: 'collateral', type: 'uint256' },
-	{ internalType: 'uint256', name: 'repaymentFee', type: 'uint256' },
-	{ internalType: 'uint256', name: 'protocolFee', type: 'uint256' },
-	{ internalType: 'address', name: 'serviceFeeRecipient', type: 'address' },
-	{ internalType: 'uint256', name: 'serviceFee', type: 'uint256' },
-	{ internalType: 'uint64', name: 'duration', type: 'uint64' },
-	{ internalType: 'uint64', name: 'gracePeriod', type: 'uint64' },
-	{ internalType: 'uint64', name: 'offerExpiry', type: 'uint64' },
-	{ internalType: 'uint64', name: 'startTime', type: 'uint64' },
-	{ internalType: 'bool', name: 'listed', type: 'bool' },
-	{ internalType: 'uint256', name: 'boost', type: 'uint256' },
-	{ internalType: 'uint256', name: 'settlementValue', type: 'uint256' },
-	{ internalType: 'uint64', name: 'version', type: 'uint64' }
-] as const;
-
-// Fields a creator may amend on an open offer (mirrors FlashBankP2PLoan.OfferUpdate).
-const OFFER_UPDATE_COMPONENTS = [
-	{ internalType: 'uint256', name: 'repaymentFee', type: 'uint256' },
-	{ internalType: 'uint64', name: 'duration', type: 'uint64' },
-	{ internalType: 'uint64', name: 'gracePeriod', type: 'uint64' },
-	{ internalType: 'uint64', name: 'offerExpiry', type: 'uint64' },
-	{ internalType: 'uint256', name: 'settlementValue', type: 'uint256' },
-	{ internalType: 'address', name: 'allowedTaker', type: 'address' },
-	{ internalType: 'address', name: 'serviceFeeRecipient', type: 'address' },
-	{ internalType: 'uint256', name: 'serviceFee', type: 'uint256' }
-] as const;
-
-const P2P_ABI = [
-	{
-		inputs: [{
-			components: [
-				{ internalType: 'bool', name: 'creatorIsLender', type: 'bool' },
-				{ internalType: 'address', name: 'allowedTaker', type: 'address' },
-				{ internalType: 'address', name: 'principalToken', type: 'address' },
-				{ internalType: 'address', name: 'collateralToken', type: 'address' },
-				{ internalType: 'uint256', name: 'principal', type: 'uint256' },
-				{ internalType: 'uint256', name: 'collateral', type: 'uint256' },
-				{ internalType: 'uint256', name: 'repaymentFee', type: 'uint256' },
-				{ internalType: 'uint64', name: 'duration', type: 'uint64' },
-				{ internalType: 'uint64', name: 'gracePeriod', type: 'uint64' },
-				{ internalType: 'uint64', name: 'offerExpiry', type: 'uint64' },
-				{ internalType: 'bool', name: 'listed', type: 'bool' },
-				{ internalType: 'address', name: 'serviceFeeRecipient', type: 'address' },
-				{ internalType: 'uint256', name: 'serviceFee', type: 'uint256' },
-				{ internalType: 'uint256', name: 'boost', type: 'uint256' },
-				{ internalType: 'uint256', name: 'settlementValue', type: 'uint256' }
-			], internalType: 'struct FlashBankP2PLoan.LoanParams', name: 'p', type: 'tuple'
-		}],
-		name: 'createLoan', outputs: [{ internalType: 'uint256', name: 'id', type: 'uint256' }], stateMutability: 'nonpayable', type: 'function'
-	},
-	{ inputs: [{ internalType: 'uint256', name: 'id', type: 'uint256' }], name: 'take', outputs: [], stateMutability: 'nonpayable', type: 'function' },
-	{ inputs: [{ internalType: 'uint256', name: 'id', type: 'uint256' }, { internalType: 'uint64', name: 'expectedVersion', type: 'uint64' }], name: 'takeChecked', outputs: [], stateMutability: 'nonpayable', type: 'function' },
-	{
-		inputs: [
-			{ internalType: 'uint256', name: 'id', type: 'uint256' },
-			{ components: OFFER_UPDATE_COMPONENTS as any, internalType: 'struct FlashBankP2PLoan.OfferUpdate', name: 'u', type: 'tuple' }
-		], name: 'updateOffer', outputs: [], stateMutability: 'nonpayable', type: 'function'
-	},
-	{ inputs: [{ internalType: 'uint256', name: 'id', type: 'uint256' }, { internalType: 'uint256', name: 'amount', type: 'uint256' }], name: 'boostOffer', outputs: [], stateMutability: 'nonpayable', type: 'function' },
-	{ inputs: [{ internalType: 'uint256', name: 'id', type: 'uint256' }], name: 'repay', outputs: [], stateMutability: 'nonpayable', type: 'function' },
-	{ inputs: [{ internalType: 'uint256', name: 'id', type: 'uint256' }], name: 'claimDefault', outputs: [], stateMutability: 'nonpayable', type: 'function' },
-	{ inputs: [{ internalType: 'uint256', name: 'id', type: 'uint256' }], name: 'cancel', outputs: [], stateMutability: 'nonpayable', type: 'function' },
-	{ inputs: [], name: 'loanCount', outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }], stateMutability: 'view', type: 'function' },
-	{ inputs: [], name: 'protocolFeeBps', outputs: [{ internalType: 'uint16', name: '', type: 'uint16' }], stateMutability: 'view', type: 'function' },
-	{
-		inputs: [{ internalType: 'uint256', name: 'start', type: 'uint256' }, { internalType: 'uint256', name: 'limit', type: 'uint256' }],
-		name: 'getLoansPaged', outputs: [{ components: LOAN_COMPONENTS as any, internalType: 'struct FlashBankP2PLoan.Loan[]', name: 'page', type: 'tuple[]' }], stateMutability: 'view', type: 'function'
-	},
-	{
-		inputs: [{ internalType: 'uint256', name: 'id', type: 'uint256' }],
-		name: 'quoteTake', outputs: [{ internalType: 'address', name: 'token', type: 'address' }, { internalType: 'uint256', name: 'amount', type: 'uint256' }], stateMutability: 'view', type: 'function'
-	},
-	{ inputs: [{ internalType: 'uint256', name: 'id', type: 'uint256' }], name: 'quoteRepayment', outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }], stateMutability: 'view', type: 'function' },
-	{ inputs: [{ internalType: 'uint256', name: 'id', type: 'uint256' }], name: 'quoteDefault', outputs: [{ internalType: 'uint256', name: 'toLender', type: 'uint256' }, { internalType: 'uint256', name: 'toBorrower', type: 'uint256' }], stateMutability: 'view', type: 'function' }
-] as const;
-
-const ERC20_ABI = [
-	{ inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }], name: 'approve', outputs: [{ name: '', type: 'bool' }], stateMutability: 'nonpayable', type: 'function' },
-	{ inputs: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }], name: 'allowance', outputs: [{ name: '', type: 'uint256' }], stateMutability: 'view', type: 'function' },
-	{ inputs: [{ name: 'account', type: 'address' }], name: 'balanceOf', outputs: [{ name: '', type: 'uint256' }], stateMutability: 'view', type: 'function' },
-	{ inputs: [], name: 'symbol', outputs: [{ name: '', type: 'string' }], stateMutability: 'view', type: 'function' },
-	{ inputs: [], name: 'decimals', outputs: [{ name: '', type: 'uint8' }], stateMutability: 'view', type: 'function' },
-	{ inputs: [], name: 'faucet', outputs: [], stateMutability: 'nonpayable', type: 'function' }
-] as const;
+// ABIs live in src/lib/p2pContracts.ts (version-aware: v1 on mainnets, v2 on the Sepolia
+// playground). The page picks the right one per network via p2pAbiFor(networkConfig.p2pVersion).
+const ERC20_ABI = erc20Abi();
 
 const STATUS_LABEL = ['None', 'Open', 'Active', 'Repaid', 'Defaulted', 'Cancelled'];
 const INPUT_CLS = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500';
@@ -194,6 +110,7 @@ type LoanView = {
 	repaymentFee: bigint; protocolFee: bigint; serviceFeeRecipient: string; serviceFee: bigint;
 	duration: bigint; gracePeriod: bigint; offerExpiry: bigint; startTime: bigint; listed: boolean; boost: bigint;
 	settlementValue: bigint; version: bigint;
+	coolingOff: bigint; // v2 only — 0n on v1 networks (no rebate window)
 };
 
 type TokenMeta = { symbol: string; decimals: number };
@@ -252,10 +169,14 @@ export default function FlashbankLoan() {
 	const networkConfig = NETWORKS[chainId as keyof typeof NETWORKS] || NETWORKS[1];
 	const contractAddress = networkConfig.p2pLoan;
 	const registry = networkConfig.tokens as readonly RegToken[];
+	// v1 (mainnets) vs v2 (Sepolia playground: cooling-off rebate, pull-payouts).
+	const isV2 = networkConfig.p2pVersion === 2;
+	const P2P_ABI = p2pAbiFor(networkConfig.p2pVersion);
 	const ready = Boolean(contractAddress) && Boolean(publicClient);
 
 	const [tab, setTab] = useState<'browse' | 'create' | 'active' | 'how'>('browse');
 	const [loans, setLoans] = useState<LoanView[]>([]);
+	const [unclaimedRows, setUnclaimedRows] = useState<{ token: string; amount: bigint }[]>([]);
 	const [meta, setMeta] = useState<Record<string, TokenMeta>>({});
 	const [balances, setBalances] = useState<Record<string, bigint>>({});
 	const [protocolBps, setProtocolBps] = useState<number>(0);
@@ -280,6 +201,8 @@ export default function FlashbankLoan() {
 	const [graceDays, setGraceDays] = useState(1);
 	const [boostAmount, setBoostAmount] = useState('');
 	const [advanced, setAdvanced] = useState(false);
+	// v2 only: cooling-off window in days ('' = automatic protocol minimum for the term).
+	const [coolingDays, setCoolingDays] = useState('');
 	const [serviceRecipient, setServiceRecipient] = useState('');
 	const [serviceFee, setServiceFee] = useState('');
 	const [allowedTaker, setAllowedTaker] = useState('');
@@ -361,7 +284,8 @@ export default function FlashbankLoan() {
 				principal: l.principal, collateral: l.collateral, repaymentFee: l.repaymentFee, protocolFee: l.protocolFee,
 				serviceFeeRecipient: l.serviceFeeRecipient, serviceFee: l.serviceFee, duration: l.duration,
 				gracePeriod: l.gracePeriod, offerExpiry: l.offerExpiry, startTime: l.startTime, listed: l.listed,
-				boost: l.boost ?? 0n, settlementValue: l.settlementValue ?? 0n, version: l.version ?? 0n
+				boost: l.boost ?? 0n, settlementValue: l.settlementValue ?? 0n, version: l.version ?? 0n,
+				coolingOff: l.coolingOff ?? 0n
 			}));
 			setLoans(mapped);
 			await fetchMeta(mapped.flatMap((l) => [l.principalToken, l.collateralToken]));
@@ -373,6 +297,42 @@ export default function FlashbankLoan() {
 	}, [ready, publicClient, contractAddress, fetchMeta]);
 
 	useEffect(() => { refresh(); }, [refresh]);
+
+	// v2 pull-payout queue: check every token this wallet could plausibly have queued (registry
+	// tokens plus both sides of any loan it appears in). Cheap on the playground's loan counts.
+	const refreshUnclaimed = useCallback(async () => {
+		if (!isV2 || !ready || !publicClient || !address) { setUnclaimedRows([]); return; }
+		try {
+			const tokens = new Map<string, string>();
+			registry.forEach((t) => tokens.set(t.address.toLowerCase(), t.address));
+			loans.forEach((l) => {
+				tokens.set(l.principalToken.toLowerCase(), l.principalToken);
+				tokens.set(l.collateralToken.toLowerCase(), l.collateralToken);
+			});
+			const rows: { token: string; amount: bigint }[] = [];
+			for (const token of tokens.values()) {
+				const amount = await publicClient.readContract({
+					address: contractAddress as `0x${string}`, abi: P2P_ABI, functionName: 'unclaimed',
+					args: [token as `0x${string}`, address as `0x${string}`]
+				} as any) as bigint;
+				if (amount > 0n) rows.push({ token, amount });
+			}
+			setUnclaimedRows(rows);
+		} catch { setUnclaimedRows([]); }
+	}, [isV2, ready, publicClient, address, registry, loans, contractAddress, P2P_ABI]);
+
+	useEffect(() => { refreshUnclaimed(); }, [refreshUnclaimed]);
+
+	const handleWithdrawUnclaimed = async (token: string) => {
+		try {
+			await toast.promise((async () => {
+				const hash = await safeWrite(contractAddress as `0x${string}`, P2P_ABI, 'withdrawUnclaimed', [token]);
+				await publicClient!.waitForTransactionReceipt({ hash });
+				await refreshUnclaimed();
+				await fetchBalances([token]);
+			})(), { loading: 'Withdrawing…', success: 'Payout withdrawn', error: 'Withdraw failed' });
+		} catch { /* handled */ }
+	};
 	useEffect(() => { fetchMeta([principalToken, collateralToken]); }, [principalToken, collateralToken, fetchMeta]);
 	useEffect(() => {
 		fetchBalances([principalToken, collateralToken, ...registry.map((t) => t.address)]);
@@ -445,6 +405,19 @@ export default function FlashbankLoan() {
 			const grace = BigInt(Math.round(graceDays * 86400));
 			if (duration <= 0n) { toast.error('Term must be at least a fraction of a day'); return; }
 
+			// v2: optional explicit cooling-off window; 0 lets the contract pick the minimum.
+			let coolingSecs = 0n;
+			if (isV2 && coolingDays.trim() !== '') {
+				const days = Number(coolingDays);
+				if (!Number.isFinite(days) || days < 0) { toast.error('Cooling-off must be a number of days'); return; }
+				coolingSecs = BigInt(Math.round(days * 86400));
+				const minSecs = BigInt(minCoolingSecs(Number(duration)));
+				if (coolingSecs !== 0n && (coolingSecs < minSecs || coolingSecs > duration)) {
+					toast.error(`Cooling-off must be between ${formatDuration(minSecs)} and the full term — or leave it blank for automatic`);
+					return;
+				}
+			}
+
 			// Optional surplus return: settlementValue is the agreed rate applied to the WHOLE collateral
 			// (collateralUnits * rate / 10^cDec), in principal-token units. Frozen on-chain — never an oracle.
 			let settlementValue = 0n;
@@ -458,6 +431,7 @@ export default function FlashbankLoan() {
 			const params = {
 				creatorIsLender, allowedTaker: allowedTaker || ZERO, principalToken, collateralToken,
 				principal, collateral, repaymentFee: fee, duration, gracePeriod: grace, offerExpiry: 0n,
+				...(isV2 ? { coolingOff: coolingSecs } : {}),
 				listed, serviceFeeRecipient: serviceFee ? serviceRecipient : ZERO, serviceFee: serviceFee ? svc : 0n,
 				boost, settlementValue
 			};
@@ -542,10 +516,20 @@ export default function FlashbankLoan() {
 		if (!publicClient) return;
 		if (!isConnected) { toast.error('Connect a wallet first'); return; }
 		if (!termsChanged && boostTopUp <= 0n) { setEditing(null); return; }
+		// v2 tuples carry coolingOff: keep the creator's window when it still fits the (possibly new)
+		// term, otherwise 0 re-normalises to the protocol minimum.
+		const patched = isV2
+			? (() => {
+				const newDuration = BigInt(update.duration);
+				const minSecs = BigInt(minCoolingSecs(Number(newDuration)));
+				const keep = loan.coolingOff >= minSecs && loan.coolingOff <= newDuration;
+				return { ...update, coolingOff: keep ? loan.coolingOff : 0n };
+			})()
+			: update;
 		try {
 			await toast.promise((async () => {
 				if (termsChanged) {
-					const hash = await safeWrite(contractAddress as `0x${string}`, P2P_ABI, 'updateOffer', [BigInt(loan.id), update]);
+					const hash = await safeWrite(contractAddress as `0x${string}`, P2P_ABI, 'updateOffer', [BigInt(loan.id), patched]);
 					await publicClient.waitForTransactionReceipt({ hash });
 				}
 				if (boostTopUp > 0n) {
@@ -641,7 +625,26 @@ export default function FlashbankLoan() {
 					{networkConfig.isPlayground && (
 						<div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-amber-900 flex items-start gap-2.5">
 							<Sparkles className="h-4 w-4 mt-0.5 flex-shrink-0 text-amber-500" />
-							<p className="text-sm"><strong>Playground</strong> on the Sepolia testnet — free play-money, <strong>no real value</strong>. Mint tokens from the faucet below, then try the whole flow. Unaudited demo; never send real assets.</p>
+							<p className="text-sm">
+								<strong>Playground</strong> on the Sepolia testnet — free play-money, <strong>no real value</strong>. Mint tokens from the faucet below, then try the whole flow. Unaudited demo; never send real assets.
+								{isV2 && <span className="block mt-1 text-[13px]">This playground runs the <strong>v2 escrow</strong>: repay early and the fee is pro-rated down to a 10% floor (the <em>cooling-off rebate</em>), tokens are sanity-checked at posting, and blocked payouts queue safely instead of jamming settlement.</span>}
+							</p>
+						</div>
+					)}
+
+					{/* v2 pull-payout queue: only renders when something is actually waiting. */}
+					{unclaimedRows.length > 0 && (
+						<div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+							<div className="text-sm font-semibold text-emerald-900">Queued payouts waiting for you</div>
+							<p className="text-xs text-emerald-800 mt-0.5 mb-2">A settlement payment couldn&apos;t be delivered to your wallet at the time, so the escrow is holding it. Withdraw whenever you like.</p>
+							<div className="flex flex-wrap gap-2">
+								{unclaimedRows.map((r) => (
+									<button key={r.token} onClick={() => handleWithdrawUnclaimed(r.token)}
+										className="inline-flex items-center gap-1.5 text-sm bg-emerald-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-emerald-700 font-medium">
+										Withdraw {fmt(r.amount, r.token)}
+									</button>
+								))}
+							</div>
 						</div>
 					)}
 
@@ -843,6 +846,12 @@ export default function FlashbankLoan() {
 								<Disclosure open={advanced} onToggle={() => setAdvanced((v) => !v)} label="Advanced options" hint="grace period, private deals, service fees">
 									<div className="space-y-4 pt-1">
 										<RangeRow label="Grace period (after the term)" value={graceDays} min={0} max={14} step={1} onChange={setGraceDays} display={graceDays === 0 ? 'none' : `${graceDays} day${graceDays === 1 ? '' : 's'}`} />
+										{isV2 && (
+											<Field label="Cooling-off window (days)"
+												hint={`The flat fee vests over this window, so an early repayment is rebated (never below a 10% floor). Blank = automatic minimum: ${formatDuration(BigInt(minCoolingSecs(Math.round(termDays * 86400))))} for this term.`}>
+												<input value={coolingDays} onChange={(e) => setCoolingDays(e.target.value)} placeholder="auto" className={INPUT_CLS} />
+											</Field>
+										)}
 										<Field label="Restrict to one taker (private deal)" hint="Leave blank for the open market.">
 											<input value={allowedTaker} onChange={(e) => setAllowedTaker(e.target.value)} placeholder="0x… address that may take this offer" className={INPUT_CLS} />
 										</Field>
@@ -997,6 +1006,7 @@ export default function FlashbankLoan() {
 						cInfo={tokenInfo(confirming.collateralToken)}
 						publicClient={publicClient}
 						contractAddress={contractAddress as `0x${string}`}
+						abi={P2P_ABI}
 						fmt={fmt}
 						onClose={() => setConfirming(null)}
 						onConfirm={() => handleTake(confirming)}
@@ -1347,6 +1357,7 @@ function OfferCard({ loan, mine, pInfo, cInfo, fmt, isConnected, onTake, onCance
 				<SummaryRow label="Collateral" value={fmt(loan.collateral, loan.collateralToken)} />
 				<SummaryRow label="Fee" value={fmt(loan.repaymentFee, loan.principalToken)} />
 				<SummaryRow label="Term" value={`${formatDuration(loan.duration)} (+${formatDuration(loan.gracePeriod)} grace)`} />
+				{loan.coolingOff > 0n && <SummaryRow label="Early-exit rebate" value={`fee vests over ${formatDuration(loan.coolingOff)}`} />}
 				{featured && <SummaryRow label="Boost" value={fmt(loan.boost, loan.principalToken)} />}
 				{loan.serviceFee > 0n && <SummaryRow label="Service fee" value={`${fmt(loan.serviceFee, loan.principalToken)} → ${formatAddress(loan.serviceFeeRecipient)}`} />}
 				{loan.allowedTaker !== ZERO && (
@@ -1436,6 +1447,12 @@ function ActiveLoanCard({ loan, now, me, fmt, onRepay, onClaim }: {
 					<div className={`h-full ${barCls} transition-all`} style={{ width: `${progress}%` }} />
 				</div>
 				<p className={`text-xs mt-1.5 ${overdue ? 'text-red-600' : inGrace ? 'text-amber-600' : 'text-gray-500'}`}>{statusText}</p>
+				{loan.coolingOff > 0n && now < start + Number(loan.coolingOff) && !overdue && (
+					<p className="text-[11px] text-emerald-600 mt-1">
+						Cooling-off active — {iAmBorrower ? 'repaying now costs' : 'an immediate repayment would pay you'} ≈ {fmt(loan.principal + vestedFeeNow(loan.repaymentFee, loan.startTime, loan.coolingOff, now), loan.principalToken)}
+						{' '}(the {fmt(loan.repaymentFee, loan.principalToken)} fee fully vests in {formatDuration(start + Number(loan.coolingOff) - now)}).
+					</p>
+				)}
 				{loan.settlementValue > 0n && (() => {
 					const { toLender, toBorrower } = splitOnDefault(loan.collateral, loan.principal + loan.repaymentFee, loan.settlementValue);
 					return (
@@ -1453,9 +1470,9 @@ function ActiveLoanCard({ loan, now, me, fmt, onRepay, onClaim }: {
 // Shows what they deposit (read straight from quoteTake), what they receive, the repay window, the
 // on-default split, and the version that takeChecked pins. The deal only fires on an explicit, opt-in
 // acknowledgement — never on a single accidental click.
-function TakeConfirmModal({ loan, pInfo, cInfo, publicClient, contractAddress, fmt, onClose, onConfirm }: {
+function TakeConfirmModal({ loan, pInfo, cInfo, publicClient, contractAddress, abi, fmt, onClose, onConfirm }: {
 	loan: LoanView; pInfo: TokenInfo; cInfo: TokenInfo;
-	publicClient: any; contractAddress: `0x${string}`;
+	publicClient: any; contractAddress: `0x${string}`; abi: readonly any[];
 	fmt: (a: bigint, t: string) => string;
 	onClose: () => void; onConfirm: () => void;
 }) {
@@ -1468,13 +1485,13 @@ function TakeConfirmModal({ loan, pInfo, cInfo, publicClient, contractAddress, f
 		(async () => {
 			try {
 				const res = await publicClient.readContract({
-					address: contractAddress, abi: P2P_ABI, functionName: 'quoteTake', args: [BigInt(loan.id)]
+					address: contractAddress, abi, functionName: 'quoteTake', args: [BigInt(loan.id)]
 				}) as [string, bigint];
 				if (alive) setDeposit({ token: res[0], amount: res[1] });
 			} catch { /* keep null — the rest of the summary still renders */ }
 		})();
 		return () => { alive = false; };
-	}, [loan.id, contractAddress, publicClient]);
+	}, [loan.id, contractAddress, publicClient, abi]);
 
 	const debt = loan.principal + loan.repaymentFee;
 	const { toLender, toBorrower } = splitOnDefault(loan.collateral, debt, loan.settlementValue);
@@ -1501,6 +1518,9 @@ function TakeConfirmModal({ loan, pInfo, cInfo, publicClient, contractAddress, f
 							: <SummaryRow label="You're owed at repayment" value={fmt(debt, loan.principalToken)} />}
 						<SummaryRow label={iAmBorrower ? 'You repay to redeem' : 'Borrower repays'} value={fmt(debt, loan.principalToken)} />
 						<SummaryRow label="Repay window" value={`${formatDuration(loan.duration)} (+${formatDuration(loan.gracePeriod)} grace)`} />
+						{loan.coolingOff > 0n && (
+							<SummaryRow label="Early-exit rebate" value={`repay within ${formatDuration(loan.coolingOff)} and the fee is pro-rated (10% floor)`} />
+						)}
 						{loan.serviceFee > 0n && <SummaryRow label="Service fee" value={`${fmt(loan.serviceFee, loan.principalToken)} → ${formatAddress(loan.serviceFeeRecipient)}`} />}
 					</dl>
 

@@ -70,9 +70,15 @@ Same bytecode on every chain; `Ownable` (owner = deployer), fee recipient = Vult
 |-------|-----------|----------|-----|
 | Ethereum | `0x131C8545b28bca9063B364380956Df33A70018A0` | [✅](https://etherscan.io/address/0x131C8545b28bca9063B364380956Df33A70018A0#code) | 0 bps |
 | Base | `0x86FbF8e03f8A6f3eF52062E3f81627F64aa5FcbB` | [✅](https://basescan.org/address/0x86FbF8e03f8A6f3eF52062E3f81627F64aa5FcbB#code) | 0 bps |
-| Sepolia (playground) | `0x3Ce4B6DC383d3105A6D35a6816BC10D395Aa1017` | ✅ | 0 bps |
+| Sepolia (playground) | `0x536f4C17C18854943a45841Fef4b3054ED281E76` | [✅](https://sepolia.etherscan.io/address/0x536f4C17C18854943a45841Fef4b3054ED281E76#code) | 0 bps · **v2 (2.0.0)** |
 
-Per-chain records in `loans/deployments/*-p2p.json`. Tokens on the mainnet UI are real WETH/USDC; the Sepolia
+The Sepolia playground runs **FlashBankP2PLoanV2** (since 2026-06-10): token validation, the
+graduated cooling-off fee rebate (10% floor) and pull-payout fallbacks — proven live by the MCP
+two-agent drill (`mcp/scripts/drill.js`: early repay of a 6 fpUSD fee cost 0.602 fpUSD). Mainnets
+stay on v1 until v2 graduates. The previous v1 playground (`0x3Ce4…1017`) remains on-chain but the
+site and MCP no longer point at it.
+
+Per-chain records in `loans/deployments/*-p2p*.json`. Tokens on the mainnet UI are real WETH/USDC; the Sepolia
 playground uses the freely-mintable fpUSD/fpETH faucet tokens. (Arbitrum P2P not deployed — deployer balance too thin;
 add later with `MAX_FEE_GWEI` pinned low.)
 

@@ -56,14 +56,19 @@ export function getSigner(chainKey) {
 	return new ethers.Wallet(key, getProvider(chainKey));
 }
 
-/** The P2P loan escrow contract on a chain (read-only by default). */
+/** The P2P loan escrow contract on a chain (read-only by default), version-aware ABI. */
 export function getP2P(chainKey, withSigner = false) {
 	const chain = getChain(chainKey);
 	if (!chain.p2pLoan) {
 		throw new Error(`FlashBankP2PLoan is not deployed on ${chain.name} yet.`);
 	}
 	const runner = withSigner ? getSigner(chainKey) : getProvider(chainKey);
-	return new ethers.Contract(chain.p2pLoan, p2pAbi(), runner);
+	return new ethers.Contract(chain.p2pLoan, p2pAbi(chain.p2pVersion), runner);
+}
+
+/** Deployed P2P contract version on a chain (1 = mainnet build, 2 = Sepolia playground). */
+export function p2pVersion(chainKey) {
+	return getChain(chainKey).p2pVersion;
 }
 
 /** The flash-loan router (v3) on a chain — read surface only. */

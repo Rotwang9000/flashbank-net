@@ -100,7 +100,7 @@ export default function Home() {
 							<ShieldCheck className="h-3.5 w-3.5 text-emerald-600" /> Open source · verified on Etherscan · self-custody throughout
 						</p>
 						<h1 className="text-4xl sm:text-5xl font-bold text-gray-900 tracking-tight leading-tight">
-							To <span className="text-blue-600">flashbank</span> <span className="text-gray-400 font-medium">(verb)</span>
+							To <span className="text-blue-600">flashbank</span>
 						</h1>
 						<p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
 							To move money on-chain without handing it to anyone. Two ways to do it: an atomic{' '}
@@ -116,7 +116,7 @@ export default function Home() {
 								<Coins className="h-4 w-4" /> P2P loans
 							</Link>
 							<Link href="/audit" className="inline-flex items-center gap-2 bg-white text-gray-700 border border-gray-300 px-6 py-3 rounded-xl font-semibold hover:border-gray-400 transition-colors">
-								<FileSearch className="h-4 w-4" /> Read the honest audit
+								<FileSearch className="h-4 w-4" /> Read our self-audit
 							</Link>
 						</div>
 					</section>

@@ -107,6 +107,11 @@ export function describeLoan(id, loan, tokenInfoFor, nowSeconds = Math.floor(Dat
 	if (loan.serviceFee > 0n) {
 		out.serviceFee = `${formatAmount(loan.serviceFee, principalInfo.decimals)} ${principalInfo.symbol} to ${loan.serviceFeeRecipient}`;
 	}
+	// v2-only field (FlashBankP2PLoanV2): the flat fee vests over this window, so an early
+	// repayment is rebated down to a 10% floor of the agreed fee.
+	if (loan.coolingOff !== undefined && loan.coolingOff !== null && loan.coolingOff > 0n) {
+		out.coolingOff = `${secondsToHuman(loan.coolingOff)} (fee vests from a 10% floor to full over this window; early repay is rebated)`;
+	}
 	if (loan.startTime !== 0n) {
 		out.activatedAt = tsToIso(loan.startTime);
 		out.repayDeadline = tsToIso(BigInt(loan.startTime) + BigInt(loan.duration) + BigInt(loan.gracePeriod));

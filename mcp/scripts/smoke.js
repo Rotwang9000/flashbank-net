@@ -14,7 +14,12 @@ async function smokeP2P(chainKey) {
 	const chain = getChain(chainKey);
 	const p2p = getP2P(chainKey);
 	const total = Number(await p2p.loanCount());
-	console.log(`[${chain.name}] P2P loanCount = ${total}`);
+	console.log(`[${chain.name}] P2P (contract v${chain.p2pVersion}) loanCount = ${total}`);
+	if (chain.p2pVersion === 2) {
+		const onChainVersion = await p2p.VERSION();
+		const minWindow = await p2p.minCoolingOff(7n * 86400n);
+		console.log(`[${chain.name}] VERSION()=${onChainVersion}, minCoolingOff(7d)=${Number(minWindow) / 3600}h`);
+	}
 
 	const start = Math.max(0, total - SMOKE_PAGE);
 	const page = await p2p.getLoansPaged(start, SMOKE_PAGE);

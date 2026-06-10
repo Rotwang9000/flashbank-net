@@ -77,7 +77,7 @@ export default function Audit() {
 				{/* Simple header */}
 				<header className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-gray-200">
 					<div className="container mx-auto px-4 sm:px-6 py-3 flex items-center justify-between max-w-5xl">
-						<Link href="/flash" className="flex items-center gap-2.5">
+						<Link href="/" className="flex items-center gap-2.5">
 							<div className="w-9 h-9 bg-gray-900 rounded-xl flex items-center justify-center shadow-sm"><Zap className="h-5 w-5 text-white" /></div>
 							<span className="text-lg font-bold text-gray-900 tracking-tight">Flash<span className="text-blue-600">Bank</span></span>
 						</Link>
@@ -116,7 +116,7 @@ export default function Audit() {
 						<div className="text-sm text-amber-900 space-y-1.5">
 							<p><strong>No external audit.</strong> Neither contract has been reviewed by a professional auditing firm. Everything below is our own reading of our own code. The severities are our judgement, not an independent rating.</p>
 							<p><strong>The P2P loans are now live on Ethereum and Base</strong> (mainnet, real assets), alongside a Sepolia play-money playground. They carry no external audit — only this self-review — so weigh real-money use accordingly. The Sepolia playground uses valueless test tokens (fpUSD/fpETH from the on-page faucet); never confuse the two.</p>
-							<p><strong>Custom tokens are testnet-only for now.</strong> On mainnet the interface offers only <strong>ETH and USDC</strong>; the contract itself stays fully permissionless. A next version (<code className="text-xs bg-amber-100 px-1 py-0.5 rounded">FlashBankP2PLoanV2</code>) that sanity-checks tokens and adds a graduated <em>cooling-off</em> fee rebate — so a near-instant return costs almost nothing, blocking fake-token fee farming — is written and unit-tested but <strong>not deployed</strong>. See <a href={`${GITHUB}/blob/master/docs/design/P2P_V2_COOLING_OFF.md`} target="_blank" rel="noopener noreferrer" className="underline">the v2 design notes</a>.</p>
+							<p><strong>Custom tokens are testnet-only for now.</strong> On mainnet the interface offers only <strong>ETH and USDC</strong>; the contract itself stays fully permissionless. A next version (<code className="text-xs bg-amber-100 px-1 py-0.5 rounded">FlashBankP2PLoanV2</code>) is written, adversarially reviewed and unit-tested but <strong>not deployed</strong>: token sanity-checks, a graduated <em>cooling-off</em> fee rebate (a near-instant return costs only a 10% floor — blocking fake-token fee farming without making listing-griefing free), and pull-payout fallbacks so a blocklisted recipient can never brick the other party&rsquo;s repayment or default claim. See <a href={`${GITHUB}/blob/master/docs/design/P2P_V2_COOLING_OFF.md`} target="_blank" rel="noopener noreferrer" className="underline">the v2 design notes</a>.</p>
 							<p><strong>Open by default.</strong> Source for both contracts is verified on Etherscan and public on <a href={GITHUB} target="_blank" rel="noopener noreferrer" className="underline">GitHub</a>. Please read it, and tell us what we missed.</p>
 						</div>
 					</div>
@@ -143,7 +143,7 @@ export default function Audit() {
 							rows={[
 								{ k: 'Custody', v: 'Escrow between create & settle' },
 								{ k: 'Pricing', v: 'No oracle · time-based only' },
-								{ k: 'Tests', v: '48 live + 17 staged (v2)' },
+								{ k: 'Tests', v: '48 live + 22 staged (v2)' },
 								{ k: 'Owner powers', v: 'Interface fee only (≤ 1%)' },
 								{ k: 'External audit', v: 'None' },
 								{ k: 'Network', v: 'Ethereum + Base · Sepolia demo' }

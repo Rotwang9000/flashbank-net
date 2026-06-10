@@ -48,6 +48,7 @@ feature is self-contained and has its own README: [`flashloans/`](../flashloans/
 
 - [Concurrent test guide](development/CONCURRENT_TEST_GUIDE.md)
 - [ConnectKit upgrade notes](development/CONNECTKIT_UPGRADE.md)
+- [MCP server for AI agents](../mcp/README.md) — browse/quote/transact over the Model Context Protocol
 
 ## Marketing
 

@@ -1,5 +1,33 @@
 # FlashBank Changelog
 
+## v3.2 - v2 hardening, landing page + MCP server for agents (2026-06-10)
+
+### 🛡️ P2P v2 hardened after an adversarial review (still NOT deployed)
+- **Reviewed** the staged `FlashBankP2PLoanV2` for abuse vectors before go-live; the full 15-point
+  analysis now lives in `docs/design/P2P_V2_COOLING_OFF.md`. Two real issues found and fixed:
+- **Added** a minimum vested-fee floor (`MIN_VESTED_FEE_BPS` = 10%): the cooling-off rebate no longer
+  lets anyone consume a rival's listing (and burn its non-refundable boost) for ~nothing — every take
+  now pays the lender at least a tenth of the agreed fee, while a fake-token victim still exits cheaply.
+- **Added** pull-payout fallbacks (`unclaimed` + `withdrawUnclaimed`): a blocklisted/reverting recipient
+  can no longer brick the other party's settlement — a blocked lender cannot force a borrower into
+  default, and a hostile borrower cannot jam a lender's default claim. Found latent in v1 too.
+- **Added** `BlocklistToken` test mock; v2 suite now 22 cases (70 across the loans project).
+
+### 🌐 Website
+- **Added** a proper landing page at `/` introducing both products on equal footing (the root used to
+  redirect straight to the flash-loan app), plus a custom 404, `sitemap.xml` and `robots.txt`.
+- Logos now link home; audit page reflects the hardened v2 and new test counts.
+
+### 🤖 MCP server (`mcp/`) — agents can flashbank now
+- **Added** a self-contained Model Context Protocol server: 14 tools covering an `explain` primer,
+  chain/wallet status, P2P offer browsing + full loan detail, flash-loan pool stats + fee quotes, and
+  gated writes (create/take/repay/claim-default/cancel + Sepolia faucet).
+- **Safety model:** read-only with zero config; writes need `FLASHBANK_MCP_PRIVATE_KEY`; mainnet writes
+  additionally need `FLASHBANK_MCP_ALLOW_MAINNET=true`. Takes pin the exact reviewed terms on-chain
+  (terms hash where supported, version pin on the older Sepolia build — feature-detected).
+- **Tested:** 14 unit/protocol tests (including a real stdio MCP handshake) + a live read-only smoke
+  against the deployed contracts. Registered for Cursor via `.cursor/mcp.json` (read-only default).
+
 ## v3.1 - Mainnet P2P, faucets, cleaner URLs + v2 prep (2026-06-09)
 
 ### 🚀 P2P live on mainnet

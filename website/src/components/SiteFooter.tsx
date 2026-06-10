@@ -51,6 +51,7 @@ export default function SiteFooter() {
 					<Col title="Products">
 						<FooterLink href="/flash"><Zap className="h-3.5 w-3.5 text-blue-600" /> Flash Loans</FooterLink>
 						<FooterLink href="/p2p"><Coins className="h-3.5 w-3.5 text-emerald-600" /> P2P Loans</FooterLink>
+						<FooterLink href="/">Home</FooterLink>
 					</Col>
 
 					<Col title="Learn">

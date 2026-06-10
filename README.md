@@ -87,10 +87,12 @@ front end never invites an unknown/fake token (the contract itself stays permiss
 it directly).
 
 **Next version (prepared, not deployed).** [`FlashBankP2PLoanV2`](loans/contracts/FlashBankP2PLoanV2.sol)
-adds on-chain token sanity-validation and a **graduated cooling-off rebate**: the flat fee vests from ~0 over
-a short window so a near-instant return costs almost nothing (killing fake-token fee-farming), with a
-same-block guard so it cannot be used as a free flash loan. Written and unit-tested (17 cases), awaiting
-review before deploy — see [docs/design/P2P_V2_COOLING_OFF.md](docs/design/P2P_V2_COOLING_OFF.md).
+adds on-chain token sanity-validation, a **graduated cooling-off rebate** (the flat fee vests from a 10%
+floor so a near-instant return is cheap — killing fake-token fee-farming — while consuming a listing is
+never free, and a same-block guard stops free flash loans), and **pull-payout fallbacks** so a
+blocklisted recipient can never brick the other party's repayment or default claim. Adversarially
+reviewed and unit-tested (22 cases), awaiting final review before deploy — full pitfall analysis in
+[docs/design/P2P_V2_COOLING_OFF.md](docs/design/P2P_V2_COOLING_OFF.md).
 
 ### Live on Sepolia (playground — testnet only, no real value)
 
@@ -111,6 +113,17 @@ ones to show ranking). Redeploy with `cd loans && npx hardhat run scripts/deploy
 
 ---
 
+## For AI agents (MCP)
+
+The repo ships a self-contained **Model Context Protocol server** ([`mcp/`](mcp)) so agents can
+flashbank too: browse open P2P offers, get quotes, check flash-loan liquidity and fees — and, with
+an explicitly configured throwaway key, post/take/repay loans and use the Sepolia faucet. Reads need
+no configuration; **mainnet writes are double-gated** behind `FLASHBANK_MCP_PRIVATE_KEY` *and*
+`FLASHBANK_MCP_ALLOW_MAINNET=true`. Takes always pin the exact reviewed terms on-chain. Details and
+the tool catalogue: [`mcp/README.md`](mcp/README.md).
+
+---
+
 ## Repository layout
 
 Each feature is a **self-contained Hardhat project**. The two never import each other's Solidity,
@@ -122,6 +135,7 @@ flashloans/           Flash-loan router feature — own contracts/, test/, scrip
 loans/                P2P term-loan feature — own contracts/, test/, scripts/, deployments/, hardhat.config.js
 common/               Shared toolchain (hardhat.base.js) inherited by both features — do not delete
 website/              Next.js front end (static export, deployed to flashbank.net) — showcases both features
+mcp/                  Model Context Protocol server so AI agents can browse/quote/transact (see mcp/README.md)
 docs/                 Documentation (see docs/README.md) — architecture, security, deployment, design
 package.json          Thin root: installs the shared dependencies and runs both features' scripts
 ```

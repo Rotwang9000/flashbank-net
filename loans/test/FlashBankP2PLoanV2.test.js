@@ -26,6 +26,11 @@ describe("FlashBankP2PLoanV2", () => {
 	const COOLING_MIN_CAP = 24n * 60n * 60n; // 1 day
 	// Minimum (and default) cooling window for the 7-day term used here: 10% of 604800s = 60480s.
 	const COOLING_DEFAULT_7D = (BigInt(DURATION) * COOLING_MIN_BPS) / 10_000n; // 60480
+	// Anti-griefing floor: 10% of the agreed fee vests immediately (first non-activation block).
+	const MIN_VESTED_FEE_BPS = 1000n;
+	const FEE_FLOOR = (REPAY_FEE * MIN_VESTED_FEE_BPS) / 10_000n;
+	// Vested fee at `elapsed` seconds into the default 7-day cooling window.
+	const vestedFee = (elapsed) => FEE_FLOOR + ((REPAY_FEE - FEE_FLOOR) * BigInt(elapsed)) / COOLING_DEFAULT_7D;
 
 	function buildParams(overrides = {}) {
 		return {
@@ -115,37 +120,46 @@ describe("FlashBankP2PLoanV2", () => {
 			expect(await p2p.minCoolingOff(DURATION)).to.equal(COOLING_DEFAULT_7D);
 		});
 
-		it("charges roughly nothing for a near-immediate (next-block) exit", async () => {
+		it("charges only the 10% floor (plus a sliver) for a near-immediate exit", async () => {
 			await p2p.connect(lender).createLoan(buildParams());
 			await p2p.connect(borrower).take(0);
 			const loan = await p2p.getLoan(0);
 
-			// Exit 1 second in: fee = REPAY_FEE * 1 / coolingOff (a tiny sliver).
+			// Exit 1 second in: fee = floor + (fee - floor) * 1 / coolingOff — essentially the floor.
 			await time.setNextBlockTimestamp(Number(loan.startTime) + 1);
-			const expectedFee = (REPAY_FEE * 1n) / COOLING_DEFAULT_7D;
-			expect(expectedFee).to.be.gt(0n);
-			expect(expectedFee).to.be.lt(REPAY_FEE / 1000n); // < 0.1% of the agreed fee
+			const expectedFee = vestedFee(1);
+			expect(expectedFee).to.be.gte(FEE_FLOOR);
+			expect(expectedFee).to.be.lt(FEE_FLOOR + REPAY_FEE / 1000n); // floor + <0.1% of the fee
 
 			await expect(p2p.connect(borrower).repay(0))
 				.to.emit(p2p, "LoanRepaid")
 				.withArgs(0, borrower.address, lender.address, PRINCIPAL + expectedFee, expectedFee);
 		});
 
-		it("charges half the fee at the half-way point of the cooling window", async () => {
+		it("charges floor + half the remainder (55%) at the half-way point of the window", async () => {
 			await p2p.connect(lender).createLoan(buildParams());
 			await p2p.connect(borrower).take(0);
 			const loan = await p2p.getLoan(0);
 
 			const half = Number(COOLING_DEFAULT_7D) / 2; // 30240s
 			await time.setNextBlockTimestamp(Number(loan.startTime) + half);
-			const expectedFee = REPAY_FEE / 2n;
+			const expectedFee = FEE_FLOOR + (REPAY_FEE - FEE_FLOOR) / 2n; // 10% + 45% = 55%
+			expect(expectedFee).to.equal((REPAY_FEE * 5500n) / 10_000n);
 
 			await expect(p2p.connect(borrower).repay(0))
 				.to.emit(p2p, "LoanRepaid")
 				.withArgs(0, borrower.address, lender.address, PRINCIPAL + expectedFee, expectedFee);
 
-			// Lender earned exactly half the agreed fee.
+			// Lender earned exactly the vested fee.
 			expect(await principal.balanceOf(lender.address)).to.equal(MINT + expectedFee);
+		});
+
+		it("never charges less than the floor (anti-griefing: consuming a listing costs 10% of the fee)", async () => {
+			await p2p.connect(lender).createLoan(buildParams());
+			await p2p.connect(borrower).take(0);
+			// Next block, minimal elapsed time: a griefer who takes-and-repays to kill the listing
+			// still pays the lender at least the floor.
+			expect(await p2p.effectiveFee(0)).to.be.gte(FEE_FLOOR);
 		});
 
 		it("charges the FULL fee on a same-block take+repay (free-flash-loan guard)", async () => {
@@ -264,6 +278,97 @@ describe("FlashBankP2PLoanV2", () => {
 			await expect(p2p.connect(lender).claimDefault(0))
 				.to.emit(p2p, "LoanDefaulted")
 				.withArgs(0, lender.address, COLLATERAL, 0n);
+		});
+	});
+
+	describe("Pull-payout fallback (a blocked recipient cannot brick settlement)", () => {
+		let blockToken, blockAddr;
+
+		beforeEach(async () => {
+			const Block = await ethers.getContractFactory("BlocklistToken");
+			blockToken = await Block.deploy();
+			await blockToken.waitForDeployment();
+			blockAddr = await blockToken.getAddress();
+			for (const who of [lender, borrower]) {
+				await blockToken.mint(who.address, MINT);
+				await blockToken.connect(who).approve(p2pAddr, ethers.MaxUint256);
+			}
+		});
+
+		it("repay succeeds when the lender is blocked; payout queues and is withdrawable after unblock", async () => {
+			// Principal is the blocklisting token: lender lends BLOCK, borrower pledges tCOLL.
+			await p2p.connect(lender).createLoan(buildParams({ principalToken: blockAddr }));
+			await p2p.connect(borrower).take(0);
+			const loan = await p2p.getLoan(0);
+
+			await blockToken.setBlocked(lender.address, true);
+
+			// Past the cooling window => the full fee is owed.
+			await time.setNextBlockTimestamp(Number(loan.startTime) + Number(COOLING_DEFAULT_7D) + 10);
+			const owed = PRINCIPAL + REPAY_FEE;
+			await expect(p2p.connect(borrower).repay(0))
+				.to.emit(p2p, "PayoutQueued").withArgs(blockAddr, lender.address, owed);
+
+			// Borrower got their collateral back; the lender's funds are held as unclaimed.
+			expect(await collateral.balanceOf(borrower.address)).to.equal(MINT);
+			expect(await p2p.unclaimed(blockAddr, lender.address)).to.equal(owed);
+
+			// Still blocked => withdraw reverts and the queued balance is preserved.
+			await expect(p2p.connect(lender).withdrawUnclaimed(blockAddr)).to.be.reverted;
+			expect(await p2p.unclaimed(blockAddr, lender.address)).to.equal(owed);
+
+			// Unblock and withdraw: lender net = -PRINCIPAL escrowed +owed back = +REPAY_FEE.
+			await blockToken.setBlocked(lender.address, false);
+			await expect(p2p.connect(lender).withdrawUnclaimed(blockAddr))
+				.to.emit(p2p, "UnclaimedWithdrawn").withArgs(blockAddr, lender.address, owed);
+			expect(await blockToken.balanceOf(lender.address)).to.equal(MINT + REPAY_FEE);
+			expect(await p2p.unclaimed(blockAddr, lender.address)).to.equal(0n);
+		});
+
+		it("claimDefault succeeds when the borrower blocks the surplus leg; surplus queues for them", async () => {
+			// Collateral is the blocklisting token; the agreed rate values the collateral at 2x the
+			// debt, so half must return to the borrower as surplus on default.
+			const debt = PRINCIPAL + REPAY_FEE;
+			await p2p.connect(lender).createLoan(buildParams({
+				collateralToken: blockAddr,
+				settlementValue: debt * 2n,
+			}));
+			await p2p.connect(borrower).take(0);
+			const loan = await p2p.getLoan(0);
+
+			await blockToken.setBlocked(borrower.address, true);
+			await time.setNextBlockTimestamp(Number(loan.startTime) + DURATION + GRACE + 1);
+
+			const toLender = COLLATERAL / 2n;
+			const surplus = COLLATERAL - toLender;
+			await expect(p2p.connect(lender).claimDefault(0))
+				.to.emit(p2p, "LoanDefaulted").withArgs(0, lender.address, toLender, surplus);
+
+			expect(await p2p.unclaimed(blockAddr, borrower.address)).to.equal(surplus);
+
+			await blockToken.setBlocked(borrower.address, false);
+			await p2p.connect(borrower).withdrawUnclaimed(blockAddr);
+			expect(await blockToken.balanceOf(borrower.address)).to.equal(MINT - COLLATERAL + surplus);
+		});
+
+		it("repay queues the collateral return if the borrower is blocked on the collateral token", async () => {
+			await p2p.connect(lender).createLoan(buildParams({ collateralToken: blockAddr }));
+			await p2p.connect(borrower).take(0);
+			const loan = await p2p.getLoan(0);
+
+			await blockToken.setBlocked(borrower.address, true);
+			await time.setNextBlockTimestamp(Number(loan.startTime) + Number(COOLING_DEFAULT_7D) + 10);
+			await p2p.connect(borrower).repay(0);
+
+			expect(await p2p.unclaimed(blockAddr, borrower.address)).to.equal(COLLATERAL);
+			await blockToken.setBlocked(borrower.address, false);
+			await p2p.connect(borrower).withdrawUnclaimed(blockAddr);
+			expect(await blockToken.balanceOf(borrower.address)).to.equal(MINT);
+		});
+
+		it("withdrawUnclaimed reverts when nothing is queued", async () => {
+			await expect(p2p.connect(stranger).withdrawUnclaimed(principalAddr))
+				.to.be.revertedWithCustomError(p2p, "NothingUnclaimed");
 		});
 	});
 });

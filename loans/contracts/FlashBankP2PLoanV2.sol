@@ -14,11 +14,15 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
  *
  *         The live contract is {FlashBankP2PLoan} (v1), deployed and verified on Ethereum + Base.
  *         v1 is immutable and is intentionally left untouched (its source must keep matching the
- *         on-chain bytecode). V2 is the staging ground for two additions that are *contract-level*
+ *         on-chain bytecode). V2 is the staging ground for additions that are *contract-level*
  *         and so cannot be retrofitted onto v1:
  *
  *           1. Token sanity validation at offer creation (see {_validateToken}).
- *           2. A graduated "cooling-off" rebate on the repayment fee (see {_effectiveFee}).
+ *           2. A graduated "cooling-off" rebate on the repayment fee (see {_effectiveFee}),
+ *              floored at {MIN_VESTED_FEE_BPS} so consuming a listing is never free (anti-griefing).
+ *           3. Pull-payout fallback for settlement legs to non-callers (see {_sendOrQueue} and
+ *              {withdrawUnclaimed}) so a blocklisted/reverting recipient can never brick the other
+ *              party's repay or default claim.
  *
  * @dev Everything else mirrors v1 exactly (time-only liquidation, no oracle, optional surplus
  *      return, listing/boost/service fees, version + terms pinning). Only the two features above
@@ -64,6 +68,12 @@ contract FlashBankP2PLoanV2 is Ownable, ReentrancyGuard {
 	uint64 public constant COOLING_MIN_FLOOR = 10 minutes;
 	uint64 public constant COOLING_MIN_CAP = 1 days;
 	uint8 public constant MAX_TOKEN_DECIMALS = 36;     // reject absurd ERC-20 metadata
+
+	// Minimum share of the agreed fee that vests immediately (anti-griefing floor). Without it, a
+	// rival could take any open offer and repay next block for ~nothing — consuming the listing and
+	// burning its non-refundable boost. With the floor, every take costs at least 10% of the agreed
+	// fee, paid to the lender, while a fake-token victim still escapes for a tenth of the fee.
+	uint16 public constant MIN_VESTED_FEE_BPS = 1000;  // 10% of repaymentFee
 
 	enum Status {
 		None,
@@ -140,6 +150,10 @@ contract FlashBankP2PLoanV2 is Ownable, ReentrancyGuard {
 	address public protocolFeeRecipient;
 	uint16 public protocolFeeBps;
 
+	/// @notice Payouts that could not be delivered (recipient blocked/reverting at settlement time),
+	///         held for pull-withdrawal: token => recipient => amount. See {_sendOrQueue}.
+	mapping(address => mapping(address => uint256)) public unclaimed;
+
 	error InvalidToken();
 	error InvalidAmount();
 	error InvalidDuration();
@@ -162,6 +176,7 @@ contract FlashBankP2PLoanV2 is Ownable, ReentrancyGuard {
 	error UnexpectedTokenBalance();
 	error OfferVersionMismatch();
 	error OfferTermsMismatch();
+	error NothingUnclaimed();
 
 	event ProtocolFeeRecipientUpdated(address indexed oldRecipient, address indexed newRecipient);
 	event ProtocolFeeBpsUpdated(uint16 oldBps, uint16 newBps);
@@ -187,6 +202,9 @@ contract FlashBankP2PLoanV2 is Ownable, ReentrancyGuard {
 		uint256 surplusToBorrower
 	);
 	event LoanCancelled(uint256 indexed id, address indexed creator);
+	/// @dev A settlement payout could not be delivered and was queued for pull-withdrawal.
+	event PayoutQueued(address indexed token, address indexed to, uint256 amount);
+	event UnclaimedWithdrawn(address indexed token, address indexed to, uint256 amount);
 
 	constructor(address _protocolFeeRecipient, uint16 _protocolFeeBps) {
 		if (_protocolFeeBps > MAX_PROTOCOL_FEE_BPS) revert InvalidProtocolFee();
@@ -373,6 +391,11 @@ contract FlashBankP2PLoanV2 is Ownable, ReentrancyGuard {
 	 * @dev Only the borrower may repay, and only within `maturity + gracePeriod`. The fee charged is
 	 *      the *vested* portion of `repaymentFee` ({_effectiveFee}), so an early exit costs little and
 	 *      a same-block round-trip costs the full fee.
+	 *
+	 *      Both outbound payouts use {_sendOrQueue}: if the lender cannot receive the principal token
+	 *      (e.g. a blocklist), repayment still completes and the lender's payout is queued — a blocked
+	 *      lender can no longer force the borrower into default. Likewise the collateral return queues
+	 *      rather than bricking the repayment.
 	 */
 	function repay(uint256 id) external nonReentrant {
 		Loan storage loan = loans[id];
@@ -388,8 +411,8 @@ contract FlashBankP2PLoanV2 is Ownable, ReentrancyGuard {
 		uint256 feePaid = _effectiveFee(loan);
 		uint256 owed = loan.principal + feePaid;
 		_pullExact(loan.principalToken, borrower, owed);
-		_send(loan.principalToken, lender, owed);
-		_send(loan.collateralToken, borrower, loan.collateral);
+		_sendOrQueue(loan.principalToken, lender, owed);
+		_sendOrQueue(loan.collateralToken, borrower, loan.collateral);
 
 		emit LoanRepaid(id, borrower, lender, owed, feePaid);
 	}
@@ -399,6 +422,10 @@ contract FlashBankP2PLoanV2 is Ownable, ReentrancyGuard {
 	 * @dev Identical to v1: with a `settlementValue` set, the lender keeps only the collateral covering
 	 *      `principal + repaymentFee` (the FULL agreed fee — default is not an early exit) and any
 	 *      surplus returns to the borrower; with `settlementValue == 0` the lender takes all.
+	 *
+	 *      The surplus leg uses {_sendOrQueue}: a borrower who cannot (or maliciously will not) receive
+	 *      the surplus can no longer brick the lender's claim — the surplus queues for pull-withdrawal.
+	 *      The lender's own leg stays strict: the lender is the caller, so a failure only delays them.
 	 */
 	function claimDefault(uint256 id) external nonReentrant {
 		Loan storage loan = loans[id];
@@ -414,10 +441,23 @@ contract FlashBankP2PLoanV2 is Ownable, ReentrancyGuard {
 		(uint256 toLender, uint256 toBorrower) = _splitCollateralOnDefault(loan);
 		_send(loan.collateralToken, lender, toLender);
 		if (toBorrower > 0) {
-			_send(loan.collateralToken, borrower, toBorrower);
+			_sendOrQueue(loan.collateralToken, borrower, toBorrower);
 		}
 
 		emit LoanDefaulted(id, lender, toLender, toBorrower);
+	}
+
+	/**
+	 * @notice Withdraw payouts that could not be delivered to you at settlement time (see {unclaimed}).
+	 * @dev Zeroed before sending; reverts if the transfer still fails (e.g. still blocklisted) so the
+	 *      balance is preserved for a later attempt.
+	 */
+	function withdrawUnclaimed(address token) external nonReentrant {
+		uint256 amount = unclaimed[token][msg.sender];
+		if (amount == 0) revert NothingUnclaimed();
+		unclaimed[token][msg.sender] = 0;
+		_send(token, msg.sender, amount);
+		emit UnclaimedWithdrawn(token, msg.sender, amount);
 	}
 
 	/// @notice Cancel an untaken offer and reclaim the escrow (any spent `boost` is not refunded).
@@ -609,10 +649,12 @@ contract FlashBankP2PLoanV2 is Ownable, ReentrancyGuard {
 	}
 
 	/**
-	 * @dev The fee actually owed on repayment — the agreed `repaymentFee` vested linearly over the
-	 *      cooling window. A same-block take+repay (the signature of a free intra-block/flash loan,
-	 *      not a cooling-off exit) pays the FULL fee. Rounded down, in the borrower's favour, and never
-	 *      exceeds the agreed fee.
+	 * @dev The fee actually owed on repayment — the agreed `repaymentFee` vested linearly from the
+	 *      {MIN_VESTED_FEE_BPS} floor to the full amount over the cooling window. A same-block
+	 *      take+repay (the signature of a free intra-block/flash loan, not a cooling-off exit) pays
+	 *      the FULL fee. The floor means even an instant exit pays 10% of the agreed fee, so consuming
+	 *      someone's listing (and its boost) is never free. Rounded down, in the borrower's favour,
+	 *      and never exceeds the agreed fee.
 	 */
 	function _effectiveFee(Loan storage loan) internal view returns (uint256) {
 		uint256 fee = loan.repaymentFee;
@@ -630,7 +672,8 @@ contract FlashBankP2PLoanV2 is Ownable, ReentrancyGuard {
 		if (elapsed >= cooling) {
 			return fee;
 		}
-		return (fee * elapsed) / cooling;
+		uint256 floorFee = (fee * MIN_VESTED_FEE_BPS) / FEE_DENOMINATOR;
+		return floorFee + ((fee - floorFee) * elapsed) / cooling;
 	}
 
 	/// @dev Snapshot the listing fee: only charged when the offer opts in and a recipient exists.
@@ -700,5 +743,27 @@ contract FlashBankP2PLoanV2 is Ownable, ReentrancyGuard {
 			return;
 		}
 		IERC20(token).safeTransfer(to, amount);
+	}
+
+	/**
+	 * @dev Send `amount` to `to`, but if the transfer fails (blocklisted recipient, reverting hook, a
+	 *      false return), credit it to {unclaimed} for pull-withdrawal instead of reverting the whole
+	 *      settlement. Used only for payouts to parties OTHER than the caller, so nobody can brick
+	 *      someone else's repay/claim by being unable (or unwilling) to receive. Mirrors SafeERC20's
+	 *      success test: ok = call succeeded AND (no return data OR decoded true).
+	 *      A token that returns success without moving funds defrauds its holder either way; queueing
+	 *      is not triggered, and no accounting here relies on the contract's token balance.
+	 */
+	function _sendOrQueue(address token, address to, uint256 amount) internal {
+		if (amount == 0) {
+			return;
+		}
+		(bool success, bytes memory data) = token.call(abi.encodeCall(IERC20.transfer, (to, amount)));
+		bool ok = success && (data.length == 0 || (data.length >= 32 && abi.decode(data, (bool))));
+		if (ok) {
+			return;
+		}
+		unclaimed[token][to] += amount;
+		emit PayoutQueued(token, to, amount);
 	}
 }

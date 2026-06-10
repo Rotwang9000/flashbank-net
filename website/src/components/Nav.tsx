@@ -51,7 +51,7 @@ export default function Nav({ active, networks, chainId, onSelectNetwork, isConn
 	return (
 		<header className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-gray-200">
 			<div className="container mx-auto px-4 sm:px-6 py-3 flex flex-wrap gap-x-4 gap-y-3 justify-between items-center">
-				<a href="/flash" className="flex items-center gap-2.5 shrink-0">
+				<a href="/" className="flex items-center gap-2.5 shrink-0">
 					<div className="w-9 h-9 bg-gray-900 rounded-xl flex items-center justify-center shadow-sm">
 						<Zap className="h-5 w-5 text-white" />
 					</div>

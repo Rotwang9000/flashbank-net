@@ -1,0 +1,30 @@
+{
+	"name": "@flashbank/mcp",
+	"version": "1.0.0",
+	"private": true,
+	"description": "MCP server exposing the FlashBank contracts (P2P term loans + flash-loan router) to AI agents.",
+	"type": "module",
+	"main": "src/server.js",
+	"bin": {
+		"flashbank-mcp": "src/server.js"
+	},
+	"scripts": {
+		"start": "node src/server.js",
+		"test": "node --test test/",
+		"smoke": "node scripts/smoke.js"
+	},
+	"keywords": [
+		"mcp",
+		"model-context-protocol",
+		"defi",
+		"flash-loans",
+		"p2p-lending",
+		"agents"
+	],
+	"license": "MIT",
+	"dependencies": {
+		"@modelcontextprotocol/sdk": "^1.29.0",
+		"ethers": "^6.16.0",
+		"zod": "^4.4.3"
+	}
+}

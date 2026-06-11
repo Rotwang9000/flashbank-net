@@ -1,5 +1,16 @@
 # FlashBank Changelog
 
+## v3.3.1 - MCP 1.1.0: Glama listing, resources, prompts, annotations (2026-06-11)
+
+- **Listed on Glama**: https://glama.ai/mcp/servers/Rotwang9000/flashbank-net — added the repo-root
+  `glama.json` (maintainer claim) so the listing can be managed and re-indexed.
+- **Annotations on all 15 tools** (`readOnlyHint`/`destructiveHint`/`idempotentHint`/`openWorldHint`)
+  so agent clients — and Glama's tool index — can reason about risk per call.
+- **Added MCP resources** (`flashbank://guide|chains|cooling-off|safety`) and **guided prompts**
+  (`play_on_sepolia`, `lend_assets`, `borrow_against_collateral`), plus connect-time `instructions`.
+- **Packaging**: renamed to `flashbank-mcp` (npm-publishable with `bin`, `files`, repo metadata) and
+  added a `Dockerfile`; protocol test now covers instructions, annotations, resources and prompts.
+
 ## v3.3 - P2P v2 live on the Sepolia playground (2026-06-10)
 
 ### 🚀 FlashBankP2PLoanV2 deployed (testnet first)

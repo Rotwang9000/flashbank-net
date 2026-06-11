@@ -13,6 +13,7 @@ test('the server speaks MCP: initialize, tools/list and an offline tools/call', 
 	try {
 		const init = await server.initialize('flashbank-protocol-test');
 		assert.equal(init.result.serverInfo.name, 'flashbank');
+		assert.match(init.result.instructions ?? '', /verb, not a bank/i, 'connect-time instructions should orient the model');
 
 		const list = await server.request('tools/list', {});
 		const names = list.result.tools.map((t) => t.name).sort();
@@ -27,11 +28,43 @@ test('the server speaks MCP: initialize, tools/list and an offline tools/call', 
 			assert.ok(names.includes(expected), `missing tool ${expected}`);
 		}
 
+		// Safety annotations are what let agent clients reason about tool risk — assert the
+		// extremes: a read tool, an irreversible write and a reversible write.
+		const tool = (name) => list.result.tools.find((t) => t.name === name);
+		assert.equal(tool('explain').annotations.readOnlyHint, true);
+		assert.equal(tool('p2p_claim_default').annotations.readOnlyHint, false);
+		assert.equal(tool('p2p_claim_default').annotations.destructiveHint, true);
+		assert.equal(tool('p2p_create_offer').annotations.destructiveHint, false);
+		assert.equal(tool('faucet_mint').annotations.idempotentHint, false);
+
 		const explain = await server.callTool('explain');
 		assert.match(explain.explainer, /flashbank.*verb/i);
 		assert.match(explain.explainer, /P2P TERM LOANS/);
 		assert.match(explain.explainer, /FLASH LOANS/);
 		assert.match(explain.explainer, /cooling-off/i);
+
+		// Resources: reference docs readable without spending a tool call.
+		const resources = await server.request('resources/list', {});
+		const uris = resources.result.resources.map((r) => r.uri).sort();
+		for (const expected of ['flashbank://guide', 'flashbank://chains', 'flashbank://cooling-off', 'flashbank://safety']) {
+			assert.ok(uris.includes(expected), `missing resource ${expected}`);
+		}
+		const guide = await server.request('resources/read', { uri: 'flashbank://guide' });
+		assert.match(guide.result.contents[0].text, /verb/i);
+		const chains = await server.request('resources/read', { uri: 'flashbank://chains' });
+		const registry = JSON.parse(chains.result.contents[0].text);
+		const sepolia = registry.chains.find((c) => c.key === 'sepolia');
+		assert.equal(sepolia.p2pVersion, 2);
+		assert.equal(sepolia.playground, true);
+
+		// Prompts: guided workflows.
+		const prompts = await server.request('prompts/list', {});
+		const promptNames = prompts.result.prompts.map((p) => p.name);
+		for (const expected of ['play_on_sepolia', 'lend_assets', 'borrow_against_collateral']) {
+			assert.ok(promptNames.includes(expected), `missing prompt ${expected}`);
+		}
+		const playground = await server.request('prompts/get', { name: 'play_on_sepolia', arguments: {} });
+		assert.match(playground.result.messages[0].content.text, /faucet_mint/);
 
 		// Write tools refuse politely in read-only mode (no key in this spawn).
 		await assert.rejects(

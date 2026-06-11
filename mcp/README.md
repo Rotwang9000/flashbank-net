@@ -1,11 +1,18 @@
 # FlashBank MCP server
 
+[![Listed on Glama](https://img.shields.io/badge/Glama-flashbank-blue)](https://glama.ai/mcp/servers/Rotwang9000/flashbank-net)
+
 A [Model Context Protocol](https://modelcontextprotocol.io) server that lets AI agents browse,
 quote and (optionally) transact with the FlashBank contracts — the **P2P term-loan escrow** and the
 **flash-loan router** — on Ethereum, Base, Arbitrum and the Sepolia playground.
 
 Self-contained: inline minimal ABIs, public RPCs, no Hardhat compilation needed. Read tools work
-with **zero configuration**; write tools are opt-in and safety-gated.
+with **zero configuration**; write tools are opt-in and safety-gated. Beyond the 15 tools it
+serves **resources** (`flashbank://guide`, `flashbank://chains`, `flashbank://cooling-off`,
+`flashbank://safety`), **guided prompts** (`play_on_sepolia`, `lend_assets`,
+`borrow_against_collateral`) and connect-time instructions, and every tool carries MCP safety
+annotations (`readOnlyHint` / `destructiveHint` / `idempotentHint`) so agent clients can reason
+about risk before calling anything.
 
 ```bash
 cd mcp && npm install && npm test     # 16 tests incl. a full MCP stdio handshake — no network/key needed
@@ -58,10 +65,24 @@ are deliberately double-gated and the contracts carry **no external audit**.
 Flash loans are quote/read only by design: executing one requires a smart contract implementing the
 borrower callback, which is not something an MCP tool should improvise.
 
-## Using it from Cursor
+## Resources & prompts
 
-The repo ships a project-level `.cursor/mcp.json` that registers this server in **read-only** mode.
-To enable writes, add env vars (throwaway key!):
+| Resource | Content |
+| --- | --- |
+| `flashbank://guide` | The product primer (same text as `explain`) |
+| `flashbank://chains` | Chain/contract/token registry as JSON, incl. per-chain contract versions |
+| `flashbank://cooling-off` | The v2 fee-vesting model with the exact formula |
+| `flashbank://safety` | The write-gating model and agent rules of thumb |
+
+| Prompt | Workflow |
+| --- | --- |
+| `play_on_sepolia` | Safe first session: faucet → post → inspect → cancel, narrated |
+| `lend_assets` | Compose a sensible lend offer (cushion, fee, term, surplus-return) and place it |
+| `borrow_against_collateral` | Shortlist offers, compare true cost + default risk, take with pinned terms |
+
+## Installation
+
+**From this repo** (works today):
 
 ```json
 {
@@ -77,7 +98,31 @@ To enable writes, add env vars (throwaway key!):
 }
 ```
 
-Any other MCP client works the same way — stdio transport, command `node mcp/src/server.js`.
+The repo ships a project-level `.cursor/mcp.json` that registers it for Cursor in **read-only**
+mode (omit the `env` block and it stays read-only). Claude Desktop uses the same JSON shape in
+`claude_desktop_config.json`; Claude Code: `claude mcp add flashbank -- node mcp/src/server.js`.
+
+**Via npm** (once published as [`flashbank-mcp`](https://www.npmjs.com/package/flashbank-mcp)):
+
+```json
+{
+	"mcpServers": {
+		"flashbank": {
+			"command": "npx",
+			"args": ["-y", "flashbank-mcp"]
+		}
+	}
+}
+```
+
+**Via Docker**:
+
+```bash
+cd mcp && docker build -t flashbank-mcp .
+docker run -i --rm flashbank-mcp                # read-only
+```
+
+Any other MCP client works the same way — stdio transport, command `node src/server.js`.
 
 ## Environment variables
 
@@ -94,12 +139,16 @@ src/chains.js         chain registry (addresses, tokens, RPCs, p2pVersion) — u
 src/abi.js            inline minimal ABIs, version-aware (v1 mainnets, v2 Sepolia playground)
 src/clients.js        providers, signer, write gate, token resolution, allowances
 src/format.js         pure formatting helpers (unit-tested)
-src/server.js         the MCP server + tool definitions
+src/server.js         the MCP server: tools, resources, prompts, annotations
 scripts/mcp-client.js minimal stdio client shared by the protocol test and the drill
 scripts/smoke.js      live read-only smoke against the real deployments
 scripts/drill.js      live two-agent lifecycle drill on Sepolia
 test/                 node:test suites incl. a full MCP stdio protocol test
+Dockerfile            container build (stdio entrypoint), used by hosts like Glama
 ```
+
+The listing on [Glama](https://glama.ai/mcp/servers/Rotwang9000/flashbank-net) is maintained via
+the repo-root `glama.json`.
 
 The Sepolia playground runs **`FlashBankP2PLoanV2`** (`0x536f…1E76`): cooling-off rebate, token
 validation and pull-payouts (see `docs/design/P2P_V2_COOLING_OFF.md`). Mainnets stay on v1 until

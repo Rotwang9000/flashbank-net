@@ -25,7 +25,19 @@ import {
 } from './format.js';
 
 const SERVER_NAME = 'flashbank';
-const SERVER_VERSION = '1.0.0';
+const SERVER_VERSION = '1.1.0';
+
+// Shown to the model by MCP clients at connect time — orientation, not documentation.
+const INSTRUCTIONS = `FlashBank MCP ("flashbank" is a verb, not a bank): browse, quote and optionally transact
+with the FlashBank P2P term-loan escrow and flash-loan router on Ethereum, Base, Arbitrum and the
+Sepolia playground.
+
+Start with the "explain" tool (or the flashbank://guide resource) before acting. Read tools are
+always available. Write tools need FLASHBANK_MCP_PRIVATE_KEY (use a throwaway key) and stay
+Sepolia-only unless FLASHBANK_MCP_ALLOW_MAINNET=true — mainnet moves real, unaudited-contract
+assets, so prefer the play-money playground. Before taking any offer, review it with p2p_get_loan
+(check the on-default split and, on v2 chains, the cooling-off rebate); takes pin the reviewed
+terms on-chain so a re-priced offer reverts instead of surprising you.`;
 
 const DEFAULT_LIST_LIMIT = 20;
 const MAX_LIST_LIMIT = 100;
@@ -130,21 +142,146 @@ async function scanLoans(p2p, keep, maxMatches) {
 	return { total, matches };
 }
 
+/**
+ * Read-only reference documents exposed as MCP resources, so clients can pull context without
+ * spending a tool call. Everything here is static or derived from the static chain registry.
+ */
+function registerResources(server) {
+	const textResource = (uri, text, mimeType = 'text/plain') => ({ contents: [{ uri, text, mimeType }] });
+
+	server.registerResource('guide', 'flashbank://guide', {
+		title: 'FlashBank primer',
+		description: 'Plain-English primer on both products, the loan lifecycle, fees and safety rules (same text as the explain tool).',
+		mimeType: 'text/plain',
+	}, async (uri) => textResource(uri.href, EXPLAINER));
+
+	server.registerResource('chains', 'flashbank://chains', {
+		title: 'Chain & contract registry',
+		description: 'Supported chains with deployed contract addresses, contract versions, registry tokens and explorers.',
+		mimeType: 'application/json',
+	}, async (uri) => {
+		const chains = chainKeys().map((key) => {
+			const chain = getChain(key);
+			return {
+				key,
+				name: chain.name,
+				chainId: chain.chainId,
+				playground: chain.isPlayground,
+				p2pLoan: chain.p2pLoan || null,
+				p2pVersion: chain.p2pVersion,
+				flashRouter: chain.flashRouter,
+				tokens: chain.tokens,
+				explorer: chain.explorer,
+			};
+		});
+		return textResource(uri.href, JSON.stringify({ chains }, null, '\t'), 'application/json');
+	});
+
+	server.registerResource('cooling-off', 'flashbank://cooling-off', {
+		title: 'v2 cooling-off fee model',
+		description: 'How the flat fee vests on FlashBankP2PLoanV2 chains (Sepolia playground): the early-repay rebate, the 10% floor and the same-block guard.',
+		mimeType: 'text/plain',
+	}, async (uri) => textResource(uri.href, `FlashBankP2PLoanV2 cooling-off fee model (live on the Sepolia playground)
+
+The agreed flat fee (repaymentFee) is a MAXIMUM that vests over the loan's coolingOff window:
+
+  elapsed  = now - startTime
+  floorFee = repaymentFee * 10%                      (MIN_VESTED_FEE_BPS = 1000)
+  feeNow   = repaymentFee                            if same block as activation
+           = repaymentFee                            if elapsed >= coolingOff
+           = floorFee + (repaymentFee - floorFee) * elapsed / coolingOff   otherwise
+
+Consequences:
+- Repay almost immediately -> pay ~10% of the agreed fee (a fake-token victim escapes cheaply).
+- The 10% floor means consuming someone's listing is never free (anti-griefing).
+- A same-block take+repay still pays the FULL fee (no free flash loans through the escrow).
+- The window: creators may set coolingOff >= the protocol minimum (10% of the term, clamped to
+  [10 minutes, 1 day]); 0 means "use the minimum". Longer windows are more borrower-friendly.
+
+Tools: p2p_get_loan shows "toRepayNow" (vested quote) on active v2 loans; p2p_repay reports the
+fee actually paid and any rebate. Mainnets run v1 (no vesting) until v2 graduates.`));
+
+	server.registerResource('safety', 'flashbank://safety', {
+		title: 'Write-safety model',
+		description: 'How writes are gated (env vars), what the audit status is, and which chain agents should practise on.',
+		mimeType: 'text/plain',
+	}, async (uri) => textResource(uri.href, `FlashBank MCP write-safety model
+
+Mode                 Requirement                              Allows
+read-only (default)  nothing                                  browsing, quotes, pool stats
+playground writes    FLASHBANK_MCP_PRIVATE_KEY                create/take/repay/claim/cancel + faucet on Sepolia
+mainnet writes       ... and FLASHBANK_MCP_ALLOW_MAINNET=true the same on Ethereum/Base with REAL assets
+
+Rules of thumb for agents:
+- Use a dedicated throwaway key; never one holding meaningful funds.
+- The contracts are open-source and Etherscan-verified but carry NO external audit.
+- Practise on Sepolia: fpUSD/fpETH are faucet-minted play money (faucet_mint tool).
+- Review any offer with p2p_get_loan before taking; the take pins the reviewed terms on-chain.
+- Flash loans are quote/read-only here: executing one needs a borrower-callback contract.`));
+}
+
+/** Guided workflows exposed as MCP prompts. Arguments are strings per the MCP spec. */
+function registerPrompts(server) {
+	const userMessage = (text) => ({ messages: [{ role: 'user', content: { type: 'text', text } }] });
+
+	server.registerPrompt('play_on_sepolia', {
+		title: 'Try FlashBank on the playground',
+		description: 'A safe first session: mint play-money, post a small offer, inspect it, and exercise the v2 cooling-off rebate on Sepolia.',
+	}, () => userMessage(`Walk me through a complete FlashBank P2P session on the Sepolia playground (play-money only):
+1. Call explain, then wallet_status on sepolia — if writes are disabled, stop and tell me how to enable them safely (throwaway key).
+2. Mint fpUSD and fpETH with faucet_mint.
+3. Post a small lend offer with p2p_create_offer (e.g. lend 50 fpUSD against 0.2 fpETH, flat fee 2 fpUSD, 7-day term) and show me the resulting loan with p2p_get_loan.
+4. List the market with p2p_list_offers and explain how mine ranks against the seeded/boosted ones.
+5. Explain what would happen next as borrower: the cooling-off rebate if they repay early (use the flashbank://cooling-off resource), and the on-default split.
+6. Cancel my offer with p2p_cancel and confirm the escrow came back.
+Keep amounts tiny, narrate each step, and show transaction links.`));
+
+	server.registerPrompt('lend_assets', {
+		title: 'Post a sensible lend offer',
+		description: 'Compose and post a P2P lend offer with sane terms: collateral cushion, fee sizing, term, cooling-off window and surplus-return choice.',
+		argsSchema: {
+			chain: z.string().optional().describe('Chain key (default sepolia; mainnets need the explicit env gate)'),
+			principal: z.string().optional().describe('Amount + token to lend, e.g. "100 fpUSD"'),
+			termDays: z.string().optional().describe('Loan term in days, e.g. "14"'),
+		},
+	}, ({ chain, principal, termDays }) => userMessage(`I want to lend ${principal || 'a small amount'} on ${chain || 'sepolia'} for ${termDays || 'about 14'} days through FlashBank P2P.
+1. Check wallet_status and my balance; if the chain is a playground, faucet_mint what's missing.
+2. Propose terms and JUSTIFY them: collateral asset + amount (sensible cushion over the principal at current rough rates), a flat fee (typically 1-5% of principal scaled by term), a grace period, whether to set settlementValue so surplus collateral returns to the borrower on default (fairer; recommended), and on v2 chains whether the default cooling-off window suffices.
+3. Show me the exact p2p_create_offer call you intend, wait for nothing, then place it.
+4. Confirm with p2p_get_loan and tell me how to monitor it (p2p_my_loans) and what happens at maturity, repayment and default.`));
+
+	server.registerPrompt('borrow_against_collateral', {
+		title: 'Find and take a borrow offer',
+		description: 'Browse open offers, evaluate the real cost and default risk of the best candidates, then take one with the terms pinned on-chain.',
+		argsSchema: {
+			chain: z.string().optional().describe('Chain key (default sepolia)'),
+			need: z.string().optional().describe('What you want to borrow, e.g. "100 fpUSD"'),
+		},
+	}, ({ chain, need }) => userMessage(`I want to borrow ${need || 'some tokens'} on ${chain || 'sepolia'} through FlashBank P2P.
+1. Browse with p2p_list_offers and shortlist up to 3 offers that match what I need.
+2. For each, call p2p_get_loan and compare: total repayment (principal + flat fee — on v2 chains also the vested "toRepayNow" if I exit early), the collateral I must lock, the term + grace, and EXACTLY what I lose on default (full forfeit vs surplus returned).
+3. Recommend one with reasoning; check my balances cover the collateral (wallet_status, faucet_mint on playgrounds).
+4. Take it with p2p_take_offer (this pins the reviewed terms on-chain) and show the repayment deadline, then remind me how to repay (p2p_repay) and what the cooling-off rebate would save if I repay early.`));
+}
+
 function buildServer() {
-	const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION });
+	const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions: INSTRUCTIONS });
+
+	registerResources(server);
+	registerPrompts(server);
 
 	// ------------------------------------------------------------------ meta / read tools
 
 	server.registerTool('explain', {
 		title: 'Explain FlashBank',
 		description: 'Plain-English primer on both FlashBank products, the loan lifecycle, fees and safety rules. Call this first if you are unsure how anything works.',
-		annotations: { readOnlyHint: true },
+		annotations: { readOnlyHint: true, openWorldHint: false, idempotentHint: true },
 	}, safe(async () => jsonContent({ explainer: EXPLAINER })));
 
 	server.registerTool('list_chains', {
 		title: 'List chains',
 		description: 'Supported chains with contract addresses, registry tokens and whether writes are currently permitted for each.',
-		annotations: { readOnlyHint: true },
+		annotations: { readOnlyHint: true, openWorldHint: false, idempotentHint: true },
 	}, safe(async () => {
 		const chains = chainKeys().map((key) => {
 			const chain = getChain(key);
@@ -176,7 +313,7 @@ function buildServer() {
 		title: 'Wallet status',
 		description: 'Address, native balance and registry-token balances of the configured signing wallet on one chain. Reports read-only mode when no key is set.',
 		inputSchema: { chain: CHAIN_ENUM.describe('Chain to inspect') },
-		annotations: { readOnlyHint: true },
+		annotations: { readOnlyHint: true, openWorldHint: true },
 	}, safe(async ({ chain }) => {
 		if (!hasSigner()) {
 			return jsonContent({ mode: 'read-only', detail: 'No FLASHBANK_MCP_PRIVATE_KEY configured; all write tools are disabled.' });
@@ -208,7 +345,7 @@ function buildServer() {
 			chain: CHAIN_ENUM.describe('Chain to browse'),
 			limit: z.number().int().min(1).max(MAX_LIST_LIMIT).optional().describe(`Max offers to return (default ${DEFAULT_LIST_LIMIT})`),
 		},
-		annotations: { readOnlyHint: true },
+		annotations: { readOnlyHint: true, openWorldHint: true },
 	}, safe(async ({ chain, limit }) => {
 		const p2p = getP2P(chain);
 		const max = limit || DEFAULT_LIST_LIMIT;
@@ -235,7 +372,7 @@ function buildServer() {
 			chain: CHAIN_ENUM,
 			id: z.number().int().nonnegative().describe('Loan id'),
 		},
-		annotations: { readOnlyHint: true },
+		annotations: { readOnlyHint: true, openWorldHint: true },
 	}, safe(async ({ chain, id }) => {
 		const p2p = getP2P(chain);
 		const loan = await p2p.getLoan(id);
@@ -287,7 +424,7 @@ function buildServer() {
 			chain: CHAIN_ENUM,
 			address: z.string().optional().describe('Address to look up (defaults to the signing wallet)'),
 		},
-		annotations: { readOnlyHint: true },
+		annotations: { readOnlyHint: true, openWorldHint: true },
 	}, safe(async ({ chain, address }) => {
 		let who = address;
 		if (!who) {
@@ -316,7 +453,7 @@ function buildServer() {
 		title: 'Flash-loan pools',
 		description: 'Per-token flash-loan liquidity on a chain: committed amount, live available liquidity, fee, per-loan cap and provider count.',
 		inputSchema: { chain: CHAIN_ENUM },
-		annotations: { readOnlyHint: true },
+		annotations: { readOnlyHint: true, openWorldHint: true },
 	}, safe(async ({ chain }) => {
 		const chainCfg = getChain(chain);
 		const router = getRouter(chain);
@@ -356,7 +493,7 @@ function buildServer() {
 			token: z.string().describe('Token symbol (e.g. "WETH") or 0x address'),
 			amount: z.string().describe('Human amount to borrow, e.g. "250"'),
 		},
-		annotations: { readOnlyHint: true },
+		annotations: { readOnlyHint: true, openWorldHint: true },
 	}, safe(async ({ chain, token, amount }) => {
 		const info = await resolveToken(chain, token);
 		const raw = parseAmount(amount, info.decimals);
@@ -379,7 +516,8 @@ function buildServer() {
 
 	server.registerTool('p2p_create_offer', {
 		title: 'Create a P2P offer',
-		description: 'Post a loan offer (you lend) or borrow request (you borrow) on-chain. Escrows your side immediately: lenders escrow the principal, borrowers escrow the collateral. Requires a signing key; mainnet additionally requires FLASHBANK_MCP_ALLOW_MAINNET=true.',
+		description: 'Post a loan offer (you lend) or borrow request (you borrow) on-chain. Escrows your side immediately: lenders escrow the principal, borrowers escrow the collateral. Reversible via p2p_cancel while untaken. Requires a signing key; mainnet additionally requires FLASHBANK_MCP_ALLOW_MAINNET=true.',
+		annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
 		inputSchema: {
 			chain: CHAIN_ENUM,
 			side: z.enum(['lend', 'borrow']).describe('"lend" = you provide the principal; "borrow" = you provide the collateral'),
@@ -458,7 +596,8 @@ function buildServer() {
 
 	server.registerTool('p2p_take_offer', {
 		title: 'Take a P2P offer',
-		description: 'Accept an open offer, pinning the EXACT terms currently on-chain (takeWithTerms) so a last-second re-price reverts instead of surprising you. Approves and escrows your side, which activates the loan. Requires a signing key (mainnet gated).',
+		description: 'Accept an open offer, pinning the EXACT terms currently on-chain (takeWithTerms) so a last-second re-price reverts instead of surprising you. Approves and escrows your side, which activates the loan — a BINDING commitment until repaid or defaulted. Requires a signing key (mainnet gated).',
+		annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
 		inputSchema: {
 			chain: CHAIN_ENUM,
 			id: z.number().int().nonnegative().describe('Loan id to take'),
@@ -506,6 +645,7 @@ function buildServer() {
 	server.registerTool('p2p_repay', {
 		title: 'Repay a P2P loan',
 		description: 'Repay an active loan you borrowed, redeeming your collateral. On v2 chains (Sepolia) the fee is the VESTED amount — repaying inside the cooling-off window is rebated down to a 10% floor. Requires the signing wallet to be the borrower (mainnet gated).',
+		annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
 		inputSchema: { chain: CHAIN_ENUM, id: z.number().int().nonnegative() },
 	}, safe(async ({ chain, id }) => {
 		assertWritesAllowed(chain);
@@ -548,7 +688,8 @@ function buildServer() {
 
 	server.registerTool('p2p_claim_default', {
 		title: 'Claim a defaulted P2P loan',
-		description: 'After the repay window closes unpaid, the lender claims the collateral (any agreed surplus returns to the borrower). Requires the signing wallet to be the lender (mainnet gated).',
+		description: 'After the repay window closes unpaid, the lender claims the collateral (any agreed surplus returns to the borrower). Irreversibly settles the loan. Requires the signing wallet to be the lender (mainnet gated).',
+		annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
 		inputSchema: { chain: CHAIN_ENUM, id: z.number().int().nonnegative() },
 	}, safe(async ({ chain, id }) => {
 		assertWritesAllowed(chain);
@@ -574,6 +715,7 @@ function buildServer() {
 	server.registerTool('p2p_cancel', {
 		title: 'Cancel an open P2P offer',
 		description: 'Cancel an offer you created that has not been taken, reclaiming your escrow (any boost spend is not refunded). Mainnet gated.',
+		annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
 		inputSchema: { chain: CHAIN_ENUM, id: z.number().int().nonnegative() },
 	}, safe(async ({ chain, id }) => {
 		assertWritesAllowed(chain);
@@ -586,6 +728,7 @@ function buildServer() {
 	server.registerTool('p2p_withdraw_unclaimed', {
 		title: 'Withdraw queued payouts (v2)',
 		description: 'v2 chains (Sepolia) only: if a settlement payout to you could not be delivered (e.g. a blocklisting token), it queues on-chain — this checks your queued balance for a token and withdraws it.',
+		annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
 		inputSchema: {
 			chain: CHAIN_ENUM,
 			token: z.string().describe('Token symbol or 0x address the payout was in'),
@@ -610,6 +753,7 @@ function buildServer() {
 	server.registerTool('faucet_mint', {
 		title: 'Mint Sepolia play-money',
 		description: 'Mint a free batch of 10,000 fpUSD or fpETH (valueless playground tokens) to the signing wallet on Sepolia. The safe way for agents to get funds to experiment with.',
+		annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
 		inputSchema: { token: z.enum(['fpUSD', 'fpETH']).describe('Which playground token to mint') },
 	}, safe(async ({ token }) => {
 		const chain = playgroundKey();

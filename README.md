@@ -119,7 +119,10 @@ ones to show ranking and one with a creator-set 2-day cooling window). Redeploy 
 
 ## For AI agents (MCP)
 
-The repo ships a self-contained **Model Context Protocol server** ([`mcp/`](mcp)) so agents can
+[![Listed on Glama](https://img.shields.io/badge/Glama-flashbank-blue)](https://glama.ai/mcp/servers/Rotwang9000/flashbank-net)
+
+The repo ships a self-contained **Model Context Protocol server** ([`mcp/`](mcp), [listed on
+Glama](https://glama.ai/mcp/servers/Rotwang9000/flashbank-net)) so agents can
 flashbank too: browse open P2P offers, get quotes, check flash-loan liquidity and fees — and, with
 an explicitly configured throwaway key, post/take/repay loans and use the Sepolia faucet. Reads need
 no configuration; **mainnet writes are double-gated** behind `FLASHBANK_MCP_PRIVATE_KEY` *and*

@@ -1,5 +1,7 @@
 # FlashBank MCP server
 
+[![npm](https://img.shields.io/npm/v/%40flashbank%2Fmcp?label=%40flashbank%2Fmcp)](https://www.npmjs.com/package/@flashbank/mcp)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.Rotwang9000%2Fflashbank-8A2BE2)](https://registry.modelcontextprotocol.io/v0/servers?search=flashbank)
 [![Listed on Glama](https://img.shields.io/badge/Glama-flashbank-blue)](https://glama.ai/mcp/servers/Rotwang9000/flashbank-net)
 
 A [Model Context Protocol](https://modelcontextprotocol.io) server that lets AI agents browse,
@@ -82,38 +84,40 @@ borrower callback, which is not something an MCP tool should improvise.
 
 ## Installation
 
-**From this repo** (works today):
-
-```json
-{
-	"mcpServers": {
-		"flashbank": {
-			"command": "node",
-			"args": ["mcp/src/server.js"],
-			"env": {
-				"FLASHBANK_MCP_PRIVATE_KEY": "0x<throwaway-key-funded-on-sepolia>"
-			}
-		}
-	}
-}
-```
-
-The repo ships a project-level `.cursor/mcp.json` that registers it for Cursor in **read-only**
-mode (omit the `env` block and it stays read-only). Claude Desktop uses the same JSON shape in
-`claude_desktop_config.json`; Claude Code: `claude mcp add flashbank -- node mcp/src/server.js`.
-
-**Via npm** (once published as [`flashbank-mcp`](https://www.npmjs.com/package/flashbank-mcp)):
+**Via npm** (recommended — published as [`@flashbank/mcp`](https://www.npmjs.com/package/@flashbank/mcp)):
 
 ```json
 {
 	"mcpServers": {
 		"flashbank": {
 			"command": "npx",
-			"args": ["-y", "flashbank-mcp"]
+			"args": ["-y", "@flashbank/mcp"]
 		}
 	}
 }
 ```
+
+Add `"env": { "FLASHBANK_MCP_PRIVATE_KEY": "0x<throwaway-key>" }` to enable writes. Claude Desktop
+uses the same JSON shape in `claude_desktop_config.json`; Claude Code:
+`claude mcp add flashbank -- npx -y @flashbank/mcp`. The server is also listed in the
+[official MCP Registry](https://registry.modelcontextprotocol.io/v0/servers?search=flashbank) as
+`io.github.Rotwang9000/flashbank`, so registry-aware clients can discover and install it by name.
+
+**From this repo**:
+
+```json
+{
+	"mcpServers": {
+		"flashbank": {
+			"command": "node",
+			"args": ["mcp/src/server.js"]
+		}
+	}
+}
+```
+
+The repo ships a project-level `.cursor/mcp.json` that registers it for Cursor in **read-only**
+mode (no `env` block = read-only).
 
 **Via Docker**:
 

@@ -25,7 +25,7 @@ import {
 } from './format.js';
 
 const SERVER_NAME = 'flashbank';
-const SERVER_VERSION = '1.1.0';
+const SERVER_VERSION = '1.1.1';
 
 // Shown to the model by MCP clients at connect time — orientation, not documentation.
 const INSTRUCTIONS = `FlashBank MCP ("flashbank" is a verb, not a bank): browse, quote and optionally transact

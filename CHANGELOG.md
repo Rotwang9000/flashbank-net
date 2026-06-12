@@ -1,5 +1,19 @@
 # FlashBank Changelog
 
+## v3.3.2 - MCP 1.1.1 published: npm + official MCP Registry (2026-06-12)
+
+- **Published to npm** as [`@flashbank/mcp`](https://www.npmjs.com/package/@flashbank/mcp) (the
+  granular org token can't mint unscoped names, so `flashbank-mcp` became the org-scoped package;
+  the `flashbank-mcp` bin name is unchanged). `npx -y @flashbank/mcp` now works anywhere.
+- **Published to the official MCP Registry** as `io.github.Rotwang9000/flashbank` (`mcp/server.json`
+  + `mcpName` in `package.json`; namespace is case-sensitive — must match the GitHub login). Registry
+  consumers (PulseMCP etc.) index from there.
+- **Discoverability**: GitHub repo description/homepage/topics set (mcp, flash-loans, defi,
+  p2p-lending, …); landing page gained an "Agents can flashbank too" section with the npx one-liner;
+  `website/public/llms.txt` added for AI crawlers; npm/Registry badges on both READMEs.
+- **Launch kit** drafted at `docs/marketing/LAUNCH_KIT.md`: X thread, Show HN, Reddit copy and a
+  registry/directory status table.
+
 ## v3.3.1 - MCP 1.1.0: Glama listing, resources, prompts, annotations (2026-06-11)
 
 - **Listed on Glama**: https://glama.ai/mcp/servers/Rotwang9000/flashbank-net — added the repo-root

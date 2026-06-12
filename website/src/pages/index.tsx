@@ -3,7 +3,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import {
 	Zap, Coins, ArrowRight, ShieldCheck, Clock, Scale, Github, FileSearch,
-	Droplets, Wallet, Timer, BadgeCheck
+	Droplets, Wallet, Timer, BadgeCheck, Bot
 } from 'lucide-react';
 import SiteFooter from '../components/SiteFooter';
 import ContentHeader from '../components/ContentHeader';
@@ -150,6 +150,30 @@ export default function Home() {
 							<TrustItem icon={<Scale className="h-4 w-4" />} title="How it works" text="Plain-English walkthroughs, diagrams and a scenario calculator for the loan mechanics." href="/how-it-works" />
 							<TrustItem icon={<Github className="h-4 w-4" />} title="All code public" text="Contracts verified on Etherscan; the whole repo — site included — is on GitHub." href={GITHUB} external />
 							<TrustItem icon={<Droplets className="h-4 w-4" />} title="Try it free" text="A Sepolia playground with faucet play-money (fpETH/fpUSD) — experiment with big numbers at zero risk." href="/p2p" />
+						</div>
+					</section>
+
+					{/* Agents */}
+					<section className="pb-10">
+						<div className="bg-slate-900 rounded-2xl px-6 py-7 sm:px-8 text-slate-100">
+							<div className="flex items-center gap-2.5 mb-2">
+								<span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-700/60">
+									<Bot className="h-4 w-4 text-emerald-400" />
+								</span>
+								<h2 className="text-lg font-bold">Agents can flashbank too</h2>
+							</div>
+							<p className="text-sm text-slate-300 leading-relaxed max-w-2xl">
+								An open-source <strong className="text-slate-100">MCP server</strong> lets AI agents browse offers,
+								quote fees and check flash-loan liquidity with zero configuration — and, with an explicitly
+								configured throwaway key, transact on the Sepolia playground. Mainnet writes are double-gated.
+							</p>
+							<pre className="mt-4 bg-slate-950 border border-slate-700/60 rounded-xl px-4 py-3 text-sm font-mono text-emerald-300 overflow-x-auto">npx -y @flashbank/mcp</pre>
+							<div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-400">
+								<a href="https://www.npmjs.com/package/@flashbank/mcp" target="_blank" rel="noopener noreferrer" className="hover:text-slate-200 underline underline-offset-2">npm: @flashbank/mcp</a>
+								<a href="https://registry.modelcontextprotocol.io/v0/servers?search=flashbank" target="_blank" rel="noopener noreferrer" className="hover:text-slate-200 underline underline-offset-2">Official MCP Registry</a>
+								<a href="https://glama.ai/mcp/servers/Rotwang9000/flashbank-net" target="_blank" rel="noopener noreferrer" className="hover:text-slate-200 underline underline-offset-2">Glama</a>
+								<a href={`${GITHUB}/tree/master/mcp`} target="_blank" rel="noopener noreferrer" className="hover:text-slate-200 underline underline-offset-2">Docs &amp; tool catalogue</a>
+							</div>
 						</div>
 					</section>
 

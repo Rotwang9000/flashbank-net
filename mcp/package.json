@@ -1,6 +1,7 @@
 {
-	"name": "flashbank-mcp",
-	"version": "1.1.0",
+	"name": "@flashbank/mcp",
+	"version": "1.1.1",
+	"mcpName": "io.github.Rotwang9000/flashbank",
 	"description": "MCP server exposing the FlashBank contracts (P2P term loans + flash-loan router) to AI agents: browse offers, quote fees, and optionally transact on Ethereum, Base, Arbitrum and the Sepolia playground.",
 	"type": "module",
 	"main": "src/server.js",

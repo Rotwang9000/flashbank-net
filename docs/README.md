@@ -21,7 +21,7 @@ feature is self-contained and has its own README: [`flashloans/`](../flashloans/
 ## P2P term lending
 
 - [P2P lending design](design/P2P_LENDING_DESIGN.md)
-- [P2P v2 — token validation & cooling-off rebate](design/P2P_V2_COOLING_OFF.md) (prepared, not deployed)
+- [P2P v2 — token validation & cooling-off rebate](design/P2P_V2_COOLING_OFF.md) (live on the Sepolia playground)
 - [Lorrow standard compatibility](design/LORROW_COMPATIBILITY.md)
 
 ## Security
@@ -52,6 +52,7 @@ feature is self-contained and has its own README: [`flashloans/`](../flashloans/
 
 ## Marketing
 
+- [Launch kit](marketing/LAUNCH_KIT.md) — ready-to-post copy (X, HN, Reddit) + registry status
 - [Promotion strategy](marketing/PROMOTION_STRATEGY.md)
 - [Marketing content](marketing/MARKETING_CONTENT.md)
 

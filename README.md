@@ -119,10 +119,18 @@ ones to show ranking and one with a creator-set 2-day cooling window). Redeploy 
 
 ## For AI agents (MCP)
 
+[![npm](https://img.shields.io/npm/v/%40flashbank%2Fmcp?label=%40flashbank%2Fmcp)](https://www.npmjs.com/package/@flashbank/mcp)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.Rotwang9000%2Fflashbank-8A2BE2)](https://registry.modelcontextprotocol.io/v0/servers?search=flashbank)
 [![Listed on Glama](https://img.shields.io/badge/Glama-flashbank-blue)](https://glama.ai/mcp/servers/Rotwang9000/flashbank-net)
 
-The repo ships a self-contained **Model Context Protocol server** ([`mcp/`](mcp), [listed on
-Glama](https://glama.ai/mcp/servers/Rotwang9000/flashbank-net)) so agents can
+```bash
+npx -y @flashbank/mcp     # zero-config read-only MCP server, any MCP client
+```
+
+The repo ships a self-contained **Model Context Protocol server** ([`mcp/`](mcp), published as
+[`@flashbank/mcp`](https://www.npmjs.com/package/@flashbank/mcp), listed in the [official MCP
+Registry](https://registry.modelcontextprotocol.io/v0/servers?search=flashbank) and on
+[Glama](https://glama.ai/mcp/servers/Rotwang9000/flashbank-net)) so agents can
 flashbank too: browse open P2P offers, get quotes, check flash-loan liquidity and fees — and, with
 an explicitly configured throwaway key, post/take/repay loans and use the Sepolia faucet. Reads need
 no configuration; **mainnet writes are double-gated** behind `FLASHBANK_MCP_PRIVATE_KEY` *and*

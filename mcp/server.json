@@ -1,0 +1,43 @@
+{
+	"$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+	"name": "io.github.Rotwang9000/flashbank",
+	"title": "FlashBank",
+	"description": "Fixed-fee P2P term loans (no oracles) and flash loans on Ethereum, Base, Arbitrum and Sepolia.",
+	"repository": {
+		"url": "https://github.com/Rotwang9000/flashbank-net",
+		"source": "github"
+	},
+	"websiteUrl": "https://flashbank.net",
+	"version": "1.1.1",
+	"packages": [
+		{
+			"registryType": "npm",
+			"registryBaseUrl": "https://registry.npmjs.org",
+			"identifier": "@flashbank/mcp",
+			"version": "1.1.1",
+			"transport": {
+				"type": "stdio"
+			},
+			"environmentVariables": [
+				{
+					"name": "FLASHBANK_MCP_PRIVATE_KEY",
+					"description": "Optional EVM private key enabling write tools (create/take/repay offers, faucet). Omit for read-only mode. Use a throwaway key.",
+					"isRequired": false,
+					"isSecret": true
+				},
+				{
+					"name": "FLASHBANK_MCP_ALLOW_MAINNET",
+					"description": "Set to 'true' to allow write tools on mainnets (Ethereum, Base, Arbitrum). Defaults to Sepolia-only writes.",
+					"isRequired": false,
+					"isSecret": false
+				},
+				{
+					"name": "FLASHBANK_MCP_RPC_SEPOLIA",
+					"description": "Optional custom RPC URL override for Sepolia (similarly FLASHBANK_MCP_RPC_ETHEREUM / _BASE / _ARBITRUM).",
+					"isRequired": false,
+					"isSecret": false
+				}
+			]
+		}
+	]
+}

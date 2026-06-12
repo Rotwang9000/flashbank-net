@@ -1,0 +1,47 @@
+# FlashBank
+
+> To flashbank (verb): to move money on-chain without handing it to anyone. Two open-source,
+> self-custody products: atomic flash loans (liquidity never leaves provider wallets) and
+> fixed-term peer-to-peer loans (one flat fee, no interest, no price oracles — settlement is
+> decided purely by time). Live on Ethereum, Base and Arbitrum, with a free-play Sepolia
+> playground. Unaudited; all contracts verified on Etherscan.
+
+FlashBank is not a bank: it takes no deposits and never holds user funds. "flashbank" is
+always a verb.
+
+## Apps
+
+- [Flash loans](https://flashbank.net/flash): borrow within a single atomic transaction from
+  allowance-based liquidity; capped fees; immutable router (v3).
+- [P2P term loans](https://flashbank.net/p2p): post or take fixed-term collateralised offers in
+  a neutral escrow; repay before the deadline or the collateral becomes claimable. The Sepolia
+  playground runs v2 with a graduated cooling-off fee rebate and a faucet (fpETH/fpUSD).
+
+## For AI agents
+
+- [MCP server](https://github.com/Rotwang9000/flashbank-net/tree/master/mcp): `npx -y @flashbank/mcp` —
+  15 tools (browse, quote, optionally transact), resources and guided prompts. Reads need no
+  config; writes need an explicit throwaway key; mainnet writes are double-gated.
+- npm package: https://www.npmjs.com/package/@flashbank/mcp
+- Official MCP Registry name: io.github.Rotwang9000/flashbank
+- Glama listing: https://glama.ai/mcp/servers/Rotwang9000/flashbank-net
+
+## Documentation
+
+- [How it works](https://flashbank.net/how-it-works): plain-English walkthroughs and diagrams.
+- [Calculator](https://flashbank.net/calculator): interactive scenario calculator for loan outcomes.
+- [Security](https://flashbank.net/security): the threat model and the protections in place.
+- [Self-audit](https://flashbank.net/audit): a candid review of both products that leads with
+  the limitations; includes contract addresses and test counts.
+- [Lorrow compatibility](https://flashbank.net/lorrow): mapping to the Lorrow lending framework.
+- [Source code](https://github.com/Rotwang9000/flashbank-net): contracts, tests, site and MCP
+  server in one public repo (MIT).
+
+## Key facts
+
+- Flash-loan router: FlashBankRouterV3 on Ethereum, Base, Arbitrum and Sepolia.
+- P2P escrow: FlashBankP2PLoan v1 on Ethereum and Base; FlashBankP2PLoanV2 (cooling-off rebate,
+  token validation, pull-payouts) on the Sepolia playground.
+- Fees are fixed amounts agreed up front, never interest rates — compatible with interest-free
+  finance requirements.
+- No price oracles anywhere: loans settle on time, not on market moves.

@@ -3,7 +3,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import {
 	Zap, Coins, ArrowRight, ShieldCheck, Clock, Scale, Github, FileSearch,
-	Droplets, Wallet, Timer, BadgeCheck, Bot
+	Droplets, Wallet, Timer, BadgeCheck, Bot, Radar, Boxes, ExternalLink
 } from 'lucide-react';
 import SiteFooter from '../components/SiteFooter';
 import ContentHeader from '../components/ContentHeader';
@@ -173,6 +173,39 @@ export default function Home() {
 								<a href="https://registry.modelcontextprotocol.io/v0/servers?search=flashbank" target="_blank" rel="noopener noreferrer" className="hover:text-slate-200 underline underline-offset-2">Official MCP Registry</a>
 								<a href="https://glama.ai/mcp/servers/Rotwang9000/flashbank-net" target="_blank" rel="noopener noreferrer" className="hover:text-slate-200 underline underline-offset-2">Glama</a>
 								<a href={`${GITHUB}/tree/master/mcp`} target="_blank" rel="noopener noreferrer" className="hover:text-slate-200 underline underline-offset-2">Docs &amp; tool catalogue</a>
+							</div>
+						</div>
+					</section>
+
+					{/* Ecosystem — find the opportunity, then flashbank it */}
+					<section className="pb-10">
+						<div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-6 py-7 sm:px-8">
+							<div className="flex items-center gap-2.5 mb-2">
+								<span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+									<Radar className="h-4 w-4" />
+								</span>
+								<h2 className="text-lg font-bold text-gray-900">Find the opportunity, then flashbank it</h2>
+							</div>
+							<p className="text-sm text-gray-600 leading-relaxed max-w-2xl">
+								A flash loan is the <em>capital</em> — you still need the <em>opportunity</em> and a way to land it.{' '}
+								<a href="https://seneschal.space" target="_blank" rel="noopener noreferrer" className="font-medium text-gray-900 underline underline-offset-2 hover:text-blue-700">Seneschal</a>,
+								from the same author, is a pay-per-call data shop for searchers and agents that pairs naturally with FlashBank.
+							</p>
+							<div className="mt-4 grid sm:grid-cols-2 gap-3">
+								<div className="flex items-start gap-2.5 text-sm text-gray-700">
+									<span className="mt-0.5 shrink-0 text-blue-600"><Radar className="h-4 w-4" /></span>
+									<span>Free cross-protocol <strong>liquidation telemetry</strong> (Aave, Morpho, Spark, Compound) and builder-bid intel — spot the play, then flashbank the capital to execute it atomically.</span>
+								</div>
+								<div className="flex items-start gap-2.5 text-sm text-gray-700">
+									<span className="mt-0.5 shrink-0 text-blue-600"><Boxes className="h-4 w-4" /></span>
+									<span>An independent <strong>Ethereum block builder</strong> (<code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">rpc.seneschal.space</code>) to land your arbitrage or liquidation bundle. Like FlashBank, it ships an MCP server — no API key.</span>
+								</div>
+							</div>
+							<div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-gray-500">
+								<a href="https://seneschal.space" target="_blank" rel="noopener noreferrer" className="hover:text-gray-800 underline underline-offset-2 inline-flex items-center gap-1">seneschal.space <ExternalLink className="h-3 w-3" /></a>
+								<a href="https://api.seneschal.space/v1/builders/leaderboard?window=24h&amp;limit=10" target="_blank" rel="noopener noreferrer" className="hover:text-gray-800 underline underline-offset-2 inline-flex items-center gap-1">Builder leaderboard <ExternalLink className="h-3 w-3" /></a>
+								<a href="https://docs.seneschal.space" target="_blank" rel="noopener noreferrer" className="hover:text-gray-800 underline underline-offset-2 inline-flex items-center gap-1">Data docs <ExternalLink className="h-3 w-3" /></a>
+								<a href="https://mcp.seneschal.space/" target="_blank" rel="noopener noreferrer" className="hover:text-gray-800 underline underline-offset-2 inline-flex items-center gap-1">MCP server <ExternalLink className="h-3 w-3" /></a>
 							</div>
 						</div>
 					</section>

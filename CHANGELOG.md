@@ -1,5 +1,22 @@
 # FlashBank Changelog
 
+## v3.3.3 - Seneschal cross-promotion + landing polish (2026-06-14)
+
+- **Ecosystem cross-link to [Seneschal](https://seneschal.space)** (sister project, same author —
+  complementary, not a dependency). The two pair naturally for searchers: find/price a liquidation
+  or arbitrage on Seneschal and land the bundle via its block builder (`rpc.seneschal.space`),
+  flashbank the capital here to execute atomically.
+  - Landing page (`website/src/pages/index.tsx`): new "Find the opportunity, then flashbank it"
+    section — Seneschal's free liquidation telemetry (Aave/Morpho/Spark/Compound) + builder intel +
+    independent block builder, with links to the site, builder leaderboard, data docs and MCP server.
+  - Footer (`website/src/components/SiteFooter.tsx`): "Sister project: Seneschal" line on every page.
+  - `website/public/llms.txt`: new "Related projects" section so agents crawling FlashBank discover
+    Seneschal (also MCP-enabled).
+- **Polish**: `_app.tsx` AppKit metadata de-hyped — description now "Non-custodial flash loans and
+  fixed-term P2P loans — no deposits, no custody" (was the stale "Revolutionary trustless flash loans
+  with zero permanent risk"), and the wallet-modal icon points at the real `favicon.ico` (was a
+  non-existent `logo.png`). Static export rebuilt clean (16/16 pages).
+
 ## v3.3.2 - MCP 1.1.1 published: npm + official MCP Registry (2026-06-12)
 
 - **Published to npm** as [`@flashbank/mcp`](https://www.npmjs.com/package/@flashbank/mcp) (the

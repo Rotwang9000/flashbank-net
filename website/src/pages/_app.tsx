@@ -12,10 +12,10 @@ const queryClient = new QueryClient();
 const projectId = process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || 'demo-project-id';
 
 const metadata = {
-  name: 'FlashBank.net',
-  description: 'Revolutionary trustless flash loans with zero permanent risk',
+  name: 'FlashBank',
+  description: 'Non-custodial flash loans and fixed-term P2P loans — no deposits, no custody.',
   url: 'https://flashbank.net',
-  icons: ['https://flashbank.net/logo.png'],
+  icons: ['https://flashbank.net/favicon.ico'],
 };
 
 const networks = [mainnet, arbitrum, base, sepolia];

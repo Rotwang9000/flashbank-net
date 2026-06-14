@@ -46,6 +46,11 @@ export default function SiteFooter() {
 							Two ways to move money on-chain without giving up custody — atomic flash loans and
 							fixed-term peer-to-peer loans.
 						</p>
+						<p className="text-xs text-gray-400 mt-3">
+							Sister project:{' '}
+							<a href="https://seneschal.space" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-gray-900 underline underline-offset-2">Seneschal</a>{' '}
+							— liquidation data &amp; an Ethereum block builder for searchers.
+						</p>
 					</div>
 
 					<Col title="Products">

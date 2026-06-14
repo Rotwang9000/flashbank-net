@@ -26,6 +26,17 @@ always a verb.
 - Official MCP Registry name: io.github.Rotwang9000/flashbank
 - Glama listing: https://glama.ai/mcp/servers/Rotwang9000/flashbank-net
 
+## Related projects
+
+- Seneschal (https://seneschal.space) — by the same author; complementary, not a dependency.
+  Pay-per-call data and infrastructure for Ethereum searchers and AI agents: free cross-protocol
+  liquidation telemetry (Aave, Morpho, Spark, Compound), builder-bid / market-share intel, an
+  independent mainnet block builder (rpc.seneschal.space) to land bundles, and Monero/Zcash
+  view-key payment webhooks. It is x402-paid and MCP-enabled, so the two pair naturally: find and
+  price an opportunity on Seneschal, flashbank the capital here to execute it atomically, then land
+  the bundle through Seneschal's builder. MCP: https://mcp.seneschal.space/ · docs:
+  https://docs.seneschal.space/ · agent guide: https://seneschal.space/llms.txt
+
 ## Documentation
 
 - [How it works](https://flashbank.net/how-it-works): plain-English walkthroughs and diagrams.

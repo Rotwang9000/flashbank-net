@@ -1,0 +1,14 @@
+iFlashBank — non-custodial flash loans + fixed-term P2P loans. No deposits, no custody.	
+iAgent/MCP discovery card (Gopher-over-HTTPS). Lines: <type><label>TAB<selector>; h = follow URL.	
+i	
+hWebsite	URL:https://flashbank.net
+hllms.txt — agent guide	URL:https://flashbank.net/llms.txt
+hFlash-loan app	URL:https://flashbank.net/flash
+hP2P loans	URL:https://flashbank.net/p2p
+hMCP on npm (@flashbank/mcp)	URL:https://www.npmjs.com/package/@flashbank/mcp
+i	
+iSister projects (same author):	
+hSeneschal — Monero/Zcash payment webhooks + DeFi/builder data + live MCP registry	URL:https://seneschal.space/.well-known/agent.gopher
+hwinbit32 — non-custodial multi-chain wallet + agent private payments	URL:https://winbit32.com/.well-known/agent.gopher
+hsecresea — privacy NFT marketplace (Zcash shielded)	URL:https://secresea.com/.well-known/agent.gopher
+.

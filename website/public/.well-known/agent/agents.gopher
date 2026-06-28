@@ -1,0 +1,7 @@
+FlashBank — for agents
+======================
+MCP: npx -y @flashbank/mcp   (zero-config, read-only)
+Agent guide (prose): https://flashbank.net/llms.txt
+
+Read the flash-loan and P2P markets, then act through the apps below. Read
+access needs no key.

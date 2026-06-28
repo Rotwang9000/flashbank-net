@@ -1,0 +1,5 @@
+FlashBank — what this is
+========================
+Atomic flash loans and fixed-term peer-to-peer loans. Nothing is deposited and
+nothing is custodied: a flash loan borrows and repays inside one transaction,
+and P2P loans are matched directly between lender and borrower on fixed terms.

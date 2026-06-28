@@ -1,14 +1,18 @@
-iFlashBank — non-custodial flash loans + fixed-term P2P loans. No deposits, no custody.	
-iAgent/MCP discovery card (Gopher-over-HTTPS). Lines: <type><label>TAB<selector>; h = follow URL.	
+iFlashBank — Non-custodial flash loans + fixed-term P2P loans. No deposits, no custody.	
+iAgent/MCP discovery card (Gopher-over-HTTPS). Type 1 = drill in, 0 = read, h = follow URL.	
+i	
+0About — what this is (read here, no web tab)	/.well-known/agent/about.gopher
+0Agents — how agents/LLMs use it (llms.txt)	/.well-known/agent/agents.gopher
+1Actions — things you can do here	/.well-known/agent/actions.gopher
 i	
 hWebsite	URL:https://flashbank.net
 hllms.txt — agent guide	URL:https://flashbank.net/llms.txt
-hFlash-loan app	URL:https://flashbank.net/flash
-hP2P loans	URL:https://flashbank.net/p2p
 hMCP on npm (@flashbank/mcp)	URL:https://www.npmjs.com/package/@flashbank/mcp
+hSource (GitHub, MIT)	URL:https://github.com/Rotwang9000/flashbank-net
 i	
 iSister projects (same author):	
-hSeneschal — Monero/Zcash payment webhooks + DeFi/builder data + live MCP registry	URL:https://seneschal.space/.well-known/agent.gopher
-hwinbit32 — non-custodial multi-chain wallet + agent private payments	URL:https://winbit32.com/.well-known/agent.gopher
-hsecresea — privacy NFT marketplace (Zcash shielded)	URL:https://secresea.com/.well-known/agent.gopher
+hSeneschal — Monero/Zcash payment webhooks + Ethereum builder/DeFi data	URL:https://seneschal.space/.well-known/agent.gopher
+hwinbit32 — Non-custodial multi-chain wallet (a desktop in your browser): Z…	URL:https://winbit32.com/.well-known/agent.gopher
+hsecresea — Privacy NFT marketplace — NFTs (NFPTs) minted on Zcash, with fu…	URL:https://secresea.com/.well-known/agent.gopher
+hZecBus — Non-custodial Zcash mixing "departures" — board a shared shield…	URL:https://zecbus.com/.well-known/agent.gopher
 .

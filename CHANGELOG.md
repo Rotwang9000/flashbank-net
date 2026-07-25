@@ -1,5 +1,20 @@
 # FlashBank Changelog
 
+## Unreleased - UI defaults to Ethereum mainnet
+
+- **`/flash` and `/p2p` now open on Ethereum mainnet** instead of the Sepolia playground.
+  Sepolia stays fully available in the network switcher (faucet play-money, demo borrower).
+- **Flash demo panel** is gated on a configured `demoBorrower` address, so mainnets no longer
+  show a non-functional demo block.
+- **P2P create-disabled copy** no longer hard-pushes Sepolia when a chain simply has no escrow
+  yet (e.g. Arbitrum) — points at Ethereum, Base, or the playground instead.
+- **Quiet-market teaser**: when mainnet has zero offers / zero WETH committed, the apps pull
+  live Sepolia playground stats (open offers, fpETH liquidity) into a clearly labelled
+  play-money panel — looks busy without inventing mainnet TVL or locking real capital.
+- **Flash loan history** on `/flash`: live `FlashLoanExecuted` feed (chunked RPC lookback).
+  Seeded five Sepolia demo loans; MCP lifecycle drill re-run (create→take→repay→cancel).
+- **MCP** `npm test` glob fixed (`test/*.test.js`).
+
 ## v3.3.3 - Seneschal cross-promotion + landing polish (2026-06-14)
 
 - **Ecosystem cross-link to [Seneschal](https://seneschal.space)** (sister project, same author —

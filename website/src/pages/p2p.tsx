@@ -14,11 +14,13 @@ import { useIsMounted } from '../hooks/useIsMounted';
 import Nav from '../components/Nav';
 import SiteFooter from '../components/SiteFooter';
 import FaucetCard from '../components/FaucetCard';
+import PlaygroundTeaser, { isQuietMarket } from '../components/PlaygroundTeaser';
 import { p2pAbiFor, erc20Abi, minCoolingSecs, vestedFeeNow } from '../lib/p2pContracts';
 
 // "flashbank" is used here only as a VERB (you *flashbank* a loan). This product is a neutral
 // peer-to-peer escrow; it is not a bank and takes no custody as a financial institution.
 
+const MAINNET_CHAIN = 1;
 const PLAYGROUND_CHAIN = 11155111;
 
 const NETWORKS = {
@@ -156,8 +158,8 @@ export default function FlashbankLoan() {
 	const { disconnect } = useDisconnect();
 	const isMounted = useIsMounted();
 
-	// View defaults to the live playground so visitors see real offers before connecting.
-	const [selectedChainId, setSelectedChainId] = useState<number>(PLAYGROUND_CHAIN);
+	// View defaults to Ethereum mainnet; Sepolia remains available as the play-money playground.
+	const [selectedChainId, setSelectedChainId] = useState<number>(MAINNET_CHAIN);
 	useEffect(() => {
 		if (isConnected && walletChainId) setSelectedChainId(walletChainId);
 	}, [isConnected, walletChainId]);
@@ -591,7 +593,10 @@ export default function FlashbankLoan() {
 		: collateralNum;
 	const defaultBorrowerColl = Math.max(collateralNum - defaultLenderColl, 0);
 
-	const createDisabledReason = !ready ? 'Switch to Sepolia to use the playground'
+	const createDisabledReason = !ready
+		? (chainId === PLAYGROUND_CHAIN
+			? 'Contract address not configured for this network'
+			: 'No loan contract on this network yet — try Ethereum, Base, or the Sepolia playground')
 		: !isConnected ? 'Connect your wallet to post'
 			: principalNum <= 0 ? `Enter how much ${pInfo.symbol} to ${role === 'lend' ? 'lend' : 'borrow'}`
 				: collateralNum <= 0 ? `Enter the ${cInfo.symbol} collateral`
@@ -730,8 +735,16 @@ export default function FlashbankLoan() {
 								</button>
 							</div>
 							{browseOffers.length === 0 ? (
-								<EmptyState icon={<Search className="h-7 w-7" />} title="No open offers here yet"
-									body="Be the first to post one." action={<button onClick={() => setTab('create')} className="inline-flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700"><Plus className="h-4 w-4" /> Flashbank a loan</button>} />
+								<div className="space-y-4">
+									{isQuietMarket({ isPlayground: networkConfig.isPlayground, activity: openOffers.length }) && !loading && (
+										<PlaygroundTeaser product="p2p" onOpenPlayground={() => selectNetwork(PLAYGROUND_CHAIN)} />
+									)}
+									<EmptyState icon={<Search className="h-7 w-7" />} title="No open offers on this network yet"
+										body={networkConfig.isPlayground
+											? 'Mint from the faucet above and be the first to post one.'
+											: 'Mainnet is early — post the first real offer, or try the play-money market above.'}
+										action={<button onClick={() => setTab('create')} className="inline-flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700"><Plus className="h-4 w-4" /> Flashbank a loan</button>} />
+								</div>
 							) : (
 								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 									{browseOffers.map((l) => (

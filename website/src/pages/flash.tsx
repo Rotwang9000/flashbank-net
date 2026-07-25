@@ -9,6 +9,8 @@ import { useIsMounted } from '../hooks/useIsMounted';
 import Nav from '../components/Nav';
 import SiteFooter from '../components/SiteFooter';
 import FaucetCard from '../components/FaucetCard';
+import PlaygroundTeaser, { isQuietMarket } from '../components/PlaygroundTeaser';
+import FlashLoanHistory from '../components/FlashLoanHistory';
 
 const NETWORKS = {
 	1: {
@@ -111,6 +113,9 @@ const NETWORKS = {
 		demoCounter: process.env.NEXT_PUBLIC_SEPOLIA_DEMO_COUNTER_ADDRESS || ''
 	}
 } as const;
+
+const MAINNET_CHAIN = 1;
+const PLAYGROUND_CHAIN = 11155111;
 
 const ROUTER_ABI = [
 	{
@@ -244,12 +249,20 @@ const formatAddress = (addr?: string | null) => {
 
 export default function Home() {
 	const { address, isConnected } = useAppKitAccount();
-	const chainId = useChainId();
-	const publicClient = usePublicClient({ chainId });
-	const { data: walletClient } = useWalletClient();
+	const walletChainId = useChainId();
 	const { switchChain } = useSwitchChain();
 	const { disconnect } = useDisconnect();
 	const isMounted = useIsMounted();
+
+	// Browse defaults to Ethereum mainnet; follow the wallet once connected.
+	const [selectedChainId, setSelectedChainId] = useState<number>(MAINNET_CHAIN);
+	useEffect(() => {
+		if (isConnected && walletChainId) setSelectedChainId(walletChainId);
+	}, [isConnected, walletChainId]);
+
+	const chainId = selectedChainId;
+	const publicClient = usePublicClient({ chainId });
+	const { data: walletClient } = useWalletClient();
 
 	const [selectedTokenKey, setSelectedTokenKey] = useState('weth');
 	const [providerLimit, setProviderLimit] = useState<string>('0');
@@ -276,6 +289,7 @@ export default function Home() {
 	const [demoOutcome, setDemoOutcome] = useState<'none' | 'success' | 'blocked'>('none');
 	const [demoError, setDemoError] = useState<string | null>(null);
 	const [demoCounterTotal, setDemoCounterTotal] = useState('0');
+	const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
 	const networkConfig = NETWORKS[chainId as keyof typeof NETWORKS] || NETWORKS[1];
 	const selectedToken = useMemo(() => {
@@ -752,6 +766,7 @@ export default function Home() {
 				await loadAccountState();
 				await refreshPoolStats();
 				await loadDemoCounter();
+				setHistoryRefreshKey((k) => k + 1);
 				toast.success(failModeOverride ? 'Borrow attempt executed and repaid' : 'Demo completed successfully!');
 			}
 		} catch (error: any) {
@@ -766,6 +781,11 @@ export default function Home() {
 		} finally {
 			setIsRunningDemo(false);
 		}
+	};
+
+	const selectNetwork = (id: number) => {
+		setSelectedChainId(id);
+		if (isConnected) { try { switchChain({ chainId: id }); } catch { /* ignore */ } }
 	};
 
 	const networks = Object.entries(NETWORKS).map(([id, cfg]) => ({ id: Number(id), name: cfg.name }));
@@ -786,7 +806,7 @@ export default function Home() {
 					active="flash"
 					networks={networks}
 					chainId={chainId}
-					onSelectNetwork={(id) => switchChain({ chainId: id })}
+					onSelectNetwork={selectNetwork}
 					isConnected={isConnected}
 					address={address}
 					onDisconnect={disconnect}
@@ -836,7 +856,7 @@ export default function Home() {
 						<h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
 							<Zap className="h-5 w-5 text-blue-600" /> Flash Loans
 						</h2>
-						<p className="text-sm text-gray-500 mt-1">Provide WETH liquidity from your wallet, or run the live Sepolia demo end-to-end.</p>
+						<p className="text-sm text-gray-500 mt-1">Provide WETH liquidity from your wallet{networkConfig.demoBorrower ? ', or run the live demo end-to-end' : ''}.</p>
 					</div>
 
 					{/* Contract chip */}
@@ -875,7 +895,26 @@ export default function Home() {
 								<p className="text-2xl font-bold text-gray-900">{poolStats.feeBps} <span className="text-base font-medium text-gray-400">bps</span></p>
 							</div>
 						</div>
+						{isQuietMarket({ isPlayground: chainId === PLAYGROUND_CHAIN, activity: parseFloat(poolStats.committed) || 0 }) && (
+							<p className="text-xs text-gray-500 mt-4">
+								No WETH committed on {networkConfig.name} yet — be the first provider, or try the play-money pool below.
+							</p>
+						)}
 					</div>
+
+					{isQuietMarket({ isPlayground: chainId === PLAYGROUND_CHAIN, activity: parseFloat(poolStats.committed) || 0 }) && (
+						<PlaygroundTeaser product="flash" onOpenPlayground={() => selectNetwork(PLAYGROUND_CHAIN)} />
+					)}
+
+					{networkConfig.router && (
+						<FlashLoanHistory
+							publicClient={publicClient}
+							router={networkConfig.router}
+							explorer={networkConfig.explorer}
+							tokens={networkConfig.tokens.map((t) => ({ address: t.address, symbol: t.symbol, decimals: t.decimals }))}
+							refreshKey={historyRefreshKey}
+						/>
+					)}
 
 					{/* Faucet — Sepolia playground only (self-hides when a chain has no faucet tokens). */}
 					<FaucetCard
@@ -1042,8 +1081,8 @@ export default function Home() {
 						</div>
 					</div>
 
-					{/* Demo — the one-click borrower borrows native ETH (via WETH), so it only runs on a native token. */}
-					{selectedToken.native ? (
+					{/* Demo — Sepolia-only today (needs a deployed DemoBorrower). Shown only when configured. */}
+					{selectedToken.native && networkConfig.demoBorrower && (
 					<div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
 						<h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
 							<ArrowRightCircle className="h-5 w-5 text-purple-500" />
@@ -1205,7 +1244,8 @@ export default function Home() {
 							</div>
 						)}
 					</div>
-					) : (
+					)}
+					{!selectedToken.native && (
 					<div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
 						<h3 className="text-base font-semibold text-gray-900 mb-2 flex items-center gap-2">
 							<ArrowRightCircle className="h-5 w-5 text-purple-500" />

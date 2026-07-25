@@ -108,7 +108,7 @@ never send real assets.**
 | `PlaygroundToken` fpUSD (6d) | [`0x4aBb…760c`](https://sepolia.etherscan.io/address/0x4aBb056aA5aB39b55039ACAf795Ff9403Fa9760c#code) |
 | `PlaygroundToken` fpETH (18d) | [`0xB9CC…96F5`](https://sepolia.etherscan.io/address/0xB9CCa9CfE38e583CF1cf456F03946ac6376396F5#code) |
 
-Try it: open [`/p2p`](https://flashbank.net/p2p), switch to Sepolia, hit the
+Try it: open [`/p2p`](https://flashbank.net/p2p) (defaults to Ethereum mainnet), switch to Sepolia, hit the
 faucet to mint test tokens, then post or take an offer (a few offers are pre-seeded, including boosted
 ones to show ranking and one with a creator-set 2-day cooling window). Redeploy with
 `cd loans && npx hardhat run scripts/deploy-playground-v2.js --network sepolia`
